@@ -159,7 +159,9 @@ export class LaundryAccessory {
     }
     if (next && prev && next.state !== prev.state) {
       const left = next.remaining ? `, ${Math.round(next.remaining / 60)} min left` : '';
-      this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state, this.unit.kind)}${left}.`);
+      const course = next.course && (next.running || next.paused) ? ` (${stateLabel(next.course).toLowerCase()})` : '';
+      const wait = next.startsIn ? `, starts in ${duration(next.startsIn)}` : '';
+      this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state, this.unit.kind)}${course}${left}${wait}.`);
       if (next.error) {
         this.deps.log.warn(`[${this.options.name}] The machine reports an error${next.errorName ? `: ${next.errorName}` : ''}.`);
       }
@@ -278,4 +280,11 @@ export class LaundryAccessory {
 /** Update a characteristic only when its value changes (no needless events to the Home app). */
 function set(ch: Characteristic, value: CharacteristicValue): void {
   if (ch.value !== value) { ch.updateValue(value); }
+}
+
+/** "2 h 30 min", "45 min" */
+function duration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  return h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`;
 }

@@ -306,7 +306,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     const mapping = mappingFor(deviceType, profile);
     if (!mapping) {
       this.log.info(`"${alias}" (${deviceType}) isn't supported yet: its profile has nothing the Home app can show. To help add it, `
-        + 'run lg-thinq-diagnostics and attach its file to a "New appliance" issue: '
+        + 'run lg-thinq-diagnostics (see the README for where) and attach its file to a "New appliance" issue: '
         + 'https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues');
       return;
     }

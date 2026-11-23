@@ -263,6 +263,15 @@ function defineTests(hap: Hap): void {
     assert.equal(setup().acc.getServiceById(S.ContactSensor, 'door'), undefined);
   });
 
+  test('log lines: the course while running, and a delayed start', () => {
+    const { laundry, lines } = setup();
+    laundry.update(status());
+    laundry.update(status({ state: 'RESERVED', startsIn: 2 * 3600 + 30 * 60 }));
+    laundry.update(running({ state: 'RUNNING', course: 'HEAVY_DUTY', remaining: 85 * 60 }));
+    assert.ok(lines.includes('info: [Washer] Delayed start waiting, starts in 2 h 30 min.'));
+    assert.ok(lines.includes('info: [Washer] Washing (heavy duty), 85 min left.'));
+  });
+
   test('tapping the tile with control off: refused, the tile snaps back, the log says why', async () => {
     const { laundry, lines, sent } = setup();
     laundry.update(running({ remoteControl: true }));

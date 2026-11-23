@@ -126,14 +126,15 @@ anyone using this plugin. If you try one, please
 |---|---|---|
 | Washer, dryer | Tile with time left; done, problem, phase and tub-clean sensors; start and pause | **Tested** |
 | WashTower, wash combo | As washer and dryer, one set per drum | Experimental (always on) |
-| Dishwasher | As a washer, plus door and "rinse aid low" sensors | Experimental |
+| Dishwasher | As a washer, plus door and "rinse aid low" sensors; the course and a delayed start in the log | Experimental |
 | Styler, oven | As a washer: time left, done, problem | Experimental |
 | Air conditioner | Heater/cooler: on/off, cool / heat / auto (as the unit offers), room and set temperature (separate heating and cooling set points in auto, on units with two-set), fan speed (Auto at the top of the slider), swing. Switches, where the unit offers them: air purify, energy saving, display light, left-right swing, jet mode, dry mode, fan mode. Air quality, humidity and filter sensors; "problem" for a full water tank | Experimental (from real sample data) |
 | Refrigerator, wine cellar | Door-open sensor per door; set temperature per compartment; express modes as switches; water filter | Experimental |
 | Dehumidifier, humidifier | Humidifier tile: on/off, humidity now and target, fan speed; "problem" for a full tank | Experimental (dehumidifier from real sample data) |
 | Air purifier | Air purifier tile: on/off, auto or manual, fan speed (Auto at the top); a sleep mode switch; air quality (PM2.5, PM10), humidity and filter life when reported | Experimental (from real sample data) |
 | Ceiling fan, ventilator | Fan: on/off and speed | Experimental |
-| Range hood, over-the-range microwave | Fan with speed steps, and the light with brightness | Experimental (hood from real sample data) |
+| Range hood | Fan with speed steps, and the light with brightness | Experimental (from real sample data) |
+| Over-the-range microwave | Running and time left (to the second), "done" sensor, vent fan and light. LG's API has no cooking mode, power level or temperature | Experimental |
 | Water heater | Thermostat: on/off, tank and set temperature | Experimental |
 | Heat pump (system boiler) | Thermostat for room heating or cooling, and one for hot water | Experimental |
 | Robot vacuum | Switch, on while cleaning (on starts or resumes, off sends it home); battery | Experimental |
@@ -147,17 +148,25 @@ tiles show. LG's API can't choose wash programs, cooking modes and the like on a
 
 ### Help add or fix an appliance
 
-Run the diagnostics command on your Homebridge machine:
+Run the diagnostics command on your Homebridge machine. Homebridge installs plugins in its own
+folder, so the command is run from there:
 
 ```bash
+# Homebridge on a Raspberry Pi or Debian/Ubuntu (the official image or apt package)
+cd ~ && PATH=/opt/homebridge/bin:$PATH /var/lib/homebridge/node_modules/.bin/lg-thinq-diagnostics --country US
+
+# Homebridge in Docker (inside the container, for example with docker exec -it homebridge bash)
+cd /homebridge && node node_modules/homebridge-lg-thinq-connect/dist/bin/lg-thinq-diagnostics.js --country US
+
+# Plugin installed globally with npm install -g
 lg-thinq-diagnostics --country US
 ```
 
-It asks for your token without showing it, and saves `lg-diagnostics.json`: what LG reports
-about each appliance, with device IDs and serial numbers removed. Look it over, then attach it to
-a [new appliance issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose),
-with what works and what doesn't. If Homebridge's npm isn't on your path, run
-`node "$(npm root -g)/homebridge-lg-thinq-connect/dist/bin/lg-thinq-diagnostics.js"` instead.
+Use your LG account's country instead of US. It asks for your token without showing it, and saves
+`lg-diagnostics.json` in the current folder (your home folder in the first example): what LG reports
+about each appliance, with device IDs and serial numbers removed. Look it over, then attach it to a
+[new appliance issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose),
+with what works and what doesn't.
 
 ## Coming from homebridge-lg-thinq
 

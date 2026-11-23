@@ -46,6 +46,7 @@ test('our machines as captured (both off): idle, no time left, even though the d
   assert.deepEqual(w, {
     state: 'POWER_OFF', running: false, paused: false, done: false, error: false, errorName: '',
     remaining: 0, total: 0, remoteControl: false, cycleCount: 15, doorOpen: undefined, rinseAidLow: undefined,
+    course: undefined, startsIn: undefined,
   });
   const d = laundryStatus(laundryUnits('DEVICE_DRYER', dryer.profile)[0], dryer.state);
   assert.equal(d.state, 'POWER_OFF');
@@ -208,4 +209,15 @@ test('dishwasher: a cycle appliance with its own command field, door and rinse a
   // A Styler whose profile names its command field differently still finds the one with START
   const [styler] = laundryUnits('DEVICE_STYLER', { property: { operation: { anyName: { type: 'enum', mode: ['w'], value: { w: ['START', 'STOP'] } } } } });
   assert.equal(styler.opKey, 'anyName');
+});
+
+test('dishwasher: the course while running, and how long until a delayed start', () => {
+  const [unit] = laundryUnits('DEVICE_DISH_WASHER', { property: { runState: { currentState: { type: 'enum', mode: ['r'], value: { r: ['RUNNING', 'RESERVED'] } } } } });
+  const running = laundryStatus(unit, { runState: { currentState: 'RUNNING' }, dishWashingCourse: { currentDishWashingCourse: 'ECO' },
+    timer: { remainHour: 1, remainMinute: 10, remainSecond: 30 } });
+  assert.equal(running.course, 'ECO');
+  assert.equal(running.remaining, 4230, 'seconds count too');
+  const waiting = laundryStatus(unit, { runState: { currentState: 'RESERVED' }, timer: { relativeHourToStart: 3, relativeMinuteToStart: 15 } });
+  assert.equal(waiting.startsIn, 3 * 3600 + 15 * 60);
+  assert.equal(laundryStatus(unit, { runState: { currentState: 'RESERVED' } }).startsIn, undefined);
 });

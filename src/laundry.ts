@@ -160,6 +160,10 @@ export interface LaundryStatus {
   doorOpen?: boolean;
   /** Rinse aid needs refilling (dishwashers), when reported. */
   rinseAidLow?: boolean;
+  /** The course or program, when reported (dishwashers: dishWashingCourse). */
+  course?: string;
+  /** Seconds until a delayed start, while waiting for one (RESERVED). */
+  startsIn?: number;
 }
 
 // States that are not a cycle under way. Anything not listed here or in PAUSED counts as running,
@@ -167,6 +171,12 @@ export interface LaundryStatus {
 const IDLE = new Set(['POWER_OFF', 'INITIAL', 'FROZEN_PREVENT_INITIAL', 'END', 'WRINKLE_CARE', 'ERROR', 'RESERVED', 'SLEEP', 'UNKNOWN']);
 const PAUSED = new Set(['PAUSE', 'FROZEN_PREVENT_PAUSE', 'RINSE_HOLD']);
 const DONE = new Set(['END', 'WRINKLE_CARE']);
+
+/** Running, paused or finished, from LG's state word: for any appliance that runs cycles. */
+export function cyclePhase(state: string): { running: boolean; paused: boolean; done: boolean; error: boolean } {
+  const paused = PAUSED.has(state);
+  return { running: !paused && !IDLE.has(state), paused, done: DONE.has(state), error: state === 'ERROR' };
+}
 
 /** The state set for one unit, from a device's full state. */
 export function unitState(unit: LaundryUnit, state: unknown): Props | undefined {
@@ -191,6 +201,7 @@ export function laundryStatus(unit: LaundryUnit, state: unknown): LaundryStatus 
   const count = field(field(s, 'cycle'), 'cycleCount');
   const door = field(field(s, 'doorStatus'), 'doorState');
   const rinse = field(field(s, 'dishWashingStatus'), 'rinseRefill');
+  const course = field(field(s, 'dishWashingCourse'), 'currentDishWashingCourse');
   return {
     state: current,
     running,
@@ -198,12 +209,16 @@ export function laundryStatus(unit: LaundryUnit, state: unknown): LaundryStatus 
     done: DONE.has(current),
     error: current === 'ERROR',
     errorName: current === 'ERROR' && typeof errorWord === 'string' ? errorWord : '',
-    remaining: inCycle ? num(field(timer, 'remainHour')) * 3600 + num(field(timer, 'remainMinute')) * 60 : 0,
+    remaining: inCycle ? num(field(timer, 'remainHour')) * 3600 + num(field(timer, 'remainMinute')) * 60 + num(field(timer, 'remainSecond')) : 0,
     total: inCycle ? num(field(timer, 'totalHour')) * 3600 + num(field(timer, 'totalMinute')) * 60 : 0,
     remoteControl: field(field(s, 'remoteControlEnable'), 'remoteControlEnabled') === true,
     cycleCount: typeof count === 'number' ? count : undefined,
     doorOpen: door === undefined ? undefined : door === 'OPEN',
     rinseAidLow: typeof rinse === 'boolean' ? rinse : undefined,
+    course: typeof course === 'string' && course ? course : undefined,
+    startsIn: current === 'RESERVED'
+      ? num(field(timer, 'relativeHourToStart')) * 3600 + num(field(timer, 'relativeMinuteToStart')) * 60 || undefined
+      : undefined,
   };
 }
 

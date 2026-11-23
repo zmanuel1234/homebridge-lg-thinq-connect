@@ -3,7 +3,7 @@
 // until someone with the appliance confirms them.
 
 import { AirConditioner } from './air-conditioner';
-import { AirPurifier, Fan, Hood, HumidityAppliance } from './air';
+import { AirPurifier, Fan, Hood, HumidityAppliance, Microwave } from './air';
 import { Fridge } from './fridge';
 import { HeatPump, WaterHeater } from './heating';
 import { Basic, RobotVacuum, basicHasSomething } from './other';
@@ -54,7 +54,9 @@ export function mappingFor(deviceType: string, profile: unknown): Mapping | unde
   if (MAPPINGS[deviceType]) { return MAPPINGS[deviceType]; }
   if (deviceType === 'DEVICE_MICROWAVE_OVEN') {
     const res = resources(profile);
-    if (res.ventilation || res.lamp) { return { ...MAPPINGS.DEVICE_HOOD, label: 'microwave (hood fan and light)' }; }
+    if (res.runState || res.ventilation || res.lamp) {
+      return { label: 'microwave', category: 'OTHER', create: (c, p) => new Microwave(c, p) };
+    }
   }
   return basicHasSomething(profile) ? BASIC : undefined;
 }
