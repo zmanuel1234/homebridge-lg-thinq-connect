@@ -37,10 +37,10 @@
         "title": "Experimental appliances",
         "type": "boolean",
         "default": false,
-        "description": "Also add LG appliances not yet confirmed on real hardware: air conditioners, fridges, dishwashers, dehumidifiers, air purifiers and more (see the README). If you try one, please report how it works on GitHub."
+        "description": "Also add LG appliance types that are still experimental: fridges, dishwashers, air purifiers, humidifiers, ovens and more (see the README). Washers, dryers, air conditioners, dehumidifiers and range hoods are always added. If you try one, please report how it works on GitHub."
       },
       "extraControls": {
-        "title": "Extra switches for experimental appliances",
+        "title": "Extra switches",
         "type": "boolean",
         "default": true,
         "description": "Switches for what an appliance offers beyond its main tile: air conditioner air purify, energy saving, display light, the other swing direction, jet, dry and fan modes, airflow styles; air purifier sleep mode and turbo; AeroTower warm mode, UV nano and display light; humidifier auto, sleep, hygiene dry, warm mist, mood lamp and display light; water heater modes; cooktop \"all burners off\". Turn off for a tidier Home app. (Fridge and wine cellar settings such as express modes, power saving and the light are always added.)"

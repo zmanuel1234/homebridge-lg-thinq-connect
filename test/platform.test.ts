@@ -379,14 +379,15 @@ function defineTests(hap: Hap): void {
     assert.ok(!hb.lg.requests.some((r) => r.path === 'route'));
   });
 
-  test('experimental on: a real air conditioner\'s data through LG, controlled from the Home app', async (t) => {
+  test('a checked type (a real air conditioner\'s data) is added without "Experimental appliances", and controlled from the Home app', async (t) => {
     const hb = await homebridge(t);
     const dir = join(__dirname, 'fixtures', 'ha', 'air_conditioner');
     const read = (f: string): unknown => JSON.parse(readFileSync(join(dir, f), 'utf8')) as unknown;
     const info = (read('device.json') as { deviceInfo: Record<string, unknown> }).deviceInfo;
     hb.lg.devices.push({ deviceId: 'ac-1', deviceInfo: info, profile: read('profile.json'), state: read('status.json') });
-    const platform = await hb.start([], { experimental: true });
+    const platform = await hb.start();
     assert.deepEqual(hb.calls.registered.map((a) => a.displayName), ['Front Load Washer', 'Dryer', 'Test air conditioner']);
+    assert.ok(!hb.lines.some((l) => l.includes('isn\'t confirmed on a real appliance')));
     assert.ok(hb.lines.some((l) => l.startsWith('info: [Test air conditioner] Added as an air conditioner (DEVICE_AIR_CONDITIONER), checked against Home Assistant')));
     const ac = hb.calls.registered[2];
     const tile = ac.getServiceById(S.HeaterCooler, 'climate')!;
@@ -406,6 +407,7 @@ function defineTests(hap: Hap): void {
       state: { runState: { currentState: 'RUNNING' }, timer: { remainHour: 1, remainMinute: 5 } } });
     const off = await hb.start();
     assert.equal(off.machines.length, 2, 'not without the setting');
+    assert.ok(hb.lines.some((l) => l.includes('"Dishwasher" (DEVICE_DISH_WASHER) isn\'t confirmed on a real appliance yet')));
     const on = await hb.start([], { experimental: true });
     const dish = on.machines[2].units[0];
     assert.equal(dish.unit.kind, 'dishwasher');

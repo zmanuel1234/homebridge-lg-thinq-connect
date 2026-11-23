@@ -240,7 +240,8 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
         continue;
       }
       const laundry = isLaundry(deviceType);
-      if (!laundry && !this.settings.experimental) {
+      // Laundry and the types checked against Home Assistant are added; the rest need the setting
+      if (!laundry && supportLevel(deviceType) === 'experimental' && !this.settings.experimental) {
         this.log.info(`"${alias}" (${deviceType}) isn't confirmed on a real appliance yet. To try it, turn on `
           + '"Experimental appliances" in this plugin\'s settings, and please report how it works.');
         continue;
@@ -273,8 +274,8 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     if (this.machines.length) {
       this.startLive();
     } else if (!this.failedSetups.length) {
-      this.log.warn('No supported LG appliances found on this account. Washers and dryers are supported; '
-        + 'turn on "Experimental appliances" for other types.');
+      this.log.warn('No supported LG appliances found on this account. Washers, dryers, air conditioners, '
+        + 'dehumidifiers and range hoods are supported; turn on "Experimental appliances" for other types.');
     }
   }
 

@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 1.0.0-beta.1 - 2026-11-23
+
+### Changed
+- **Air conditioners, dehumidifiers and range hoods are added without "Experimental appliances"**:
+  they're checked against Home Assistant's data from real appliances. After this update they
+  appear in the Home app on their own; to keep one out, add it to **Leave out these appliances**.
+  The "Extra switches for experimental appliances" setting is now just "Extra switches" (same
+  setting, nothing to change).
 
 ### Added
 - Washers, dryers, dishwashers and Stylers: a **remote start** sensor, on while Remote Start is on

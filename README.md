@@ -14,9 +14,10 @@ with a personal access token that LG issues, not your LG password, so the plugin
 when LG changes its app's login.
 
 **Washers and dryers** are supported: the time left, a notification when a cycle finishes or
-stops on an error, and sensors for automations. **Other LG appliances** (air conditioners, fridges,
-dishwashers, dehumidifiers, air purifiers and more) can be tried with the *Experimental
-appliances* setting; see [Other appliances](#other-appliances).
+stops on an error, and sensors for automations. **Air conditioners, dehumidifiers and range
+hoods** are added too, checked against Home Assistant's data from real appliances. **Other LG
+appliances** (fridges, dishwashers, air purifiers, ovens and more) can be tried with the
+*Experimental appliances* setting; see [Other appliances](#other-appliances).
 
 ## What you get
 
@@ -126,8 +127,8 @@ What LG's error codes in the log mean:
 | Personal access token | | Your token from connect-pat.lgthinq.com |
 | Country | US | The country of your LG account (two letters) |
 | Allow starting and pausing | Off | Tapping a machine's tile starts, pauses or resumes it (needs Remote Start on the machine) |
-| Experimental appliances | Off | Also add appliance types not yet confirmed on real hardware (see [Other appliances](#other-appliances)) |
-| Extra switches for experimental appliances | On | Air conditioner, air purifier and cooktop switches; turn off for a tidier Home app |
+| Experimental appliances | Off | Also add the appliance types that are still experimental (see [Other appliances](#other-appliances)). Air conditioners, dehumidifiers and range hoods are added without it |
+| Extra switches | On | Air conditioner, air purifier and cooktop switches; turn off for a tidier Home app |
 | Live updates from LG | On | Changes and alerts arrive the moment they happen; scheduled checks continue as a backup |
 | Energy use in the Eve app | On | This month's energy use for appliances LG reports it for (see [Energy use](#energy-use)) |
 | Phase sensors | None | Extra sensors that are on during a chosen phase |
@@ -168,7 +169,8 @@ appliance, and what has to be true first:
 | Dishwasher, Styler | Start, pause, resume | The same, and **Experimental appliances** on |
 | Oven | Start at a temperature, change the temperature while cooking, stop | **Experimental appliances** and **Allow starting and pausing** on, and remote control on at the oven. Never restarts a paused or self-cleaning oven |
 | Cooktop | Switch every burner off | Models LG allows it for. It can never switch a burner on |
-| Air conditioner, purifier, humidifier, dehumidifier, fan, hood | On/off, modes, temperature, fan speed, the extra switches | **Experimental appliances** on (as LG's own app allows) |
+| Air conditioner, dehumidifier, range hood | On/off, modes, temperature, fan speed, the extra switches (as LG's own app allows) | Nothing: added like washers and dryers. Leave one out with **Leave out these appliances** |
+| Air purifier, humidifier, fan | On/off, modes, fan speed, the extra switches | **Experimental appliances** on (as LG's own app allows) |
 | Fridge, wine cellar, water heater, heat pump | Set temperatures, express and eco modes, water heater modes, the wine cellar light | **Experimental appliances** on |
 | Over-the-range microwave | Vent fan speed and light (never cooking) | **Experimental appliances** on, where LG allows it |
 | Robot vacuum | Start, resume, send home | **Experimental appliances** on |
@@ -180,8 +182,9 @@ the Home app then shows an error and the log says why.
 
 ## Other appliances
 
-With **Experimental appliances** on, the plugin also adds the LG appliance types below. They're
-built from LG's documentation, Home Assistant's LG integration and its sample data from real
+The plugin also adds the LG appliance types below: the **checked** ones (air conditioners,
+dehumidifiers, range hoods) always, the **experimental** ones with **Experimental appliances** on.
+They're built from LG's documentation, Home Assistant's LG integration and its sample data from real
 appliances, and two other plugins on the same API (credits below). If you try one, please
 [report how it works](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose).
 
@@ -190,7 +193,7 @@ Each type has one of three levels:
 - **Tested**: confirmed on a real appliance by someone using this plugin.
 - **Checked**: matches Home Assistant's LG integration on data captured from a real appliance.
   The plugin's tests feed it the same LG answers Home Assistant's tests use and compare what the
-  Home app gets with what Home Assistant shows, value by value (`test/ha-parity.test.ts`), so it
+  Home app gets with what Home Assistant shows (`test/ha-parity.test.ts`), so it
   stays in step as either side changes. Controls are built the same way, but not yet confirmed on
   a real one.
 - **Experimental**: built from LG's documentation and its own toolkits; not yet confirmed.
@@ -238,7 +241,7 @@ app, then choose:
 
 | Option | For | What it does |
 |---|---|---|
-| Extra switches | Any | Overrides "Extra switches for experimental appliances" for this one |
+| Extra switches | Any | Overrides the "Extra switches" setting for this one |
 | Modes on the tile | Air conditioner | All it has, cooling only, or heating only (for a unit used one way) |
 | The tile's swing moves | Air conditioner | Up and down (default), left and right, or both; the other direction gets a switch |
 | Room temperature sensor | Air conditioner | The room temperature as a sensor of its own, for automations |
