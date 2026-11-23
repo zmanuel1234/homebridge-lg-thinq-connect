@@ -38,6 +38,11 @@ Each washer or dryer shows up as:
   count reaches the number you set (LG suggests a Tub Clean about every 30 washes). Turn on
   notifications for it as a reminder. The count is LG's own; it's expected to start again after a
   Tub Clean.
+- **"Washer remote start"** (occupancy sensor, with *Allow starting and pausing* on, for
+  machines that report it): detected while Remote Start is on at the machine, so an automation
+  or a notification can tell you the machine is ready to be started from the Home app.
+
+When a cycle finishes, the log also notes LG's cycle count for machines that keep one.
 
 The names follow your machines' names in the ThinQ app.
 
@@ -213,6 +218,8 @@ Some air conditioners don't report air purify back; its switch then shows the la
 official API has no quiet mode, and no light for air purifiers. It doesn't cover older (ThinQ1)
 appliances, microwave cooking, or a washer's door lock.
 
+### LG quirks
+
 Things LG's API does that the plugin works around or can't fix (from Home Assistant's and LG's own
 issue reports): below an hour, live updates leave the hours out of the time left (the plugin reads
 that as 0); some washers send "washing is complete" while still weighing the load (ignored); water
@@ -307,6 +314,20 @@ Your scenes and automations are built on the tiles and sensors this plugin adds,
 The plugin's tests hold every appliance's tiles and settings to a recorded list
 (`test/surface.snapshot.json`), so a change can't slip through by accident.
 
+**Homebridge and Node.js.** Works with Homebridge 1.6 or later and Homebridge 2.0, on Node.js 22,
+24 or 26. Every change is tested on Homebridge 2 and Node.js 22, 24 and 26; before each release
+the tests are also run on Homebridge 1.8 (`npm run test:homebridge1`).
+
+## Privacy
+
+- Your token is kept only in your Homebridge settings. The plugin sends it only to LG's ThinQ
+  Connect servers, the same ones LG's own app uses.
+- The plugin talks to nobody but LG: no analytics, no tracking, no update checks of its own.
+- For live updates LG issues a key and certificate for your Homebridge. They're kept in
+  Homebridge's storage folder, readable only by the Homebridge user.
+- **Copy diagnostics** removes the token, device IDs and serial numbers, and only copies to your
+  clipboard: nothing is sent anywhere until you paste it yourself.
+
 ## Coming from homebridge-lg-thinq
 
 This plugin can run next to [homebridge-lg-thinq](https://github.com/nVuln/homebridge-lg-thinq)
@@ -333,6 +354,40 @@ This plugin can run next to [homebridge-lg-thinq](https://github.com/nVuln/homeb
 
 Older appliances that only work with LG's previous system (ThinQ1) aren't reachable through LG's
 official API: keep the old plugin for those, and leave them out of this one.
+
+## Compared with other HomeKit plugins for LG
+
+Checked November 2026. Plugins that use **LG's official ThinQ Connect API** (a token from LG)
+keep working when LG changes its app; the others sign in the way LG's app does, with your LG
+password, and depend on that staying the same.
+
+| Plugin | LG API | Appliances |
+|---|---|---|
+| **This plugin** | Official | All 31 types LG's API covers: laundry tested on real machines, air conditioner, dehumidifier, hood and air purifier checked against Home Assistant's data, the rest experimental. Energy use, live updates, settings screen with a token check and Copy diagnostics |
+| [homebridge-lg-thinq](https://github.com/nVuln/homebridge-lg-thinq) and its forks (homebridge-lg-thinq-2, @rnikoopour, @bvksound and others) | LG app login | Many types, including older ThinQ1 appliances this API can't reach, and a few details the official API doesn't report (such as the washer's door lock) |
+| [@0modfather0/homebridge-lg-thinq](https://www.npmjs.com/package/@0modfather0/homebridge-lg-thinq) | Official | Washers, dryers and a few others, read-only |
+| [homebridge-lg-thinqconnect-ac](https://www.npmjs.com/package/homebridge-lg-thinqconnect-ac) | Official | Air conditioners |
+| [homebridge-lg-thinq-system-boiler](https://www.npmjs.com/package/homebridge-lg-thinq-system-boiler) | Official | Heat pumps and hot water |
+
+## Home Assistant parity
+
+Home Assistant's [LG ThinQ integration](https://www.home-assistant.io/integrations/lg_thinq/) is
+the most used project on LG's official API, so this plugin keeps track of it:
+
+- **Same data.** The tests run Home Assistant's own sample data from real appliances through this
+  plugin and compare the results with what Home Assistant shows (`test/ha-parity.test.ts`). An
+  appliance type is marked *checked* once that passes.
+- **Same known quirks.** LG problems reported by Home Assistant users are handled here too (see
+  [LG quirks](#lg-quirks)), such as the time left jumping when it drops below an hour and the
+  "finished" alert LG sends while a washer is still weighing the load.
+- **Intentional differences.** For air conditioners with both a fan speed and a detailed fan speed,
+  the plugin uses the plain one, so *Auto* stays available (Home Assistant shows the detailed
+  one). Some values have no Home app tile, such as the program name, filter dates or a fridge's
+  door alarm history; these are in the log instead.
+- **Not covered yet.** The kimchi refrigerator shows nothing beyond its basic tile.
+
+A weekly check looks at new Home Assistant changes and LG toolkit releases and opens an issue
+here when something needs a look.
 
 ## Credits
 

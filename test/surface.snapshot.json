@@ -144,17 +144,20 @@
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/tub-clean: Configured Name, Name, Occupancy Detected",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "ours DEVICE_DRYER": [
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "ha washtower_dryer": [
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "dishwasher": [

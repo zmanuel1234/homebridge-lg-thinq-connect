@@ -390,6 +390,27 @@ function defineTests(hap: Hap): void {
     assert.equal(off.acc.getServiceById(S.OccupancySensor, 'tub-clean'), undefined);
   });
 
+  test('remote start sensor: on while Remote Start is on, only when control is allowed', () => {
+    assert.equal(unit.reportsRemoteStart, true, 'our washer reports Remote Start');
+    assert.equal(setup().acc.getServiceById(S.OccupancySensor, 'remote-start'), undefined, 'no sensor without control');
+    const { acc, laundry } = setup({ allowControl: true });
+    const sensor = acc.getServiceById(S.OccupancySensor, 'remote-start')!;
+    assert.equal(value(sensor.getCharacteristic(C.ConfiguredName)), 'Washer remote start');
+    laundry.update(status({ remoteControl: true }));
+    assert.equal(value(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    laundry.update(running({ remoteControl: false }));
+    assert.equal(value(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    const off = setup({ allowControl: false }, acc);
+    assert.equal(off.acc.getServiceById(S.OccupancySensor, 'remote-start'), undefined, 'removed when control is turned off');
+  });
+
+  test('cycle count: logged when a cycle finishes, for machines that count', () => {
+    const { laundry, lines } = setup();
+    laundry.update(running({ cycleCount: 41 }));
+    laundry.update(status({ state: 'END', done: true, cycleCount: 42 }));
+    assert.ok(lines.some((l) => l.startsWith('info: [Washer]') && l.includes('(LG counts 42 cycles)')), lines.join('\n'));
+  });
+
   test('dishwasher: door and rinse-aid sensors when the machine reports them', () => {
     const dish = laundryUnits('DEVICE_DISH_WASHER', { property: {
       runState: { currentState: { type: 'enum', mode: ['r'], value: { r: ['RUNNING', 'END'] } } },
