@@ -11,6 +11,26 @@
 - LG's error codes now come with what to do (new terms to accept, wrong country, a missing
   permission, an offline appliance, Remote Start), and a README section on signing in.
 
+### Fixed (from an independent code review)
+- An odd or empty appliance list from LG no longer removes accessories from the Home app: an
+  unreadable list is retried, and an empty one must repeat three times before anything is removed.
+- An appliance whose setup fails at startup (LG not answering) now shows a fault and is set up
+  again automatically, instead of staying frozen until Homebridge restarts.
+- No more false "done" when a cycle is stopped in its first minute (before LG knows the time), or
+  after the washer's automatic freeze protection runs.
+- A malformed message from LG's message server, or an error while applying a live update, can no
+  longer crash Homebridge.
+- An internet outage no longer throws away a working live-update certificate.
+- On a twin washer, a "complete" alert marks only the drum that was in use.
+- After LG asks to slow down (too many requests), checks wait 10 minutes.
+- Experimental appliances: no HAP warnings when first added; an air conditioner reporting its
+  range only in °F gets the right limits; an oven "preheating complete" isn't shown as done; the
+  basic appliance's problem sensor closes again.
+- Check token: WashTowers and other laundry types are marked as added automatically.
+- Live updates stay off, with a warning, if Homebridge gives no storage folder (they never write
+  elsewhere).
+- Removed a test certificate file that had been committed by mistake.
+
 ## 0.2.0-beta.4 - 2026-11-23
 
 ### Added
