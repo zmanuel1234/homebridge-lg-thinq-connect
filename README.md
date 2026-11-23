@@ -1,3 +1,7 @@
+<p align="center">
+  <img alt="LG ThinQ Connect" src="https://raw.githubusercontent.com/zmanuel1234/homebridge-lg-thinq-connect/main/branding/homebridge-lg-thinq-connect.svg" width="150">
+</p>
+
 # homebridge-lg-thinq-connect
 
 [![npm](https://badgen.net/npm/v/homebridge-lg-thinq-connect)](https://www.npmjs.com/package/homebridge-lg-thinq-connect)
