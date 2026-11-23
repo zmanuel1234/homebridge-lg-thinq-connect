@@ -1,0 +1,337 @@
+[
+  {
+    "deviceInfo": {
+      "deviceType": "DEVICE_WASHER",
+      "modelName": "F3P2CYVAT__",
+      "alias": "Front Load Washer",
+      "reportable": true
+    },
+    "profile": {
+      "error": [
+        "DOOR_OPEN_ERROR",
+        "UNABLE_TO_LOCK_ERROR",
+        "OUT_OF_BALANCE_ERROR",
+        "POWER_FAIL_ERROR",
+        "TEMPERATURE_SENSOR_ERROR",
+        "LOCKED_MOTOR_ERROR",
+        "WATER_LEVEL_SENSOR_ERROR",
+        "WATER_DRAIN_ERROR",
+        "WATER_SUPPLY_ERROR",
+        "OVERFILL_ERROR"
+      ],
+      "property": [
+        {
+          "runState": {
+            "currentState": {
+              "type": "enum",
+              "mode": [
+                "r"
+              ],
+              "value": {
+                "r": [
+                  "REFRESHING",
+                  "POWER_OFF",
+                  "DETERGENT_AMOUNT",
+                  "SPINNING",
+                  "RINSE_HOLD",
+                  "FROZEN_PREVENT_RUNNING",
+                  "INITIAL",
+                  "RINSING",
+                  "RESERVED",
+                  "FROZEN_PREVENT_INITIAL",
+                  "DRYING",
+                  "DETECTING",
+                  "PREWASH",
+                  "ADD_DRAIN",
+                  "ERROR",
+                  "PAUSE",
+                  "END",
+                  "FROZEN_PREVENT_PAUSE",
+                  "RUNNING"
+                ]
+              }
+            }
+          },
+          "operation": {
+            "washerOperationMode": {
+              "type": "enum",
+              "mode": [
+                "w"
+              ],
+              "value": {
+                "w": [
+                  "START",
+                  "STOP",
+                  "POWER_OFF"
+                ]
+              }
+            }
+          },
+          "detergent": {
+            "detergentSetting": "NORMAL"
+          },
+          "remoteControlEnable": {
+            "remoteControlEnabled": {
+              "type": "boolean",
+              "mode": [
+                "r"
+              ],
+              "value": {
+                "r": [
+                  false,
+                  true
+                ]
+              }
+            }
+          },
+          "timer": {
+            "remainHour": {
+              "type": "range",
+              "mode": [
+                "r"
+              ],
+              "value": {
+                "r": {
+                  "max": 30,
+                  "min": 0,
+                  "step": 1,
+                  "except": []
+                }
+              }
+            },
+            "remainMinute": {
+              "type": "range",
+              "mode": [
+                "r"
+              ],
+              "value": {
+                "r": {
+                  "max": 59,
+                  "min": 0,
+                  "step": 1,
+                  "except": []
+                }
+              }
+            },
+            "totalHour": {
+              "type": "range",
+              "mode": [
+                "r"
+              ],
+              "value": {
+                "r": {
+                  "max": 30,
+                  "min": 0,
+                  "step": 1,
+                  "except": []
+                }
+              }
+            },
+            "totalMinute": {
+              "type": "range",
+              "mode": [
+                "r"
+              ],
+              "value": {
+                "r": {
+                  "max": 59,
+                  "min": 0,
+                  "step": 1,
+                  "except": []
+                }
+              }
+            },
+            "relativeHourToStart": {
+              "type": "range",
+              "mode": [
+                "r",
+                "w"
+              ],
+              "value": {
+                "r": {
+                  "max": 19,
+                  "min": 1,
+                  "step": 1,
+                  "except": []
+                },
+                "w": {
+                  "max": 19,
+                  "min": 1,
+                  "step": 1,
+                  "except": []
+                }
+              }
+            },
+            "relativeMinuteToStart": {
+              "type": "range",
+              "mode": [
+                "r"
+              ],
+              "value": {
+                "r": {
+                  "max": 59,
+                  "min": 0,
+                  "step": 1,
+                  "except": []
+                }
+              }
+            }
+          },
+          "location": {
+            "locationName": "MAIN"
+          },
+          "cycle": {
+            "cycleCount": {
+              "type": "number",
+              "mode": [
+                "r"
+              ]
+            }
+          }
+        }
+      ],
+      "notification": {
+        "push": [
+          "WASHING_IS_COMPLETE",
+          "ERROR_DURING_WASHING"
+        ]
+      }
+    },
+    "state": [
+      {
+        "runState": {
+          "currentState": "POWER_OFF"
+        },
+        "remoteControlEnable": {
+          "remoteControlEnabled": false
+        },
+        "timer": {
+          "remainHour": 0,
+          "remainMinute": 0,
+          "relativeHourToStart": 0,
+          "relativeMinuteToStart": 0,
+          "totalHour": 0,
+          "totalMinute": 0
+        },
+        "cycle": {
+          "cycleCount": 15
+        },
+        "location": {
+          "locationName": "MAIN"
+        }
+      }
+    ]
+  },
+  {
+    "deviceInfo": {
+      "deviceType": "DEVICE_DRYER",
+      "modelName": "RV13D4AMH_D_US",
+      "alias": "Dryer",
+      "reportable": true
+    },
+    "profile": {
+      "property": {
+        "runState": {
+          "currentState": {
+            "type": "enum",
+            "mode": [
+              "r"
+            ],
+            "value": {
+              "r": [
+                "WRINKLE_CARE",
+                "PAUSE",
+                "END",
+                "COOLING",
+                "RUNNING",
+                "INITIAL",
+                "ERROR",
+                "POWER_OFF"
+              ]
+            }
+          }
+        },
+        "operation": {
+          "dryerOperationMode": {
+            "type": "enum",
+            "mode": [
+              "w"
+            ],
+            "value": {
+              "w": [
+                "START",
+                "STOP",
+                "POWER_OFF"
+              ]
+            }
+          }
+        },
+        "remoteControlEnable": {
+          "remoteControlEnabled": {
+            "type": "boolean",
+            "mode": [
+              "r"
+            ],
+            "value": {
+              "r": [
+                false,
+                true
+              ]
+            }
+          }
+        },
+        "timer": {
+          "remainHour": {
+            "type": "number",
+            "mode": [
+              "r"
+            ]
+          },
+          "remainMinute": {
+            "type": "number",
+            "mode": [
+              "r"
+            ]
+          },
+          "totalHour": {
+            "type": "number",
+            "mode": [
+              "r"
+            ]
+          },
+          "totalMinute": {
+            "type": "number",
+            "mode": [
+              "r"
+            ]
+          }
+        }
+      },
+      "notification": {
+        "push": [
+          "DRYING_FAILED",
+          "DRYING_IS_COMPLETE"
+        ]
+      },
+      "error": [
+        "TEMPERATURE_SENSOR_ERROR",
+        "POWER_CODE_CONNECTION_ERROR",
+        "HIGH_POWER_SUPPLY_ERROR"
+      ]
+    },
+    "state": {
+      "runState": {
+        "currentState": "POWER_OFF"
+      },
+      "remoteControlEnable": {
+        "remoteControlEnabled": false
+      },
+      "timer": {
+        "remainHour": 0,
+        "remainMinute": 1,
+        "totalHour": 0,
+        "totalMinute": 1
+      }
+    }
+  }
+]

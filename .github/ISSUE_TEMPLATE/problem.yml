@@ -1,0 +1,29 @@
+name: Problem
+description: Something doesn't work as described.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: This plugin, Homebridge, Node.js (all on the Homebridge UI's status page).
+      placeholder: 0.1.0, Homebridge 2.5.0, Node 22.20.0
+    validations:
+      required: true
+  - type: input
+    id: appliance
+    attributes:
+      label: Appliance and model
+      placeholder: Washer, F3P2CYVAT
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: The plugin's lines from the Homebridge log around the problem. Remove anything private.
+      render: text

@@ -1,0 +1,111 @@
+{
+  "pluginAlias": "LGThinQConnect",
+  "pluginType": "platform",
+  "singular": true,
+  "headerDisplay": "LG ThinQ appliances in Apple Home through LG's official ThinQ Connect API. Create a personal access token at [connect-pat.lgthinq.com](https://connect-pat.lgthinq.com) with every device permission ticked, and paste it below. This version supports washers and dryers.",
+  "footerDisplay": "Problems or a new appliance to add? [Open an issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues).",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "default": "LG ThinQ",
+        "description": "Shown in the Homebridge log."
+      },
+      "token": {
+        "title": "Personal access token",
+        "type": "string",
+        "description": "From connect-pat.lgthinq.com, signed in with the LG account your appliances are on. Keep it private."
+      },
+      "country": {
+        "title": "Country of your LG account",
+        "type": "string",
+        "default": "US",
+        "pattern": "^[A-Za-z]{2}$",
+        "description": "Two-letter code, such as US, CA, GB or DE. LG keeps accounts on a server per region."
+      },
+      "allowControl": {
+        "title": "Allow starting and pausing from the Home app",
+        "type": "boolean",
+        "default": false,
+        "description": "Tapping the machine's tile starts, pauses or resumes it. LG only accepts this after Remote Start is pressed on the machine. Off: the tile only shows the cycle."
+      },
+      "phaseSensors": {
+        "title": "Phase sensors",
+        "type": "array",
+        "uniqueItems": true,
+        "description": "Adds a sensor that is on during the chosen phase, for automations (for example, turn on a fan while spinning). Only phases a machine reports are added.",
+        "items": {
+          "type": "string",
+          "oneOf": [
+            { "title": "Detecting load", "enum": ["DETECTING"] },
+            { "title": "Prewash", "enum": ["PREWASH"] },
+            { "title": "Washing", "enum": ["RUNNING"] },
+            { "title": "Rinsing", "enum": ["RINSING"] },
+            { "title": "Spinning", "enum": ["SPINNING"] },
+            { "title": "Drying", "enum": ["DRYING"] },
+            { "title": "Cooling (dryer)", "enum": ["COOLING"] },
+            { "title": "Wrinkle care (dryer)", "enum": ["WRINKLE_CARE"] },
+            { "title": "Rinse hold", "enum": ["RINSE_HOLD"] },
+            { "title": "Paused", "enum": ["PAUSE"] },
+            { "title": "Delayed start waiting", "enum": ["RESERVED"] }
+          ]
+        }
+      },
+      "ignore": {
+        "title": "Leave out these appliances",
+        "type": "array",
+        "description": "Names exactly as in the ThinQ app.",
+        "items": {
+          "type": "string",
+          "title": "Appliance name"
+        }
+      },
+      "pollInterval": {
+        "title": "Check every (seconds, idle)",
+        "type": "integer",
+        "default": 60,
+        "minimum": 30,
+        "maximum": 3600,
+        "description": "How often to ask LG for each appliance's state while nothing is running."
+      },
+      "runningPollInterval": {
+        "title": "Check every (seconds, during a cycle)",
+        "type": "integer",
+        "default": 30,
+        "minimum": 15,
+        "maximum": 600,
+        "description": "How often to ask during a cycle, so time left and the end are up to date."
+      }
+    }
+  },
+  "layout": [
+    "token",
+    "country",
+    "allowControl",
+    "phaseSensors",
+    {
+      "type": "fieldset",
+      "title": "Advanced",
+      "expandable": true,
+      "items": [
+        "name",
+        {
+          "key": "ignore",
+          "type": "array",
+          "buttonText": "Add appliance",
+          "items": ["ignore[]"]
+        },
+        {
+          "key": "pollInterval",
+          "type": "number"
+        },
+        {
+          "key": "runningPollInterval",
+          "type": "number"
+        }
+      ]
+    }
+  ]
+}
