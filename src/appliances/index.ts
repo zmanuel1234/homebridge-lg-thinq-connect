@@ -2,6 +2,7 @@
 // All of these are experimental: they appear only with the "Experimental appliances" setting on,
 // until someone with the appliance confirms them.
 
+import { Cooktop } from './cooking';
 import { AirConditioner } from './air-conditioner';
 import { AirPurifier, Fan, Hood, HumidityAppliance, Microwave } from './air';
 import { Fridge } from './fridge';
@@ -10,7 +11,7 @@ import { Basic, RobotVacuum, basicHasSomething } from './other';
 import type { ApplianceContext, Part } from './base';
 import { resources } from './profile';
 
-export type { ApplianceContext, Part } from './base';
+export type { ApplianceContext, ApplianceOptions, Part } from './base';
 
 // HomeKit accessory categories (Homebridge's Categories is a const enum, so the numbers are used)
 const CATEGORY = { OTHER: 1, FAN: 3, THERMOSTAT: 9, AIR_PURIFIER: 19, AIR_CONDITIONER: 21, AIR_HUMIDIFIER: 22, AIR_DEHUMIDIFIER: 23 } as const;
@@ -41,6 +42,7 @@ const MAPPINGS: Record<string, Mapping> = {
   DEVICE_SYSTEM_BOILER: { label: 'heat pump', category: 'THERMOSTAT', create: (c, p) => new HeatPump(c, p) },
   DEVICE_REFRIGERATOR: { label: 'refrigerator', category: 'OTHER', create: (c, p) => new Fridge(c, p) },
   DEVICE_WINE_CELLAR: { label: 'wine cellar', category: 'OTHER', create: (c, p) => new Fridge(c, p) },
+  DEVICE_COOKTOP: { label: 'cooktop', category: 'OTHER', create: (c, p) => new Cooktop(c, p) },
   DEVICE_ROBOT_CLEANER: { label: 'robot vacuum', category: 'OTHER', create: (c, p) => new RobotVacuum(c, p) },
 };
 

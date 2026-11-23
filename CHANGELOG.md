@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.0-beta.7 - 2026-11-23
+
+Closing the gap with the other LG plugins, where LG's official API allows it.
+
+### Added
+- **Ovens** (experimental): a thermostat per cavity. Heat starts the oven at the set temperature
+  (in its current cook mode, or bake), off stops it, and a new temperature while it's on is sent
+  at once, in the oven's own unit. LG doesn't report the actual oven temperature, so the set one
+  shows. Needs "Allow starting and pausing" and remote control on at the oven.
+- **Cooktops** (experimental): an "in use" sensor and one per burner, for "the stove is still on"
+  notifications and automations, and an "all burners off" button on models LG allows it for.
+  Before, cooktops only got the basic tile.
+- **Options per appliance** (Advanced): extra switches on or off for one appliance; for air
+  conditioners, cooling or heating only, which way the tile's swing moves (up-down, left-right
+  or both; the other direction gets a switch), and a room temperature sensor.
+- **Energy use** in the Eve app: this month's kWh on the main tile, for appliances LG keeps it for
+  (checked hourly; LG updates it with a delay). On by default; a setting turns it off.
+- Air purifiers: a **turbo** switch (the fastest setting stays off the speed slider). AeroTower:
+  **warm mode** and **UV nano** switches, its own modes, and a temperature sensor.
+
+### Fixed
+- Ovens and microwaves: DONE and CLEANING_IS_DONE count as finished, PAUSED as paused, and an
+  oven cooling down after cooking no longer shows as running.
+
 ## 0.2.0-beta.6 - 2026-11-23
 
 ### Fixed (from an independent code review; these were listed by mistake in 0.2.0-beta.5's release notes)

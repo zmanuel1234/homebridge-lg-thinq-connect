@@ -61,7 +61,7 @@ test('mappings: each type gets its own; microwaves with a fan get the hood; noth
   assert.equal(mappingFor('DEVICE_SYSTEM_BOILER', {})?.label, 'heat pump');
   assert.equal(mappingFor('DEVICE_MICROWAVE_OVEN', { property: { lamp: { lampBrightness: range(0, 2) } } })?.label, 'microwave');
   assert.equal(mappingFor('DEVICE_MICROWAVE_OVEN', {}), undefined);
-  assert.equal(mappingFor('DEVICE_COOKTOP', { property: { operation: { operationMode: en(['POWER_ON', 'POWER_OFF']) } } })?.label, 'appliance (basic)');
+  assert.equal(mappingFor('DEVICE_PLANT_CULTIVATOR', { property: { operation: { operationMode: en(['POWER_ON', 'POWER_OFF']) } } })?.label, 'appliance (basic)');
   assert.equal(mappingFor('DEVICE_KIMCHI_REFRIGERATOR', fixture('kimchi_refrigerator', 'profile')), undefined);
   assert.equal(categoryOf(mappingFor('DEVICE_AIR_CONDITIONER', {})!), 21);
 });
@@ -75,7 +75,7 @@ if (!hap) {
 function defineTests(hap: Hap): void {
   const { Service: S, Characteristic: C } = hap;
 
-  function make(deviceType: string, profile: unknown, alias = 'Thing', extraControls = true) {
+  function make(deviceType: string, profile: unknown, alias = 'Thing', extraControls = true, options?: ApplianceContext['options']) {
     const lines: string[] = [];
     const sent: Record<string, unknown>[] = [];
     let refreshes = 0;
@@ -88,6 +88,7 @@ function defineTests(hap: Hap): void {
       send: (p) => { sent.push(p); return fail ? Promise.reject(fail) : Promise.resolve({}); },
       refreshSoon: () => { refreshes++; },
       extraControls,
+      options,
     };
     const part = mappingFor(deviceType, profile)!.create(ctx, profile);
     return { part, accessory, lines, sent, refreshes: () => refreshes, failNext: (e: Error) => { fail = e; } };
@@ -503,7 +504,7 @@ function defineTests(hap: Hap): void {
   });
 
   test('basic fallback: power switch, temperatures and humidity from any profile', async () => {
-    const { part, accessory, sent } = make('DEVICE_COOKTOP', { property: {
+    const { part, accessory, sent } = make('DEVICE_PLANT_CULTIVATOR', { property: {
       operation: { operationMode: en(['POWER_ON', 'POWER_OFF']) },
       temperature: { currentTemperature: { type: 'number', mode: ['r'] }, unit: en(['C', 'F'], ['r']) },
       humidity: { currentHumidity: { type: 'number', mode: ['r'] } },
@@ -515,8 +516,120 @@ function defineTests(hap: Hap): void {
     await write(accessory.getServiceById(S.Switch, 'power')!.getCharacteristic(C.On), false);
     assert.deepEqual(sent, [{ operation: { operationMode: 'POWER_OFF' } }]);
   });
+  // ---- Closing the gap with the other LG plugins ----
+
+  const acThreeModes = () => ({ property: {
+    operation: { airConOperationMode: en(['POWER_ON', 'POWER_OFF']) },
+    airConJobMode: { currentJobMode: en(['COOL', 'HEAT', 'AUTO', 'FAN']) },
+    temperature: { targetTemperature: range(16, 30), currentTemperature: { type: 'number', mode: ['r'] } },
+    windDirection: { rotateUpDown: { type: 'boolean', mode: ['r', 'w'] }, rotateLeftRight: { type: 'boolean', mode: ['r', 'w'] } },
+  } });
+  const acOn = { operation: { airConOperationMode: 'POWER_ON' }, airConJobMode: { currentJobMode: 'COOL' },
+    temperature: { currentTemperature: 23.5, targetTemperature: 22, unit: 'C' }, windDirection: { rotateUpDown: false, rotateLeftRight: true } };
+
+  test('air conditioner options: cooling or heating only, which way the swing moves, a room temperature sensor', async () => {
+    const T = C.TargetHeaterCoolerState;
+    const all = make('DEVICE_AIR_CONDITIONER', acThreeModes(), 'AC');
+    assert.deepEqual(all.accessory.getServiceById(S.HeaterCooler, 'climate')!.getCharacteristic(T).props.validValues, [T.AUTO, T.HEAT, T.COOL]);
+    assert.ok(all.accessory.getServiceById(S.Switch, 'swing-left-right'), 'by default the tile swings up-down; left-right is a switch');
+
+    const cool = make('DEVICE_AIR_CONDITIONER', acThreeModes(), 'AC', true, { acModes: 'cool', acSwing: 'both', temperatureSensor: true });
+    cool.part.update({ ...acOn, airConJobMode: { currentJobMode: 'HEAT' } });
+    const tile = cool.accessory.getServiceById(S.HeaterCooler, 'climate')!;
+    assert.deepEqual(tile.getCharacteristic(T).props.validValues, [T.COOL]);
+    assert.equal(val(tile.getCharacteristic(T)), T.COOL, 'a mode set on the remote shows as the one the tile has');
+    assert.equal(cool.accessory.getServiceById(S.Switch, 'swing-left-right'), undefined);
+    assert.equal(cool.accessory.getServiceById(S.Switch, 'swing-up-down'), undefined);
+    assert.equal(val(tile.getCharacteristic(C.SwingMode)), C.SwingMode.SWING_ENABLED, 'swinging either way shows as swing');
+    await write(tile.getCharacteristic(C.SwingMode), C.SwingMode.SWING_DISABLED);
+    assert.deepEqual(cool.sent, [{ windDirection: { rotateUpDown: false, rotateLeftRight: false } }]);
+    const room = cool.accessory.getServiceById(S.TemperatureSensor, 'room-temperature')!;
+    assert.equal(val(room.getCharacteristic(C.CurrentTemperature)), 23.5);
+
+    const lr = make('DEVICE_AIR_CONDITIONER', acThreeModes(), 'AC', true, { acModes: 'heat', acSwing: 'left-right' });
+    lr.part.update(acOn);
+    assert.deepEqual(lr.accessory.getServiceById(S.HeaterCooler, 'climate')!.getCharacteristic(T).props.validValues, [T.HEAT]);
+    assert.ok(lr.accessory.getServiceById(S.Switch, 'swing-up-down'), 'the other direction gets the switch');
+    assert.equal(val(lr.accessory.getServiceById(S.HeaterCooler, 'climate')!.getCharacteristic(C.SwingMode)), C.SwingMode.SWING_ENABLED);
+
+    // Heating only on a unit that can't heat: all its modes stay
+    const coolOnly = make('DEVICE_AIR_CONDITIONER', fixture('air_conditioner', 'profile'), 'AC', true, { acModes: 'heat' });
+    assert.deepEqual(coolOnly.accessory.getServiceById(S.HeaterCooler, 'climate')!.getCharacteristic(T).props.validValues, [T.COOL]);
+    // Extra switches off for this one only
+    const plain = make('DEVICE_AIR_CONDITIONER', acThreeModes(), 'AC', true, { extraControls: false });
+    assert.equal(plain.accessory.services.filter((x) => x.UUID === S.Switch.UUID).length, 0);
+  });
+
+  test('air purifier: turbo kept off the slider; AeroTower warm mode, UV nano and temperature', async () => {
+    const { part, accessory, sent } = make('DEVICE_AIR_PURIFIER_FAN', { property: {
+      operation: { airFanOperationMode: en(['POWER_ON', 'POWER_OFF']) },
+      airFanJobMode: { currentJobMode: en(['SPACE_CLEAN', 'DIRECT_CLEAN', 'SLEEP']) },
+      airFlow: { windStrength: en(['LOW', 'MID', 'HIGH', 'POWER']), warmMode: en(['WARM_ON', 'WARM_OFF']) },
+      misc: { uvNano: en(['ON', 'OFF']) },
+      airQualitySensor: { temperature: { type: 'number', mode: ['r'] }, humidity: { type: 'number', mode: ['r'] } },
+    } }, 'AeroTower');
+    part.update({ operation: { airFanOperationMode: 'POWER_ON' }, airFanJobMode: { currentJobMode: 'SPACE_CLEAN' },
+      airFlow: { windStrength: 'POWER', warmMode: 'WARM_OFF' }, misc: { uvNano: 'ON' }, airQualitySensor: { temperature: 21, humidity: 40 } });
+    const turbo = accessory.getServiceById(S.Switch, 'turbo')!;
+    const warm = accessory.getServiceById(S.Switch, 'warm')!;
+    const uv = accessory.getServiceById(S.Switch, 'uv-nano')!;
+    assert.equal(val(turbo.getCharacteristic(C.On)), true);
+    assert.equal(val(warm.getCharacteristic(C.On)), false);
+    assert.equal(val(uv.getCharacteristic(C.On)), true);
+    assert.equal(val(accessory.getServiceById(S.TemperatureSensor, 'temperature')!.getCharacteristic(C.CurrentTemperature)), 21);
+    assert.equal(val(accessory.getServiceById(S.HumiditySensor, 'humidity')!.getCharacteristic(C.CurrentRelativeHumidity)), 40);
+    await write(turbo.getCharacteristic(C.On), false);
+    await write(warm.getCharacteristic(C.On), true);
+    await write(uv.getCharacteristic(C.On), false);
+    await write(accessory.getServiceById(S.Switch, 'sleep')!.getCharacteristic(C.On), true);
+    assert.deepEqual(sent, [{ airFlow: { windStrength: 'HIGH' } }, { airFlow: { warmMode: 'WARM_ON' } }, { misc: { uvNano: 'OFF' } },
+      { airFanJobMode: { currentJobMode: 'SLEEP' } }]);
+    const none = make('DEVICE_AIR_PURIFIER_FAN', { property: { airFlow: { windStrength: en(['LOW', 'POWER']), warmMode: en(['WARM_ON', 'WARM_OFF']) } } }, 'A', false);
+    assert.equal(none.accessory.services.filter((x) => x.UUID === S.Switch.UUID).length, 0);
+  });
+
+  /** A cooktop profile as LG documents it: one entry per cooking zone. */
+  const cooktopProfile = (powerOff = true) => ({ property: [
+    ...['LEFT_FRONT', 'RIGHT_FRONT', 'LEFT_REAR'].map((z) => ({
+      cookingZone: { currentState: en(['INITIAL', 'COOK', 'PAUSE', 'LOCK'], ['r']) },
+      location: { locationName: z },
+      power: { powerLevel: range(0, 9, 1, ['r']) },
+      timer: { remainHour: range(0, 11, 1, ['r']), remainMinute: range(0, 59, 1, ['r']) },
+      ...(powerOff ? { operation: { operationMode: en(['POWER_OFF'], ['w']) } } : {}),
+    })),
+  ] });
+  const zone = (z: string, st: string) => ({ cookingZone: { currentState: st }, location: { locationName: z }, timer: { remainHour: 0, remainMinute: 0 } });
+
+  test('cooktop: which burners are on, any burner on, and a button that switches them all off', async () => {
+    assert.equal(mappingFor('DEVICE_COOKTOP', cooktopProfile())?.label, 'cooktop');
+    const { part, accessory, sent, lines } = make('DEVICE_COOKTOP', cooktopProfile(), 'Cooktop');
+    const any = accessory.getServiceById(S.OccupancySensor, 'in-use')!;
+    const lf = accessory.getServiceById(S.OccupancySensor, 'zone-LEFT_FRONT')!;
+    const rf = accessory.getServiceById(S.OccupancySensor, 'zone-RIGHT_FRONT')!;
+    assert.equal(any.isPrimaryService, true);
+    assert.equal(lf.getCharacteristic(C.Name).value, 'Cooktop left front');
+    part.update([zone('LEFT_FRONT', 'COOK'), zone('RIGHT_FRONT', 'INITIAL'), zone('LEFT_REAR', 'LOCK')]);
+    assert.equal(val(any.getCharacteristic(C.OccupancyDetected)), 1);
+    assert.equal(val(lf.getCharacteristic(C.OccupancyDetected)), 1);
+    assert.equal(val(rf.getCharacteristic(C.OccupancyDetected)), 0);
+    assert.equal(part.busy, true);
+    assert.ok(lines.includes('info: [Cooktop] On: left front.'));
+    // A live update for one zone only
+    part.update([zone('LEFT_FRONT', 'INITIAL')]);
+    assert.equal(val(any.getCharacteristic(C.OccupancyDetected)), 0);
+    assert.ok(lines.includes('info: [Cooktop] All burners off.'));
+    const off = accessory.getServiceById(S.Switch, 'power-off')!;
+    await write(off.getCharacteristic(C.On), true);
+    assert.deepEqual(sent, [{ operation: { operationMode: 'POWER_OFF' } }]);
+    await write(off.getCharacteristic(C.On), false);
+    assert.equal(sent.length, 1, 'switching the button off sends nothing');
+    // Models that can't be switched off remotely, or extra controls off: no button
+    assert.equal(make('DEVICE_COOKTOP', cooktopProfile(false), 'C').accessory.getServiceById(S.Switch, 'power-off'), undefined);
+    assert.equal(make('DEVICE_COOKTOP', cooktopProfile(), 'C', false).accessory.getServiceById(S.Switch, 'power-off'), undefined);
+  });
+
   test('basic fallback: an LG alert opens the problem sensor, and it closes again on its own', () => {
-    const { part, accessory } = make('DEVICE_COOKTOP', { property: { operation: { operationMode: en(['POWER_ON', 'POWER_OFF']) } } });
+    const { part, accessory } = make('DEVICE_PLANT_CULTIVATOR', { property: { operation: { operationMode: en(['POWER_ON', 'POWER_OFF']) } } });
     const problem = () => accessory.getServiceById(S.ContactSensor, 'problem')!.getCharacteristic(C.ContactSensorState).value;
     const on = { operation: { operationMode: 'POWER_ON' } };
     part.update(on);

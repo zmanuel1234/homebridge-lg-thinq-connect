@@ -72,6 +72,32 @@ export interface LaundryUnit {
   towerKey?: 'washer' | 'dryer';
   /** Whether the state and commands carry location.locationName. */
   usesLocation: boolean;
+  /** Ovens: the set temperature it accepts, per unit, and its cook modes. */
+  oven?: OvenControl;
+}
+
+export interface OvenRange { min: number; max: number; step: number }
+
+export interface OvenControl {
+  /** Ranges LG accepts for targetTemperature, by unit (an oven lists °C, °F or both). */
+  ranges: { C?: OvenRange; F?: OvenRange };
+  /** Cook modes it accepts with START (BAKE, CONVECTION_BAKE, ...). */
+  cookModes: string[];
+}
+
+/** An oven's set-temperature control, from a cavity's profile; undefined if it has none. */
+function ovenControl(props: Props): OvenControl | undefined {
+  const ranges: OvenControl['ranges'] = {};
+  for (const entry of propertySets(props.temperature)) {
+    const unit = field(entry, 'unit');
+    const w = field(field(field(entry, 'targetTemperature'), 'value'), 'w');
+    const [min, max, step] = [field(w, 'min'), field(w, 'max'), field(w, 'step')];
+    if ((unit === 'C' || unit === 'F') && typeof min === 'number' && typeof max === 'number' && max > min) {
+      ranges[unit] = { min, max, step: typeof step === 'number' && step > 0 ? step : 1 };
+    }
+  }
+  if (!ranges.C && !ranges.F) { return undefined; }
+  return { ranges, cookModes: enumValues(field(field(props, 'cook'), 'cookMode'), 'w') };
 }
 
 type Props = Record<string, unknown>;
@@ -113,6 +139,7 @@ function unitFrom(kind: LaundryKind, props: Props, location: string, usesLocatio
     countsCycles: field(field(props, 'cycle'), 'cycleCount') !== undefined,
     towerKey,
     usesLocation,
+    ...(kind === 'oven' && ovenControl(props) ? { oven: ovenControl(props) } : {}),
   };
 }
 
@@ -158,6 +185,10 @@ export interface LaundryStatus {
   cycleCount?: number;
   /** The door is open (dishwashers), when reported. */
   doorOpen?: boolean;
+  /** Ovens: the temperature it's set to, and in which unit (LG doesn't report the actual one). */
+  setTemperature?: { value: number; unit: 'C' | 'F' };
+  /** Ovens: the cook mode, when reported. */
+  cookMode?: string;
   /** Rinse aid needs refilling (dishwashers), when reported. */
   rinseAidLow?: boolean;
   /** The course or program, when reported (dishwashers: dishWashingCourse). */
@@ -169,10 +200,13 @@ export interface LaundryStatus {
 // States that are not a cycle under way. Anything not listed here or in PAUSED counts as running,
 // so a state LG adds later (a new phase) shows as running rather than idle.
 // Freeze protection runs on its own, without a timer: not a cycle the person started.
+// DONE, CLEANING_IS_DONE, PREFERENCE (settings screen): ovens and microwaves.
 const IDLE = new Set(['POWER_OFF', 'INITIAL', 'FROZEN_PREVENT_INITIAL', 'FROZEN_PREVENT_RUNNING', 'FROZEN_PREVENT_PAUSE',
-  'END', 'WRINKLE_CARE', 'ERROR', 'RESERVED', 'SLEEP', 'UNKNOWN']);
-const PAUSED = new Set(['PAUSE', 'RINSE_HOLD']);
-const DONE = new Set(['END', 'WRINKLE_CARE']);
+  'END', 'WRINKLE_CARE', 'ERROR', 'RESERVED', 'SLEEP', 'UNKNOWN', 'DONE', 'CLEANING_IS_DONE', 'PREFERENCE']);
+/** An oven cooling down after cooking isn't cooking (a dryer's COOLING is part of drying). */
+const OVEN_IDLE = new Set(['COOLING']);
+const PAUSED = new Set(['PAUSE', 'PAUSED', 'RINSE_HOLD']);
+const DONE = new Set(['END', 'WRINKLE_CARE', 'DONE', 'CLEANING_IS_DONE']);
 
 /** Running, paused or finished, from LG's state word: for any appliance that runs cycles. */
 export function cyclePhase(state: string): { running: boolean; paused: boolean; done: boolean; error: boolean } {
@@ -196,7 +230,7 @@ export function laundryStatus(unit: LaundryUnit, state: unknown): LaundryStatus 
   const word = field(field(s, 'runState'), 'currentState');
   const current = typeof word === 'string' && word ? word : 'UNKNOWN';
   const paused = PAUSED.has(current);
-  const running = !paused && !IDLE.has(current);
+  const running = !paused && !IDLE.has(current) && !(unit.kind === 'oven' && OVEN_IDLE.has(current));
   const timer = field(s, 'timer');
   const inCycle = running || paused;
   const errorWord = field(field(s, 'error'), 'errorCode') ?? field(s, 'errorCode');
@@ -218,10 +252,45 @@ export function laundryStatus(unit: LaundryUnit, state: unknown): LaundryStatus 
     doorOpen: door === undefined ? undefined : door === 'OPEN',
     rinseAidLow: typeof rinse === 'boolean' ? rinse : undefined,
     course: typeof course === 'string' && course ? course : undefined,
+    ...ovenStatus(unit, s),
     startsIn: current === 'RESERVED'
       ? num(field(timer, 'relativeHourToStart')) * 3600 + num(field(timer, 'relativeMinuteToStart')) * 60 || undefined
       : undefined,
   };
+}
+
+/** Ovens only: the set temperature and cook mode. */
+function ovenStatus(unit: LaundryUnit, s: unknown): Pick<LaundryStatus, 'setTemperature' | 'cookMode'> {
+  if (unit.kind !== 'oven') { return {}; }
+  const out: Pick<LaundryStatus, 'setTemperature' | 'cookMode'> = {};
+  const t = ovenTemperature(field(s, 'temperature'));
+  if (t) { out.setTemperature = t; }
+  const mode = field(field(s, 'cook'), 'cookMode');
+  if (typeof mode === 'string' && mode) { out.cookMode = mode; }
+  return out;
+}
+
+/** An oven's set temperature from its state: an object, or a list per unit (the one in use is non-zero). */
+function ovenTemperature(value: unknown): LaundryStatus['setTemperature'] {
+  for (const entry of propertySets(value)) {
+    const v = field(entry, 'targetTemperature');
+    const unit = field(entry, 'unit') ?? field(entry, 'temperatureUnit');
+    if (typeof v === 'number' && v > 0 && (unit === 'C' || unit === 'F')) { return { value: v, unit }; }
+  }
+  return undefined;
+}
+
+/** A command that starts an oven cavity at a temperature (and cook mode, if given). */
+export function ovenStartPayload(unit: LaundryUnit, celsius: number, cookMode?: string, preferF = false): Record<string, unknown> {
+  const body = operationPayload(unit, 'START');
+  const r = unit.oven?.ranges;
+  const useF = !!r?.F && (preferF || !r.C);
+  const range = useF ? r!.F! : r?.C;
+  let value = useF ? celsius * 9 / 5 + 32 : celsius;
+  if (range) { value = Math.min(range.max, Math.max(range.min, Math.round(value / range.step) * range.step)); }
+  body.temperature = { targetTemperature: value, unit: useF ? 'F' : 'C' };
+  if (cookMode) { body.cook = { cookMode }; }
+  return body;
 }
 
 /**
@@ -279,6 +348,11 @@ export function operationPayload(unit: LaundryUnit, operation: string): Record<s
 
 // Words for LG's states, where its own name reads oddly. RUNNING is the main phase: washing or drying.
 const LABELS: Record<string, string> = {
+  COOKING_IN_PROGRESS: 'Cooking',
+  PREHEATING_IS_DONE: 'Preheated',
+  COOLING: 'Cooling down',
+  DONE: 'Finished',
+  PAUSED: 'Paused',
   POWER_OFF: 'Off',
   INITIAL: 'Ready',
   PAUSE: 'Paused',

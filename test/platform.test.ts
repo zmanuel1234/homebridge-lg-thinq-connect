@@ -27,12 +27,15 @@ try {
 
 test('settings: defaults, limits and clean-up', () => {
   const s = readSettings({ platform: 'LGThinQConnect' } as PlatformConfig);
-  assert.deepEqual(s, { token: '', country: 'US', pollInterval: 60, runningPollInterval: 30, allowControl: false, liveUpdates: true, phaseSensors: [], tubCleanAfter: 0, experimental: false, extraControls: true, ignore: [] });
+  assert.deepEqual(s, { token: '', country: 'US', pollInterval: 60, runningPollInterval: 30, allowControl: false, liveUpdates: true, phaseSensors: [], tubCleanAfter: 0, experimental: false, extraControls: true, ignore: [], appliances: new Map(), energy: true });
   const t = readSettings({
     platform: 'LGThinQConnect', token: ' abc ', country: 'gb', pollInterval: 5, runningPollInterval: '9999',
-    allowControl: 'yes', liveUpdates: false, phaseSensors: ['SPINNING', '', 3], tubCleanAfter: 500, experimental: 'yes', extraControls: false, ignore: [' Dryer '],
+    allowControl: 'yes', liveUpdates: false, phaseSensors: ['SPINNING', '', 3], tubCleanAfter: 500, experimental: 'yes', extraControls: false, ignore: [' Dryer '], energy: false,
+    appliances: [{ name: ' Living Room AC ', acModes: 'cool', acSwing: 'both', temperatureSensor: true, extraControls: false, odd: 1 },
+      { name: '', acModes: 'cool' }, { name: 'Purifier', acModes: 'sideways', acSwing: 7 }, 'junk'],
   } as unknown as PlatformConfig);
-  assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, liveUpdates: false, phaseSensors: ['SPINNING'], tubCleanAfter: 200, experimental: false, extraControls: false, ignore: ['dryer'] });
+  assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, liveUpdates: false, phaseSensors: ['SPINNING'], tubCleanAfter: 200, experimental: false, extraControls: false, ignore: ['dryer'], energy: false,
+    appliances: new Map([['living room ac', { acModes: 'cool', acSwing: 'both', temperatureSensor: true, extraControls: false }], ['purifier', {}]]) });
 });
 
 if (!hap) {
@@ -130,6 +133,40 @@ function defineTests(hap: Hap): void {
     await hb.start(cached);
     assert.equal(hb.calls.unregistered.length, 0);
     assert.ok(hb.lines.some((l) => l.startsWith('error: Couldn\'t list your LG appliances: HTTP 503') && l.includes('Trying again in 1 min')));
+  });
+
+  const until = async (check: () => boolean): Promise<void> => {
+    const end = Date.now() + 3000;
+    while (!check()) {
+      if (Date.now() > end) { throw new Error('timed out waiting'); }
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  };
+
+  test('energy: this month\'s use on the main tile for Eve, for appliances LG keeps it for', async (t) => {
+    const hb = await homebridge(t);
+    hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 12345 };
+    const platform = await hb.start();
+    await until(() => hb.lg.energyQueries.length > 0);
+    const month = `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    assert.deepEqual(hb.lg.energyQueries, [`property=energyUsage&period=MONTHLY&startDate=${month}&endDate=${month}`]);
+    const washer = hb.calls.registered.find((a) => a.displayName === 'Front Load Washer')!;
+    const valve = washer.getService(S.Valve)!;
+    await until(() => valve.characteristics.some((c) => c.UUID === 'E863F10C-079E-48FF-8F27-9C2605A29F52' && c.value === 12.345));
+    assert.ok(hb.lines.includes('info: [Front Load Washer] Energy use this month is shown in the Eve app (LG updates it with a delay).'));
+    // The dryer: LG keeps no figures for it, so nothing is added and nothing is logged above debug
+    const dryer = hb.calls.registered.find((a) => a.displayName === 'Dryer')!;
+    assert.ok(!dryer.getService(S.Valve)!.characteristics.some((c) => c.UUID === 'E863F10C-079E-48FF-8F27-9C2605A29F52'));
+    assert.ok(!hb.lines.some((l) => l.includes('[Dryer] Energy') && !l.startsWith('debug')));
+    platform.stop();
+  });
+
+  test('energy: off in the settings asks LG for nothing', async (t) => {
+    const hb = await homebridge(t);
+    hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 1 };
+    await hb.start([], { energy: false });
+    await new Promise((r) => setTimeout(r, 50));
+    assert.deepEqual(hb.lg.energyQueries, []);
   });
 
   test('LG answering an empty list: nothing removed until it says so three times in a row', async (t) => {
@@ -245,14 +282,6 @@ function defineTests(hap: Hap): void {
     assert.equal(sent?.path, 'devices/device-1/control');
     assert.deepEqual(sent?.body, { operation: { washerOperationMode: 'STOP' }, location: { locationName: 'MAIN' } });
   });
-
-  const until = async (check: () => boolean): Promise<void> => {
-    const end = Date.now() + 3000;
-    while (!check()) {
-      if (Date.now() > end) { throw new Error('timed out waiting'); }
-      await new Promise((r) => setTimeout(r, 10));
-    }
-  };
 
   test('live updates: connected after finding the appliances; a state update moves the tile right away', async (t) => {
     const hb = await homebridge(t);

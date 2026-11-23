@@ -29,6 +29,10 @@ export class FakeLG {
   readonly token = 'test-token';
   readonly requests: Recorded[] = [];
   devices: FakeDevice[] = realDevices();
+  /** Energy figures per device ID: the property names LG keeps, and watt-hours this month. */
+  energy: Record<string, { properties: string[]; wh: number }> = {};
+  /** The energy usage queries received. */
+  energyQueries: string[] = [];
   /** Requests to matching paths fail with HTTP 503. */
   failPath: RegExp | null = null;
   /** Set to answer the device list with this instead (an odd answer from LG). */
@@ -96,6 +100,16 @@ export class FakeLG {
       if (list.includes(id)) { return [400, { error: { code: '1207', message: 'Already subscribed push' } }]; }
       list.push(id);
       return [200, { response: {} }];
+    }
+    const energy = /^devices\/energy\/([^/?]+)\/(profile|usage)(?:\?(.*))?$/.exec(path);
+    if (energy) {
+      const e = this.energy[decodeURIComponent(energy[1])];
+      if (!e) { return [400, { error: { code: '1219', message: 'Not supported model' } }]; }
+      if (energy[2] === 'profile') { return [200, { response: { result: { property: e.properties } } }]; }
+      this.energyQueries.push(energy[3] || '');
+      const property = new URLSearchParams(energy[3] || '').get('property') || '';
+      // Two data points, to check they're added up
+      return [200, { response: { result: { dataList: [{ [property]: e.wh / 2 }, { [property]: e.wh / 2, other: 5 }] } } }];
     }
     if (path === 'devices') {
       if (this.listingOverride !== undefined) { return [200, { response: this.listingOverride }]; }
