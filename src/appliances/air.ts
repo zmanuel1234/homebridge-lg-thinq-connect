@@ -10,10 +10,26 @@ import { field } from '../api';
 import { Appliance, type ApplianceContext, set, limit } from './base';
 import {
   type Obj, type Range, enumValues, fieldOf, levelFor, levelPercent, num, powerField, rangeOf, resources, speedLevels,
-  stateValue, writable,
+  stateValue, temperatureC, writable,
 } from './profile';
 
 /** On/off and a fan speed from named levels (LOW, MID, HIGH), shared by the fan-like appliances. */
+/** On and off values of a switch-like property: a boolean, or an enum such as ON/OFF or WARM_ON/WARM_OFF. */
+export function onOffValues(prop: Obj | undefined): { on: unknown; off: unknown } | undefined {
+  if (!writable(prop)) { return undefined; }
+  if (field(prop, 'type') === 'boolean') { return { on: true, off: false }; }
+  const w = enumValues(prop, 'w');
+  const on = w.find((v) => /(^|_)ON$/.test(v));
+  const off = w.find((v) => /(^|_)OFF$/.test(v));
+  return on && off ? { on, off } : undefined;
+}
+
+/** A purifier switch: a property with on and off values. */
+export interface Toggle { subtype: string; label: string; resource: string; name: string; on: unknown; off: unknown; service?: Service; value: boolean }
+
+/** A switch-like property: [resource, property, subtype, label]. */
+export type ToggleSpec = readonly [string, string, string, string];
+
 abstract class Powered extends Appliance {
   protected readonly res: Obj;
   protected readonly power?: { name: string; canWrite: boolean };
@@ -81,31 +97,98 @@ abstract class Powered extends Appliance {
     setTimeout(() => this.update(undefined), 50).unref?.();
     return Promise.reject(new this.hap.HapStatusError(this.hap.HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE));
   }
+
+  /** Extra switches are wanted for this appliance (setting, or its own option). */
+  protected get extrasWanted(): boolean {
+    return (this.ctx.options?.extraControls ?? this.ctx.extraControls) !== false;
+  }
+
+  readonly toggles: Toggle[] = [];
+
+  /** Switches for the on/off properties this appliance's profile can change. */
+  protected addToggles(specs: readonly ToggleSpec[], keep: Set<string>): void {
+    if (!this.extrasWanted) { return; }
+    const { Service: S, Characteristic: C } = this.hap;
+    for (const [resource, name, subtype, label] of specs) {
+      const values = onOffValues(fieldOf(this.res, resource, name));
+      if (!values) { continue; }
+      const t: Toggle = { subtype, label, resource, name, ...values, value: false };
+      t.service = this.service(S.Switch, `${this.ctx.name} ${label}`, subtype);
+      t.service.getCharacteristic(C.On).onSet((v) => this.setToggle(t, v === true || v === 1));
+      this.toggles.push(t);
+      keep.add(subtype);
+    }
+  }
+
+  protected readToggles(state: unknown): void {
+    for (const t of this.toggles) {
+      const v = stateValue(state, t.resource, t.name);
+      if (v === t.on || v === t.off) { t.value = v === t.on; }
+    }
+  }
+
+  protected renderToggles(): void {
+    const { Characteristic: C } = this.hap;
+    for (const t of this.toggles) { set(t.service!.getCharacteristic(C.On), t.value); }
+  }
+
+  private setToggle(t: Toggle, on: boolean): Promise<void> {
+    if (on === t.value) { return Promise.resolve(); }
+    return this.command(`${t.label[0].toUpperCase()}${t.label.slice(1)} ${on ? 'on' : 'off'}`, { [t.resource]: { [t.name]: on ? t.on : t.off } })
+      .then(() => { t.value = on; });
+  }
+
+  protected temperatureSensor?: Service;
+  protected co2Sensor?: Service;
+  private roomTemperature?: number;
+  private co2?: number;
+
+  /** Room temperature and CO2 sensors, when the appliance measures them. */
+  protected addRoomSensors(keep: Set<string>): void {
+    const { Service: S, Characteristic: C } = this.hap;
+    if (field(this.res.airQualitySensor, 'temperature') || field(this.res.temperature, 'currentTemperature')) {
+      this.temperatureSensor = this.service(S.TemperatureSensor, `${this.ctx.name} temperature`, 'temperature');
+      limit(this.temperatureSensor.getCharacteristic(C.CurrentTemperature), { minValue: -40, maxValue: 100 });
+      keep.add('temperature');
+    }
+    if (field(this.res.airQualitySensor, 'CO2')) {
+      this.co2Sensor = this.service(S.CarbonDioxideSensor, `${this.ctx.name} CO2`, 'co2');
+      keep.add('co2');
+    }
+  }
+
+  protected readRoomSensors(state: unknown): void {
+    const t = num(stateValue(state, 'airQualitySensor', 'temperature'))
+      ?? temperatureC(field(state, 'temperature'), 'currentTemperature');
+    if (t !== undefined) { this.roomTemperature = t; }
+    const co2 = num(stateValue(state, 'airQualitySensor', 'CO2'));
+    if (co2 !== undefined) { this.co2 = co2; }
+  }
+
+  protected renderRoomSensors(): void {
+    const { Characteristic: C } = this.hap;
+    if (this.temperatureSensor && this.roomTemperature !== undefined) {
+      set(this.temperatureSensor.getCharacteristic(C.CurrentTemperature), Math.max(-40, Math.min(100, this.roomTemperature)));
+    }
+    if (this.co2Sensor && this.co2 !== undefined) {
+      set(this.co2Sensor.getCharacteristic(C.CarbonDioxideLevel), Math.max(0, Math.min(100_000, this.co2)));
+      // HomeKit's "abnormal" alarm: above 1,000 ppm, a common indoor guideline
+      set(this.co2Sensor.getCharacteristic(C.CarbonDioxideDetected), this.co2 > CO2_HIGH ? 1 : 0);
+    }
+  }
 }
+
+/** CO2 above this (ppm) shows as "abnormal" in the Home app. */
+const CO2_HIGH = 1000;
 
 /**
  * Air purifiers: on/off, fan speed, auto or manual mode (when the purifier has an AUTO mode), a
  * sleep mode switch, and air quality, humidity and filter sensors when reported.
  */
-/** On and off values of a switch-like property: a boolean, or an enum such as ON/OFF or WARM_ON/WARM_OFF. */
-export function onOffValues(prop: Obj | undefined): { on: unknown; off: unknown } | undefined {
-  if (!writable(prop)) { return undefined; }
-  if (field(prop, 'type') === 'boolean') { return { on: true, off: false }; }
-  const w = enumValues(prop, 'w');
-  const on = w.find((v) => /(^|_)ON$/.test(v));
-  const off = w.find((v) => /(^|_)OFF$/.test(v));
-  return on && off ? { on, off } : undefined;
-}
-
-/** A purifier switch: a property with on and off values. */
-interface Toggle { subtype: string; label: string; resource: string; name: string; on: unknown; off: unknown; service?: Service; value: boolean }
-
 export class AirPurifier extends Powered {
   readonly tile: Service;
   readonly sleep?: Service;
   readonly turbo?: Service;
-  readonly temperature?: Service;
-  readonly toggles: Toggle[] = [];
   private readonly sensors: AirSensors;
   private readonly jobModes: string[];
   /** airPurifierJobMode, or airFanJobMode on an AeroTower (purifier fan). */
@@ -113,7 +196,6 @@ export class AirPurifier extends Powered {
   private readonly turboLevel?: string;
   private wind = '';
   private jobMode = '';
-  private roomTemperature?: number;
 
   constructor(ctx: ApplianceContext, profile: unknown) {
     super(ctx, profile);
@@ -132,7 +214,7 @@ export class AirPurifier extends Powered {
     }
     this.speedCharacteristic(this.tile);
     const keep = new Set(['purifier']);
-    const extras = (ctx.options?.extraControls ?? ctx.extraControls) !== false;
+    const extras = this.extrasWanted;
     if (extras && this.jobModes.includes('SLEEP')) {
       this.sleep = this.service(S.Switch, `${ctx.name} sleep mode`, 'sleep');
       this.sleep.getCharacteristic(C.On).onSet((v) => this.setJobMode(v === true || v === 1 ? 'SLEEP' : (this.manualMode || 'AUTO')));
@@ -145,22 +227,11 @@ export class AirPurifier extends Powered {
       this.turbo.getCharacteristic(C.On).onSet((v) => this.setTurbo(v === true || v === 1));
       keep.add('turbo');
     }
-    // AeroTower: warm air, and the UV light that cleans the fan
-    for (const [resource, name, subtype, label] of [['airFlow', 'warmMode', 'warm', 'warm mode'], ['misc', 'uvNano', 'uv-nano', 'UV nano']] as const) {
-      const values = extras ? onOffValues(fieldOf(this.res, resource, name)) : undefined;
-      if (!values) { continue; }
-      const t: Toggle = { subtype, label, resource, name, ...values, value: false };
-      t.service = this.service(S.Switch, `${ctx.name} ${label}`, subtype);
-      t.service.getCharacteristic(C.On).onSet((v) => this.setToggle(t, v === true || v === 1));
-      this.toggles.push(t);
-      keep.add(subtype);
-    }
+    // AeroTower: warm air, the UV light that cleans the fan, the display light
+    this.addToggles([['airFlow', 'warmMode', 'warm', 'warm mode'], ['misc', 'uvNano', 'uv-nano', 'UV nano'],
+      ['display', 'light', 'display-light', 'display light']], keep);
     // The room temperature, when it measures it (AeroTower)
-    if (field(this.res.airQualitySensor, 'temperature')) {
-      this.temperature = this.service(S.TemperatureSensor, `${ctx.name} temperature`, 'temperature');
-      limit(this.temperature.getCharacteristic(C.CurrentTemperature), { minValue: -40, maxValue: 100 });
-      keep.add('temperature');
-    }
+    this.addRoomSensors(keep);
     this.sensors = new AirSensors(this, this.res, ctx.name, (t, n, s) => this.service(t, n, s), keep, true);
     this.problemFromProfile(profile, keep);
     this.prune(keep);
@@ -180,12 +251,8 @@ export class AirPurifier extends Powered {
       if (typeof m === 'string') { this.jobMode = m; }
       const w = this.windField ? stateValue(state, 'airFlow', this.windField) : undefined;
       if (typeof w === 'string') { this.wind = w; }
-      for (const t of this.toggles) {
-        const v = stateValue(state, t.resource, t.name);
-        if (v === t.on || v === t.off) { t.value = v === t.on; }
-      }
-      const temp = num(stateValue(state, 'airQualitySensor', 'temperature'));
-      if (temp !== undefined) { this.roomTemperature = temp; }
+      this.readToggles(state);
+      this.readRoomSensors(state);
       this.sensors.update(state);
     }
     set(this.tile.getCharacteristic(C.Active), this.on ? 1 : 0);
@@ -196,10 +263,8 @@ export class AirPurifier extends Powered {
     if (this.speeds.length) { set(this.tile.getCharacteristic(C.RotationSpeed), this.speed); }
     if (this.sleep) { set(this.sleep.getCharacteristic(C.On), this.jobMode === 'SLEEP'); }
     if (this.turbo) { set(this.turbo.getCharacteristic(C.On), this.wind === this.turboLevel); }
-    for (const t of this.toggles) { set(t.service!.getCharacteristic(C.On), t.value); }
-    if (this.temperature && this.roomTemperature !== undefined) {
-      set(this.temperature.getCharacteristic(C.CurrentTemperature), Math.max(-40, Math.min(100, this.roomTemperature)));
-    }
+    this.renderToggles();
+    this.renderRoomSensors();
     this.renderProblem();
   }
 
@@ -215,14 +280,15 @@ export class AirPurifier extends Powered {
     return this.command(on ? 'Turbo on' : 'Turbo off', { airFlow: { [this.windField!]: level } }).then(() => { this.wind = level; });
   }
 
-  private setToggle(t: Toggle, on: boolean): Promise<void> {
-    if (on === t.value) { return Promise.resolve(); }
-    return this.command(`${t.label[0].toUpperCase()}${t.label.slice(1)} ${on ? 'on' : 'off'}`, { [t.resource]: { [t.name]: on ? t.on : t.off } })
-      .then(() => { t.value = on; });
-  }
 }
 
 /** Dehumidifiers and humidifiers: the Home app's humidifier-dehumidifier tile. */
+const HUMIDIFIER_TOGGLES: ToggleSpec[] = [
+  ['operation', 'autoMode', 'auto-mode', 'auto mode'], ['operation', 'sleepMode', 'sleep-mode', 'sleep mode'],
+  ['operation', 'hygieneDryMode', 'hygiene-dry', 'hygiene dry'], ['humidity', 'warmMode', 'warm', 'warm mist'],
+  ['moodLamp', 'moodLampState', 'mood-lamp', 'mood lamp'], ['display', 'light', 'display-light', 'display light'],
+];
+
 export class HumidityAppliance extends Powered {
   readonly tile: Service;
   private readonly kind: 'dehumidifier' | 'humidifier';
@@ -248,15 +314,24 @@ export class HumidityAppliance extends Powered {
     }
     this.speedCharacteristic(this.tile);
     const keep = new Set(['humidity']);
+    // Humidifiers: auto and sleep modes, hygiene drying, warm mist, the mood lamp, the display light
+    this.addToggles(HUMIDIFIER_TOGGLES, keep);
+    this.sensors = new AirSensors(this, this.res, ctx.name, (t, n, s) => this.service(t, n, s), keep, false);
+    this.addRoomSensors(keep);
     this.problemFromProfile(profile, keep);
     this.prune(keep);
     this.update(undefined);
   }
 
+  private readonly sensors: AirSensors;
+
   update(state: unknown): void {
     const { Characteristic: C } = this.hap;
     this.readPower(state);
     if (state !== null && state !== undefined) {
+      this.readToggles(state);
+      this.readRoomSensors(state);
+      this.sensors?.update(state);
       this.current = num(stateValue(state, 'humidity', 'currentHumidity')) ?? num(stateValue(state, 'airQualitySensor', 'humidity')) ?? this.current;
       this.target = num(stateValue(state, 'humidity', 'targetHumidity')) ?? this.target;
     }
@@ -271,6 +346,8 @@ export class HumidityAppliance extends Powered {
       set(this.tile.getCharacteristic(threshold), Math.min(Math.max(this.target, this.range.min), this.range.max));
     }
     if (this.speeds.length) { set(this.tile.getCharacteristic(C.RotationSpeed), this.speed); }
+    this.renderToggles();
+    this.renderRoomSensors();
     this.renderProblem();
   }
 
@@ -292,16 +369,26 @@ export class Fan extends Powered {
     this.tile.getCharacteristic(C.Active).onSet((v) => this.setPower(v));
     this.speedCharacteristic(this.tile);
     const keep = new Set(['fan']);
+    // Ventilators: air quality (PM2.5, PM10), CO2 and temperature, when measured
+    this.sensors = new AirSensors(this, this.res, ctx.name, (t, n, s) => this.service(t, n, s), keep, false);
+    this.addRoomSensors(keep);
     this.problemFromProfile(profile, keep);
     this.prune(keep);
     this.update(undefined);
   }
 
+  private readonly sensors: AirSensors;
+
   update(state: unknown): void {
     const { Characteristic: C } = this.hap;
     this.readPower(state);
+    if (state) {
+      this.readRoomSensors(state);
+      this.sensors?.update(state);
+    }
     set(this.tile.getCharacteristic(C.Active), this.on ? 1 : 0);
     if (this.speeds.length) { set(this.tile.getCharacteristic(C.RotationSpeed), this.speed); }
+    this.renderRoomSensors();
     this.renderProblem();
   }
 }

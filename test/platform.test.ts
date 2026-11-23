@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import type { API, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
 import type * as HapNodejs from '@homebridge/hap-nodejs';
-import { LGThinQPlatform, readSettings } from '../src/platform';
+import { LGThinQPlatform, readSettings, untilNextEnergyCheck } from '../src/platform';
 import { ThinQClient } from '../src/api';
 import { FakeLG } from './fake-lg';
 import { FakeBroker } from './fake-broker';
@@ -153,7 +153,7 @@ function defineTests(hap: Hap): void {
     const washer = hb.calls.registered.find((a) => a.displayName === 'Front Load Washer')!;
     const valve = washer.getService(S.Valve)!;
     await until(() => valve.characteristics.some((c) => c.UUID === 'E863F10C-079E-48FF-8F27-9C2605A29F52' && c.value === 12.345));
-    assert.ok(hb.lines.includes('info: [Front Load Washer] Energy use this month is shown in the Eve app (LG updates it with a delay).'));
+    assert.ok(hb.lines.includes('info: [Front Load Washer] Energy use this month is shown in the Eve app (LG updates it daily).'));
     // The dryer: LG keeps no figures for it, so nothing is added and nothing is logged above debug
     const dryer = hb.calls.registered.find((a) => a.displayName === 'Dryer')!;
     assert.ok(!dryer.getService(S.Valve)!.characteristics.some((c) => c.UUID === 'E863F10C-079E-48FF-8F27-9C2605A29F52'));
@@ -401,3 +401,12 @@ function defineTests(hap: Hap): void {
     assert.ok(hb.lines.some((l) => l.includes('DEVICE_DISH_WASHER support is experimental')));
   });
 }
+
+test('energy is checked once a day, at a random time between 01:00 and 06:00', () => {
+  const at = (h: number, m = 0) => new Date(2026, 10, 23, h, m);
+  const hours = (ms: number) => ms / 3600_000;
+  assert.equal(hours(untilNextEnergyCheck(at(0), 0)), 1, 'just after midnight: 01:00 today');
+  assert.equal(hours(untilNextEnergyCheck(at(0), 0.999999)), 6 - 0.000005, 'up to 06:00');
+  assert.equal(hours(untilNextEnergyCheck(at(12), 0)), 13, 'in the afternoon: 01:00 tomorrow');
+  assert.equal(hours(untilNextEnergyCheck(at(3), 0.2)), 23, 'already past today\'s 02:00: tomorrow\'s');
+});

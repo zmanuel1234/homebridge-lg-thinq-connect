@@ -43,7 +43,7 @@
         "title": "Extra switches for experimental appliances",
         "type": "boolean",
         "default": true,
-        "description": "Switches for what an appliance offers beyond its main tile: air conditioner air purify, energy saving, display light, the other swing direction, jet, dry and fan modes; air purifier sleep mode and turbo; AeroTower warm mode and UV nano; cooktop \"all burners off\". Turn off for a tidier Home app."
+        "description": "Switches for what an appliance offers beyond its main tile: air conditioner air purify, energy saving, display light, the other swing direction, jet, dry and fan modes, airflow styles; air purifier sleep mode and turbo; AeroTower warm mode, UV nano and display light; humidifier auto, sleep, hygiene dry, warm mist, mood lamp and display light; water heater modes; cooktop \"all burners off\". Turn off for a tidier Home app."
       },
       "liveUpdates": {
         "title": "Live updates from LG",

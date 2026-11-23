@@ -50,8 +50,7 @@ export class RobotVacuum extends Appliance {
         this.state = next;
       }
       const battery = field(state, 'battery');
-      this.percent = num(field(battery, 'percent'))
-        ?? ({ HIGH: 100, MID: 60, MIDDLE: 60, LOW: 20, WARNING: 10 } as Record<string, number>)[String(field(battery, 'level'))] ?? this.percent;
+      this.percent = batteryPercent(battery) ?? this.percent;
     }
     set(this.tile.getCharacteristic(C.On), this.cleaning);
     if (this.percent !== undefined) {
@@ -71,6 +70,52 @@ export class RobotVacuum extends Appliance {
     // As Home Assistant does: wake a sleeping one, resume a paused one, otherwise start; off goes home
     const mode = !on ? 'HOMING' : this.state === 'SLEEP' ? 'WAKE_UP' : this.state === 'PAUSE' ? 'RESUME' : 'START';
     return this.command(on ? 'Cleaning' : 'Sent home', { operation: { cleanOperationMode: mode } });
+  }
+}
+
+/** Battery percent from LG's battery object: a percent, or a level word. */
+function batteryPercent(battery: unknown): number | undefined {
+  return num(field(battery, 'percent'))
+    ?? ({ FULL: 100, OVER_CHARGE: 100, HIGH: 100, MID: 60, MIDDLE: 60, LOW: 20, DOCK_LEVEL: 10, WARNING: 10, MOVELESS: 5 } as Record<string, number>)[String(field(battery, 'level'))];
+}
+
+/**
+ * Cordless stick vacuums: LG's API only reports them (no control): the battery, whether it's
+ * charging, and its state changes in the log.
+ */
+export class StickVacuum extends Appliance {
+  readonly battery: Service;
+  private state = 'UNKNOWN';
+  private percent?: number;
+
+  constructor(ctx: ApplianceContext, profile: unknown) {
+    super(ctx);
+    void profile;
+    const { Service: S } = this.hap;
+    this.battery = this.service(S.Battery, `${ctx.name} battery`, 'battery');
+    this.battery.setPrimaryService(true);
+    this.addProblemSensor();
+    this.prune(new Set(['battery', 'problem']));
+    this.update(undefined);
+  }
+
+  update(state: unknown): void {
+    const { Characteristic: C } = this.hap;
+    if (state) {
+      const s = stateValue(state, 'runState', 'currentState');
+      if (typeof s === 'string') {
+        const next = s.toUpperCase();
+        if (next !== this.state && this.state !== 'UNKNOWN') { this.ctx.log.info(`[${this.ctx.name}] ${stateLabel(next)}.`); }
+        this.state = next;
+      }
+      this.percent = batteryPercent(field(state, 'battery')) ?? this.percent;
+    }
+    if (this.percent !== undefined) {
+      set(this.battery.getCharacteristic(C.BatteryLevel), Math.max(0, Math.min(100, this.percent)));
+      set(this.battery.getCharacteristic(C.StatusLowBattery), this.percent <= 20 ? 1 : 0);
+    }
+    set(this.battery.getCharacteristic(C.ChargingState), /CHARG/.test(this.state) && !/COMPLETE|FULL/.test(this.state) ? 1 : 0);
+    this.renderProblem();
   }
 }
 

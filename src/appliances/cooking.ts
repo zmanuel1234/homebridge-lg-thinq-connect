@@ -50,6 +50,7 @@ export class Cooktop extends Appliance {
   readonly zones = new Map<string, Service>();
   readonly offSwitch: Service | undefined;
   private on = new Map<string, boolean>();
+  private levels = new Map<string, number>();
 
   constructor(ctx: ApplianceContext, profile: unknown) {
     super(ctx);
@@ -90,14 +91,24 @@ export class Cooktop extends Appliance {
       for (const zone of this.on.keys()) {
         if (!listed.has(zone)) { this.on.set(zone, false); }
       }
+      let changed = false;
       for (const e of entries(state)) {
         const zone = zoneOf(e);
         const word = field(field(e, 'cookingZone'), 'currentState');
+        const level = field(field(e, 'power'), 'powerLevel');
+        if (typeof level === 'number' && zone && level !== this.levels.get(zone)) { this.levels.set(zone, level); changed = true; }
         if (!zone || typeof word !== 'string') { continue; }
+        if (this.on.get(zone) !== ON_STATES.has(word)) { changed = true; }
         this.on.set(zone, ON_STATES.has(word));
       }
-      if (was !== this.busy) {
-        const on = [...this.on].filter(([, v]) => v).map(([z]) => zoneLabel(z));
+      // The Home app has nothing for a burner's level: it's in the log (with the zone's timer)
+      if (was !== this.busy || (changed && this.busy)) {
+        const on = [...this.on].filter(([, v]) => v).map(([z]) => {
+          const level = this.levels.get(z);
+          const e = entries(state).find((x) => zoneOf(x) === z);
+          const left = (Number(field(field(e, 'timer'), 'remainHour')) || 0) * 60 + (Number(field(field(e, 'timer'), 'remainMinute')) || 0);
+          return `${zoneLabel(z)}${level ? ` (level ${level}${left ? `, ${left} min left` : ''})` : ''}`;
+        });
         this.ctx.log.info(`[${this.ctx.name}] ${on.length ? `On: ${on.join(', ')}` : 'All burners off'}.`);
         if (this.busy) { this.problemAlert = ''; }
       }

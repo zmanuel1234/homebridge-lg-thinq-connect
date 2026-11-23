@@ -56,6 +56,9 @@ const OVEN_START_DELAY_MS = 400;
 const OVEN_RESEND_MS = 10_000;
 const toC = (f: number): number => (f - 32) * 5 / 9;
 
+/** A "finished" alert while a cycle still has more than this left (seconds) is ignored as premature. */
+const EARLY_ALERT_LEFT = 10 * 60;
+
 /** If a cycle stops being seen with this little time left, it counts as finished. */
 const NEAR_END = 3 * 60;
 /** How long "done" stays detected when the finish was only inferred (the machine already powered off). */
@@ -230,8 +233,13 @@ export class LaundryAccessory {
   alert(kind: 'finished' | 'problem' | 'other', pushCode: string): void {
     const name = this.options.name;
     if (kind === 'finished') {
-      this.deps.log.info(`[${name}] LG says the cycle is finished.`);
       const s = this.status;
+      // Some washers send "washing is complete" while still weighing the load: not a finish
+      if (s?.running && (s.state === 'DETECTING' || s.remaining > EARLY_ALERT_LEFT)) {
+        this.deps.log.debug(`[${name}] Ignored LG's "${pushCode}" alert: the cycle is still ${s.state === 'DETECTING' ? 'detecting the load' : 'running'}.`);
+        return;
+      }
+      this.deps.log.info(`[${name}] LG says the cycle is finished.`);
       if (s && (s.state === 'POWER_OFF')) {
         // Already off: a brief "done", as when a finish is inferred
         this.inferredDoneUntil = Date.now() + INFERRED_DONE_MS;

@@ -227,3 +227,17 @@ test('an oven reaching its temperature is not a finish', () => {
   assert.equal(alertKind('PREHEATING_IS_COMPLETE'), 'other');
   assert.equal(alertKind('COOKING_IS_COMPLETE'), 'finished');
 });
+
+test('below an hour, LG leaves remainHour out of live updates: minutes alone mean less than an hour', () => {
+  const unit = laundryUnits('DEVICE_WASHER', washer.profile)[0];
+  const base = washerState('RINSING', [1, 2], [1, 30]);
+  // 1:02 left, then an update with only the minutes (59): 0:59, not 1:59
+  const merged = mergeState(base, [{ timer: { remainMinute: 59 }, location: { locationName: 'MAIN' } }]);
+  assert.equal(laundryStatus(unit, merged).remaining, 59 * 60);
+  // An update with both is taken as is; one without a timer leaves it alone
+  assert.equal(laundryStatus(unit, mergeState(base, [{ timer: { remainHour: 1, remainMinute: 1 }, location: { locationName: 'MAIN' } }])).remaining, 3660);
+  assert.equal(laundryStatus(unit, mergeState(base, [{ runState: { currentState: 'SPINNING' }, location: { locationName: 'MAIN' } }])).remaining, 3720);
+  // A WashTower part, and an object-shaped state
+  assert.deepEqual(mergeState({ dryer: { timer: { remainHour: 1, remainMinute: 5 } } }, { dryer: { timer: { remainMinute: 58 } } }),
+    { dryer: { timer: { remainHour: 0, remainMinute: 58 } } });
+});

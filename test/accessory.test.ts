@@ -306,6 +306,17 @@ function defineTests(hap: Hap): void {
     assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
   });
 
+  test('LG\'s "finished" alert while the washer is still weighing the load (or has long to go) is ignored', () => {
+    const { laundry, lines } = setup();
+    laundry.update(running({ state: 'DETECTING', remaining: 0, total: 0 }));
+    laundry.alert('finished', 'WASHING_IS_COMPLETE');
+    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.ok(lines.some((l) => l.startsWith('debug: [Washer] Ignored LG\'s "WASHING_IS_COMPLETE" alert')));
+    laundry.update(running({ remaining: 45 * 60 }));
+    laundry.alert('finished', 'WASHING_IS_COMPLETE');
+    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+  });
+
   test('LG\'s "finished" alert when the machine is already off: a brief done', () => {
     const { laundry } = setup();
     laundry.update(status());

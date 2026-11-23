@@ -469,7 +469,9 @@ function defineTests(hap: Hap): void {
     const freezer = accessory.getServiceById(S.Thermostat, 'temp-FREEZER')!;
     assert.equal(val(freezer.getCharacteristic(C.TargetTemperature)), -18);
     assert.equal(freezer.getCharacteristic(C.TargetTemperature).props.minValue, -23);
-    assert.equal(accessory.getServiceById(S.Switch, 'switch-rapidFreeze'), undefined, 'only true/false switches');
+    // An ON/OFF setting is a switch too, sending LG's own words
+    await write(accessory.getServiceById(S.Switch, 'switch-rapidFreeze')!.getCharacteristic(C.On), true);
+    assert.deepEqual(sent.splice(0), [{ refrigeration: { rapidFreeze: 'ON' } }]);
     assert.equal(val(accessory.getServiceById(S.FilterMaintenance, 'filter')!.getCharacteristic(C.FilterLifeLevel)), 40);
     await write(freezer.getCharacteristic(C.TargetTemperature), -20);
     await write(accessory.getServiceById(S.Switch, 'switch-expressMode')!.getCharacteristic(C.On), true);
@@ -665,6 +667,167 @@ function defineTests(hap: Hap): void {
     // A choice the unit can't do is logged
     const c = make('DEVICE_AIR_CONDITIONER', fixture('air_conditioner', 'profile'), 'AC', true, { acModes: 'heat' });
     assert.ok(c.lines.some((l) => l.startsWith('warn: [AC] Set to heating only, but this unit has no heat mode')));
+  });
+
+  // ---- From Home Assistant's and LG's issue reports ----
+
+  test('air conditioner fan speed: windStrength when the unit has it (it has Auto), windStrengthDetail only otherwise', async () => {
+    const base = (airFlow: Record<string, unknown>) => ({ property: {
+      operation: { airConOperationMode: en(['POWER_ON', 'POWER_OFF']) }, airConJobMode: { currentJobMode: en(['COOL']) },
+      temperature: { targetTemperature: range(16, 30) }, airFlow } });
+    const both = make('DEVICE_AIR_CONDITIONER', base({ windStrength: en(['LOW', 'MID', 'HIGH', 'AUTO']), windStrengthDetail: en(['NATURE', 'LOW', 'LOW_MID', 'MID', 'HIGH', 'POWER']) }), 'AC');
+    both.part.update({ operation: { airConOperationMode: 'POWER_ON' }, airFlow: { windStrength: 'AUTO', windStrengthDetail: 'LOW' } });
+    const tile = both.accessory.getServiceById(S.HeaterCooler, 'climate')!;
+    assert.equal(val(tile.getCharacteristic(C.RotationSpeed)), 100, 'Auto, from windStrength');
+    await write(tile.getCharacteristic(C.RotationSpeed), 25);
+    assert.deepEqual(both.sent, [{ airFlow: { windStrength: 'LOW' } }]);
+    const detail = make('DEVICE_AIR_CONDITIONER', base({ windStrengthDetail: en(['LOW', 'MID', 'HIGH', 'POWER']) }), 'AC');
+    detail.part.update({ operation: { airConOperationMode: 'POWER_ON' }, airFlow: { windStrengthDetail: 'MID' } });
+    const t2 = detail.accessory.getServiceById(S.HeaterCooler, 'climate')!;
+    assert.equal(val(t2.getCharacteristic(C.RotationSpeed)), 67);
+    await write(detail.accessory.getServiceById(S.Switch, 'jet')!.getCharacteristic(C.On), true);
+    assert.deepEqual(detail.sent, [{ airFlow: { windStrengthDetail: 'POWER' } }]);
+  });
+
+  test('air conditioner: airflow styles as switches, errors on the problem sensor, a mode picked while off switches it on', async () => {
+    const { part, accessory, sent, lines } = make('DEVICE_AIR_CONDITIONER', { property: {
+      operation: { airConOperationMode: en(['POWER_ON', 'POWER_OFF']) }, airConJobMode: { currentJobMode: en(['COOL', 'HEAT']) },
+      runState: { currentState: en(['NORMAL', 'ERROR'], ['r']) },
+      temperature: { targetTemperature: range(16, 30) },
+      windDirection: { forestWind: { type: 'boolean', mode: ['r', 'w'] }, mannerWind: { type: 'boolean', mode: ['r'] } },
+    } }, 'AC');
+    part.update({ operation: { airConOperationMode: 'POWER_OFF' }, airConJobMode: { currentJobMode: 'COOL' }, runState: { currentState: 'NORMAL' },
+      windDirection: { forestWind: true } });
+    const forest = accessory.getServiceById(S.Switch, 'wind-forestWind')!;
+    assert.equal(forest.getCharacteristic(C.Name).value, 'AC forest wind');
+    assert.equal(val(forest.getCharacteristic(C.On)), true);
+    assert.equal(accessory.getServiceById(S.Switch, 'wind-mannerWind'), undefined, 'read-only: no switch');
+    await write(forest.getCharacteristic(C.On), false);
+    assert.deepEqual(sent.splice(0), [{ windDirection: { forestWind: false } }]);
+    // A mode chosen on the tile while it's off: on, then the mode (and turning it on in the same action sends nothing more)
+    const tile = accessory.getServiceById(S.HeaterCooler, 'climate')!;
+    await Promise.all([write(tile.getCharacteristic(C.TargetHeaterCoolerState), C.TargetHeaterCoolerState.HEAT), write(tile.getCharacteristic(C.Active), 1)]);
+    assert.deepEqual(sent.splice(0), [{ operation: { airConOperationMode: 'POWER_ON' } }, { airConJobMode: { currentJobMode: 'HEAT' } }]);
+    // An error reported by the unit
+    part.update({ runState: { currentState: 'ERROR' } });
+    const problem = accessory.getServiceById(S.ContactSensor, 'problem')!;
+    assert.equal(val(problem.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_NOT_DETECTED);
+    assert.ok(lines.includes('warn: [AC] The air conditioner reports an error.'));
+    part.update({ runState: { currentState: 'NORMAL' } });
+    assert.equal(val(problem.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_DETECTED);
+  });
+
+  test('humidifier: auto, sleep, hygiene dry, warm mist, mood lamp and display light switches; temperature and air quality', async () => {
+    const { part, accessory, sent } = make('DEVICE_HUMIDIFIER', { property: {
+      operation: { humidifierOperationMode: en(['POWER_ON', 'POWER_OFF']), autoMode: en(['AUTO_ON', 'AUTO_OFF']), sleepMode: en(['SLEEP_ON', 'SLEEP_OFF']),
+        hygieneDryMode: en(['ON', 'OFF']) },
+      humidity: { targetHumidity: range(30, 70, 5), warmMode: en(['WARM_ON', 'WARM_OFF']) },
+      moodLamp: { moodLampState: en(['MOODLAMP_ON', 'MOODLAMP_OFF']) },
+      display: { light: en(['ON', 'OFF']) },
+      airQualitySensor: { PM2: { type: 'number', mode: ['r'] }, temperature: { type: 'number', mode: ['r'] }, humidity: { type: 'number', mode: ['r'] } },
+    } }, 'Humidifier');
+    part.update({ operation: { humidifierOperationMode: 'POWER_ON', autoMode: 'AUTO_ON', sleepMode: 'SLEEP_OFF' },
+      humidity: { warmMode: 'WARM_ON' }, moodLamp: { moodLampState: 'MOODLAMP_OFF' },
+      airQualitySensor: { PM2: 9, temperature: 20.5, humidity: 41 } });
+    const sw = (sub: string) => accessory.getServiceById(S.Switch, sub)!;
+    assert.deepEqual(['auto-mode', 'sleep-mode', 'hygiene-dry', 'warm', 'mood-lamp', 'display-light'].map((x) => !!accessory.getServiceById(S.Switch, x)), [true, true, true, true, true, true]);
+    assert.equal(val(sw('auto-mode').getCharacteristic(C.On)), true);
+    assert.equal(val(sw('warm').getCharacteristic(C.On)), true);
+    await write(sw('mood-lamp').getCharacteristic(C.On), true);
+    await write(sw('sleep-mode').getCharacteristic(C.On), true);
+    assert.deepEqual(sent, [{ moodLamp: { moodLampState: 'MOODLAMP_ON' } }, { operation: { sleepMode: 'SLEEP_ON' } }]);
+    assert.equal(val(accessory.getServiceById(S.TemperatureSensor, 'temperature')!.getCharacteristic(C.CurrentTemperature)), 20.5);
+    assert.equal(val(accessory.getServiceById(S.AirQualitySensor, 'air-quality')!.getCharacteristic(C.PM2_5Density)), 9);
+    assert.equal(val(accessory.getServiceById(S.HumidifierDehumidifier, 'humidity')!.getCharacteristic(C.CurrentRelativeHumidity)), 41);
+    assert.equal(accessory.getServiceById(S.HumiditySensor, 'humidity'), undefined, 'humidity is on the tile');
+  });
+
+  test('ventilator: CO2 (with HomeKit\'s alarm above 1,000 ppm), air quality and temperature', () => {
+    const { part, accessory } = make('DEVICE_VENTILATOR', { property: {
+      operation: { ventOperationMode: en(['POWER_ON', 'POWER_OFF']) },
+      airFlow: { windStrength: en(['LOW', 'MID', 'HIGH']) },
+      temperature: { currentTemperature: { type: 'number', mode: ['r'] }, unit: en(['C'], ['r']) },
+      airQualitySensor: { CO2: { type: 'number', mode: ['r'] }, PM2: { type: 'number', mode: ['r'] }, PM10: { type: 'number', mode: ['r'] } },
+    } }, 'Vent');
+    part.update({ operation: { ventOperationMode: 'POWER_ON' }, temperature: { currentTemperature: 21, unit: 'C' }, airQualitySensor: { CO2: 1250, PM2: 12, PM10: 20 } });
+    const co2 = accessory.getServiceById(S.CarbonDioxideSensor, 'co2')!;
+    assert.equal(val(co2.getCharacteristic(C.CarbonDioxideLevel)), 1250);
+    assert.equal(val(co2.getCharacteristic(C.CarbonDioxideDetected)), 1);
+    part.update({ airQualitySensor: { CO2: 600 } });
+    assert.equal(val(co2.getCharacteristic(C.CarbonDioxideDetected)), 0);
+    assert.equal(val(accessory.getServiceById(S.TemperatureSensor, 'temperature')!.getCharacteristic(C.CurrentTemperature)), 21);
+    assert.equal(val(accessory.getServiceById(S.AirQualitySensor, 'air-quality')!.getCharacteristic(C.PM10Density)), 20);
+  });
+
+  test('fridge: power saving and sabbath mode as status when LG doesn\'t let them be changed; three water filters and the air filter', async () => {
+    const { part, accessory, sent } = make('DEVICE_REFRIGERATOR', { property: {
+      powerSave: { powerSaveEnabled: { type: 'boolean', mode: ['r', 'w'] } },
+      sabbath: { sabbathMode: { type: 'boolean', mode: ['r'], value: { r: [false, true] } } },
+      waterFilterInfo: { waterFilter1RemainPercent: { type: 'number', mode: ['r'] }, waterFilter2RemainPercent: { type: 'number', mode: ['r'] },
+        waterFilter3RemainPercent: { type: 'number', mode: ['r'] } },
+      refrigeration: { freshAirFilterRemainPercent: { type: 'number', mode: ['r'] } },
+    } }, 'Fridge');
+    part.update({ powerSave: { powerSaveEnabled: false }, sabbath: { sabbathMode: true },
+      waterFilterInfo: { waterFilter1RemainPercent: 80, waterFilter2RemainPercent: 8, waterFilter3RemainPercent: 50 }, refrigeration: { freshAirFilterRemainPercent: 30 } });
+    assert.equal(val(accessory.getServiceById(S.OccupancySensor, 'status-sabbathMode')!.getCharacteristic(C.OccupancyDetected)), 1);
+    assert.equal(accessory.getServiceById(S.Switch, 'switch-sabbathMode'), undefined);
+    await write(accessory.getServiceById(S.Switch, 'switch-powerSaveEnabled')!.getCharacteristic(C.On), true);
+    assert.deepEqual(sent, [{ powerSave: { powerSaveEnabled: true } }]);
+    const filters = accessory.services.filter((x) => x.UUID === S.FilterMaintenance.UUID);
+    assert.deepEqual(filters.map((f) => [f.getCharacteristic(C.Name).value, f.getCharacteristic(C.FilterLifeLevel).value]),
+      [['Fridge water filter', 80], ['Fridge water filter 2', 8], ['Fridge water filter 3', 50], ['Fridge air filter', 30]]);
+    assert.equal(val(filters[1].getCharacteristic(C.FilterChangeIndication)), C.FilterChangeIndication.CHANGE_FILTER);
+    assert.equal(filters[0].subtype, 'filter', 'the first keeps the subtype it had');
+  });
+
+  test('wine cellar: optimal humidity switch, sabbath status, and the light (refused while LG blocks light control)', async () => {
+    const { part, accessory, sent, lines } = make('DEVICE_WINE_CELLAR', { property: {
+      operation: { lightStatus: range(0, 100, 1), optimalHumidity: en(['ON', 'OFF']), sabbathMode: en(['ON', 'OFF'], ['r']) },
+    } }, 'Wine');
+    part.update({ operation: { lightStatus: 50, lightStatusControlEnabled: true, optimalHumidity: 'OFF', sabbathMode: 'ON' } });
+    const light = accessory.getServiceById(S.Lightbulb, 'light')!;
+    assert.equal(val(light.getCharacteristic(C.Brightness)), 50);
+    await write(light.getCharacteristic(C.Brightness), 80);
+    await write(accessory.getServiceById(S.Switch, 'switch-optimalHumidity')!.getCharacteristic(C.On), true);
+    assert.deepEqual(sent.splice(0), [{ operation: { lightStatus: 80 } }, { operation: { optimalHumidity: 'ON' } }]);
+    assert.equal(val(accessory.getServiceById(S.OccupancySensor, 'status-sabbathMode')!.getCharacteristic(C.OccupancyDetected)), 1);
+    part.update({ operation: { lightStatusControlEnabled: false } });
+    assert.ok(await write(light.getCharacteristic(C.On), false));
+    assert.equal(sent.length, 0);
+    assert.ok(lines.some((l) => l.includes('light control is off on the wine cellar')));
+  });
+
+  test('water heater: its modes as switches (off goes back to auto)', async () => {
+    const { part, accessory, sent } = make('DEVICE_WATER_HEATER', { property: {
+      operation: { waterHeaterOperationMode: en(['POWER_ON', 'POWER_OFF']) },
+      waterHeaterJobMode: { currentJobMode: en(['AUTO', 'HEAT_PUMP', 'TURBO', 'VACATION']) },
+      temperatureInUnits: [{ unit: 'C', targetTemperature: range(30, 60) }],
+    } }, 'Water');
+    part.update({ operation: { waterHeaterOperationMode: 'POWER_ON' }, waterHeaterJobMode: { currentJobMode: 'TURBO' } });
+    const turbo = accessory.getServiceById(S.Switch, 'mode-TURBO')!;
+    assert.equal(val(turbo.getCharacteristic(C.On)), true);
+    assert.equal(accessory.getServiceById(S.Switch, 'mode-AUTO'), undefined);
+    assert.equal(accessory.getServiceById(S.Switch, 'mode-HEAT_PUMP')!.getCharacteristic(C.Name).value, 'Water heat pump');
+    await write(turbo.getCharacteristic(C.On), false);
+    await write(accessory.getServiceById(S.Switch, 'mode-VACATION')!.getCharacteristic(C.On), true);
+    assert.deepEqual(sent, [{ waterHeaterJobMode: { currentJobMode: 'AUTO' } }, { waterHeaterJobMode: { currentJobMode: 'VACATION' } }]);
+  });
+
+  test('cooktop: burner levels and time left in the log; stick vacuum: battery and charging; kimchi fridge words aren\'t temperatures', () => {
+    const cook = make('DEVICE_COOKTOP', cooktopProfile(), 'Cooktop');
+    cook.part.update([{ ...zone('LEFT_FRONT', 'COOK'), power: { powerLevel: 7 }, timer: { remainHour: 0, remainMinute: 12 } }]);
+    assert.ok(cook.lines.includes('info: [Cooktop] On: left front (level 7, 12 min left).'));
+    const stick = make('DEVICE_STICK_CLEANER', { property: { runState: { currentState: en(['CHARGING', 'STANDBY'], ['r']) },
+      battery: { level: en(['LOW', 'MID', 'HIGH'], ['r']), percent: { type: 'number', mode: ['r'] } } } }, 'Stick');
+    stick.part.update({ runState: { currentState: 'CHARGING' }, battery: { percent: 64 } });
+    const battery = stick.accessory.getServiceById(S.Battery, 'battery')!;
+    assert.deepEqual([val(battery.getCharacteristic(C.BatteryLevel)), val(battery.getCharacteristic(C.ChargingState))], [64, 1]);
+    stick.part.update({ runState: { currentState: 'STANDBY' }, battery: { level: 'LOW' } });
+    assert.deepEqual([val(battery.getCharacteristic(C.BatteryLevel)), val(battery.getCharacteristic(C.StatusLowBattery))], [20, 1]);
+    // Kimchi fridges report compartment modes where a temperature might be: the basic tile ignores them
+    const kimchi = make('DEVICE_KIMCHI_REFRIGERATOR', { property: { temperature: [{ locationName: 'TOP', targetTemperature: en(['KIMCHI', 'FREEZER'], ['r']) }],
+      operation: { kimchiOperationMode: en(['POWER_ON', 'POWER_OFF']) } } }, 'Kimchi');
+    assert.doesNotThrow(() => kimchi.part.update({ temperature: [{ locationName: 'TOP', targetTemperature: 'KIMCHI' }], operation: { kimchiOperationMode: 'POWER_ON' } }));
   });
 
   test('basic fallback: an LG alert opens the problem sensor, and it closes again on its own', () => {

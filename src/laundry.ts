@@ -323,9 +323,12 @@ export function mergeState(base: unknown, patch: unknown): unknown {
     }
     return merged;
   }
-  const p = asObject(patch);
+  let p = asObject(patch);
   const b = asObject(base);
   if (!p) { return patch; }
+  // Below an hour, LG's updates leave remainHour out instead of sending 0 (a known LG quirk on
+  // washers, dryers, WashTowers and dishwashers): minutes without hours mean less than an hour
+  if ('remainMinute' in p && !('remainHour' in p) && b && 'remainHour' in b) { p = { ...p, remainHour: 0 }; }
   if (!b) {
     // A list-shaped state (washer) patched with one drum's object
     if (Array.isArray(base)) { return mergeState(base, [patch]); }
