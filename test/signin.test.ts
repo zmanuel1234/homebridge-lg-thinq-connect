@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ThinQClient, ThinQError } from '../src/api';
-import { checkToken, supportOf, typeName } from '../src/homebridge-ui/check';
+import { checkToken, diagnostics, supportOf, typeName } from '../src/homebridge-ui/check';
 import { FakeLG } from './fake-lg';
 import schema from '../config.schema.json';
 
@@ -78,4 +78,21 @@ test('settings page: Homebridge loads it from the build', () => {
 test('settings page: the server\'s helper library loads from the plugin\'s CommonJS build', () => {
   const out = spawnSync(process.execPath, ['-e', "process.stdout.write(typeof require('@homebridge/plugin-ui-utils').HomebridgePluginUiServer)"], { encoding: 'utf8' });
   assert.equal(out.stdout, 'function', out.stderr);
+});
+
+test('copy diagnostics: everything LG says per appliance, with IDs, serials and the token removed', async (t) => {
+  const lg = await new FakeLG().start();
+  t.after(() => lg.stop());
+  const r = await diagnostics(lg.token, 'us', (o) => new ThinQClient({ ...o, baseUrl: lg.url }));
+  assert.equal(r.ok, true);
+  assert.equal(r.message, 'Diagnostics for 2 appliance(s), with IDs and serial numbers removed.');
+  const report = JSON.parse(r.report!) as { tool: string; country: string; appliances: { profile: unknown; state: unknown }[] };
+  assert.equal(report.tool, 'settings page');
+  assert.equal(report.country, 'US');
+  assert.equal(report.appliances.length, 2);
+  assert.ok(report.appliances[0].profile && report.appliances[0].state);
+  assert.ok(!r.report!.includes('device-1') && !r.report!.includes(lg.token));
+  assert.deepEqual(await diagnostics('', 'US'), { ok: false, message: 'Paste your personal access token in the Token box first.' });
+  lg.failWith = [401, '1103', 'Invalid token'];
+  assert.match((await diagnostics('x', 'US', (o) => new ThinQClient({ ...o, baseUrl: lg.url }))).message, /^Couldn't get diagnostics: .*1103/);
 });

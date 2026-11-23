@@ -16,8 +16,15 @@
     Homebridge's settings. Checking it here doesn't save anything; press <strong>Save</strong> when you're done.</p>
   <div>
     <button id="lg-check" type="button" class="btn btn-primary m-0">Check token</button>
+    <button id="lg-diag" type="button" class="btn btn-outline-secondary m-0 ms-2">Copy diagnostics</button>
   </div>
   <div id="lg-result" class="mt-3" style="display: none"></div>
+  <div id="lg-diag-box" class="mt-3" style="display: none">
+    <p class="small mb-1" id="lg-diag-note"></p>
+    <textarea id="lg-diag-text" class="form-control" rows="6" readonly style="font-family: monospace; font-size: 11px"></textarea>
+    <p class="small text-muted mt-1 mb-0">For a <a href="https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose"
+      target="_blank" rel="noopener">GitHub issue</a>: look it over, then paste it (or attach it as a file).</p>
+  </div>
 </div>
 
 <script>
@@ -68,6 +75,30 @@
       } finally {
         homebridge.hideSpinner();
         button.disabled = false;
+      }
+    });
+
+    // What LG says about each appliance, for an issue (IDs, serials and the token removed)
+    const diagButton = document.getElementById('lg-diag');
+    diagButton.addEventListener('click', async () => {
+      diagButton.disabled = true;
+      homebridge.showSpinner();
+      try {
+        const answer = await homebridge.request('/diagnostics', { token: config.token, country: config.country });
+        if (!answer.ok) { show(false, answer.message); return; }
+        const box = document.getElementById('lg-diag-box');
+        const text = document.getElementById('lg-diag-text');
+        text.value = answer.report;
+        box.style.display = 'block';
+        let copied = false;
+        try { await navigator.clipboard.writeText(answer.report); copied = true; } catch (e) { /* not allowed here: select it instead */ }
+        if (!copied) { text.focus(); text.select(); }
+        document.getElementById('lg-diag-note').textContent = answer.message + (copied ? ' Copied.' : ' Selected: press Ctrl+C (Cmd+C on a Mac) to copy.');
+      } catch (e) {
+        show(false, 'Couldn\'t get diagnostics: ' + (e && e.message ? e.message : e));
+      } finally {
+        homebridge.hideSpinner();
+        diagButton.disabled = false;
       }
     });
 

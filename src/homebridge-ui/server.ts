@@ -1,11 +1,12 @@
 import { HomebridgePluginUiServer } from '@homebridge/plugin-ui-utils';
-import { checkToken } from './check';
+import { checkToken, diagnostics } from './check';
 
-/** The plugin's settings page backend: checks a token against LG without saving anything. */
+/** The plugin's settings page backend: checks a token and collects diagnostics, without saving anything. */
 class SettingsServer extends HomebridgePluginUiServer {
   constructor() {
     super();
     this.onRequest('/check', (body: { token?: unknown; country?: unknown } = {}) => checkToken(body.token, body.country));
+    this.onRequest('/diagnostics', (body: { token?: unknown; country?: unknown } = {}) => diagnostics(body.token, body.country));
     this.ready();
   }
 }
