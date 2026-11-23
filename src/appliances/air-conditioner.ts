@@ -47,6 +47,8 @@ export class AirConditioner extends Appliance {
   private readonly modes: Mode[];
   private readonly speeds: string[];
   private readonly swingFields: string[] = [];
+  /** The tile offers fewer modes than the unit has (cooling or heating only). */
+  private readonly restricted: boolean;
   private readonly roomSensor?: Service;
   private readonly ranges: Partial<Record<Mode, Range>>;
   private readonly twoSetRanges?: { heat?: Range; cool?: Range };
@@ -74,6 +76,10 @@ export class AirConditioner extends Appliance {
     const offered = MODES.filter((m) => jobModes.includes(m));
     // Cooling or heating only (a unit used one way): the tile offers just that, if the unit has it
     this.modes = only && offered.includes(only) ? [only] : offered;
+    this.restricted = this.modes.length < offered.length;
+    if (only && !offered.includes(only)) {
+      ctx.log.warn(`[${ctx.name}] Set to ${opts.acModes === 'cool' ? 'cooling' : 'heating'} only, but this unit has no ${only.toLowerCase()} mode: showing all its modes.`);
+    }
     const wind = fieldOf(this.res, 'airFlow', 'windStrength');
     this.speeds = writable(wind) ? speedLevels(wind) : [];
     const swings = ['rotateUpDown', 'rotateLeftRight'].filter((f) => writable(fieldOf(this.res, 'windDirection', f)));
@@ -284,8 +290,14 @@ export class AirConditioner extends Appliance {
     if (!this.power?.canWrite) { return this.refuse('This air conditioner can\'t be switched on or off through LG\'s API.'); }
     const on = v === 1 || v === true;
     if (on === this.on) { return Promise.resolve(); }
-    return this.command(on ? 'Switched on' : 'Switched off', { operation: { [this.power.name]: on ? 'POWER_ON' : 'POWER_OFF' } })
+    // Cooling or heating only: a unit left in another mode on its remote is switched to the tile's
+    // (two commands, one after the other: LG takes one kind of change per command)
+    const mode = on && this.restricted && !(this.modes as string[]).includes(this.mode) ? this.modes[0] : undefined;
+    const power = this.command(on ? 'Switched on' : 'Switched off', { operation: { [this.power.name]: on ? 'POWER_ON' : 'POWER_OFF' } })
       .then(() => { this.on = on; });
+    if (!mode) { return power; }
+    return power.then(() => this.command(`Mode ${mode.toLowerCase()}`, { airConJobMode: { currentJobMode: mode } }))
+      .then(() => { this.mode = mode; this.lastMode = mode; });
   }
 
   private setMode(v: CharacteristicValue): Promise<void> {

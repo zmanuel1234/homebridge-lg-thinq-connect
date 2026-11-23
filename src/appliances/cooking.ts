@@ -30,10 +30,14 @@ export function zoneLabel(zone: string): string {
 /** LG's zone states that mean the burner is on (PAUSE: on but held, still hot). */
 const ON_STATES = new Set(['COOK', 'PAUSE']);
 
-/** Whether a cooktop profile can be switched off as a whole (operation.operationMode: POWER_OFF). */
+/**
+ * Whether a cooktop profile can be switched off as a whole (operation.operationMode: POWER_OFF).
+ * LG puts it in the profile's extensionProperty (as its own toolkits read it); also looked for in
+ * the zones and at the top, in case a model differs.
+ */
 function canPowerOff(profile: unknown): boolean {
   const props = field(profile, 'property');
-  for (const e of [...entries(props), asObj(profile) || {}]) {
+  for (const e of [...entries(field(profile, 'extensionProperty')), ...entries(props), asObj(profile) || {}]) {
     const w = field(field(field(field(e, 'operation'), 'operationMode'), 'value'), 'w');
     if (Array.isArray(w) && w.includes('POWER_OFF')) { return true; }
   }
@@ -59,7 +63,7 @@ export class Cooktop extends Appliance {
       this.zones.set(zone, this.service(S.OccupancySensor, `${ctx.name} ${zoneLabel(zone)}`, subtype));
       keep.add(subtype);
     }
-    if (canPowerOff(profile) && ctx.extraControls !== false) {
+    if (canPowerOff(profile) && (ctx.options?.extraControls ?? ctx.extraControls) !== false) {
       this.offSwitch = this.service(S.Switch, `${ctx.name} all burners off`, 'power-off');
       keep.add('power-off');
       // A button: on sends "everything off", then it turns itself back off
@@ -81,6 +85,11 @@ export class Cooktop extends Appliance {
     this.unreachable = state === null;
     if (state) {
       const was = this.busy;
+      // The full state (live updates are merged into it): a zone it no longer lists is off
+      const listed = new Set(entries(state).map(zoneOf));
+      for (const zone of this.on.keys()) {
+        if (!listed.has(zone)) { this.on.set(zone, false); }
+      }
       for (const e of entries(state)) {
         const zone = zoneOf(e);
         const word = field(field(e, 'cookingZone'), 'currentState');

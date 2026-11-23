@@ -163,7 +163,7 @@ anyone using this plugin. If you try one, please
 | WashTower, wash combo | As washer and dryer, one set per drum | Experimental (always on) |
 | Dishwasher | As a washer, plus door and "rinse aid low" sensors; the course and a delayed start in the log | Experimental |
 | Styler | As a washer: time left, done, problem | Experimental |
-| Oven (each cavity) | As a washer: time left, done, problem; and a thermostat: heat starts the oven at the set temperature (in its current cook mode, or bake), off stops it, and a new temperature while it's on is sent at once. LG doesn't report the oven's actual temperature, so the thermostat shows the set one. Needs "Allow starting and pausing" and remote control on at the oven | Experimental (from LG's documentation) |
+| Oven (each cavity) | As a washer: time left, done, problem; and a thermostat: heat (or the main tile) starts the oven at the set temperature (350 °F or 175 °C until you choose one; in its current cook mode, or bake), off stops it, and a new temperature while it's cooking is sent at once. A paused or self-cleaning oven is never restarted from the Home app. LG doesn't report the oven's actual temperature, so the thermostat shows the set one. Needs "Allow starting and pausing" and remote control on at the oven | Experimental (from LG's documentation) |
 | Cooktop | "In use" sensor (any burner on) and one per burner, for "the stove is still on" notifications and automations; an "all burners off" button on models LG allows it for | Experimental (from LG's documentation) |
 | Air conditioner | Heater/cooler: on/off, cool / heat / auto (as the unit offers), room and set temperature (separate heating and cooling set points in auto, on units with two-set), fan speed (Auto at the top of the slider), swing. Switches, where the unit offers them: air purify, energy saving, display light, the other swing direction, jet mode, dry mode, fan mode. Air quality, humidity and filter sensors; "problem" for a full water tank. Per appliance: cooling or heating only, which way the tile's swing moves, and a room temperature sensor (see [Options per appliance](#options-per-appliance)) | Experimental (from real sample data) |
 | Refrigerator, wine cellar | Door-open sensor per door; set temperature per compartment; express modes as switches; water filter | Experimental |
@@ -200,8 +200,9 @@ app, then choose:
 
 For appliances LG keeps energy figures for, this month's use (kWh) is added to the appliance's main
 tile. Apple's Home app doesn't show energy; the **Eve** app does. LG updates the figure with a
-delay, often a day, and the plugin checks it every hour. Turn it off with **Energy use in the Eve
-app**.
+delay, often a day, and the plugin checks it every hour. It's this month's figure, so it starts
+again from 0 on the 1st (Eve treats it as a running total). Turn it off with **Energy use in the
+Eve app**; the figure is then taken off the tiles.
 
 ### Help add or fix an appliance
 

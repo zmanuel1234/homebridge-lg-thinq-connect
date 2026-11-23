@@ -589,15 +589,16 @@ function defineTests(hap: Hap): void {
   });
 
   /** A cooktop profile as LG documents it: one entry per cooking zone. */
-  const cooktopProfile = (powerOff = true) => ({ property: [
-    ...['LEFT_FRONT', 'RIGHT_FRONT', 'LEFT_REAR'].map((z) => ({
+  const cooktopProfile = (powerOff = true) => ({
+    property: ['LEFT_FRONT', 'RIGHT_FRONT', 'LEFT_REAR'].map((z) => ({
       cookingZone: { currentState: en(['INITIAL', 'COOK', 'PAUSE', 'LOCK'], ['r']) },
       location: { locationName: z },
       power: { powerLevel: range(0, 9, 1, ['r']) },
       timer: { remainHour: range(0, 11, 1, ['r']), remainMinute: range(0, 59, 1, ['r']) },
-      ...(powerOff ? { operation: { operationMode: en(['POWER_OFF'], ['w']) } } : {}),
     })),
-  ] });
+    // Where LG's toolkits read the "all off" command from
+    ...(powerOff ? { extensionProperty: { operation: { operationMode: en(['POWER_OFF'], ['w']) } } } : {}),
+  });
   const zone = (z: string, st: string) => ({ cookingZone: { currentState: st }, location: { locationName: z }, timer: { remainHour: 0, remainMinute: 0 } });
 
   test('cooktop: which burners are on, any burner on, and a button that switches them all off', async () => {
@@ -626,6 +627,44 @@ function defineTests(hap: Hap): void {
     // Models that can't be switched off remotely, or extra controls off: no button
     assert.equal(make('DEVICE_COOKTOP', cooktopProfile(false), 'C').accessory.getServiceById(S.Switch, 'power-off'), undefined);
     assert.equal(make('DEVICE_COOKTOP', cooktopProfile(), 'C', false).accessory.getServiceById(S.Switch, 'power-off'), undefined);
+    assert.equal(make('DEVICE_COOKTOP', cooktopProfile(), 'C', true, { extraControls: false }).accessory.getServiceById(S.Switch, 'power-off'), undefined);
+  });
+
+  test('cooktop: a burner LG stops listing counts as off (the stove-on sensor can\'t stick)', () => {
+    const { part, accessory } = make('DEVICE_COOKTOP', cooktopProfile(), 'Cooktop');
+    part.update([zone('LEFT_FRONT', 'COOK'), zone('RIGHT_FRONT', 'INITIAL')]);
+    assert.equal(part.busy, true);
+    part.update([zone('RIGHT_FRONT', 'INITIAL')]);
+    assert.equal(part.busy, false);
+    assert.equal(val(accessory.getServiceById(S.OccupancySensor, 'in-use')!.getCharacteristic(C.OccupancyDetected)), 0);
+  });
+
+  test('air purifier: TURBO is a switch, not a speed, and switching it off never sends it', async () => {
+    const { part, accessory, sent } = make('DEVICE_AIR_PURIFIER', { property: {
+      operation: { airPurifierOperationMode: en(['POWER_ON', 'POWER_OFF']) },
+      airFlow: { windStrength: en(['LOW', 'MID', 'HIGH', 'TURBO']) },
+    } }, 'Purifier');
+    part.update({ operation: { airPurifierOperationMode: 'POWER_ON' }, airFlow: { windStrength: 'TURBO' } });
+    await write(accessory.getServiceById(S.Switch, 'turbo')!.getCharacteristic(C.On), false);
+    await write(accessory.getServiceById(S.AirPurifier, 'purifier')!.getCharacteristic(C.RotationSpeed), 100);
+    assert.deepEqual(sent[0], { airFlow: { windStrength: 'HIGH' } });
+    assert.ok(!sent.some((p) => JSON.stringify(p).includes('TURBO')), 'the slider at full speed is HIGH, not turbo');
+    assert.deepEqual(speedLevels(en(['LOW', 'MID', 'HIGH', 'TURBO'])), ['LOW', 'MID', 'HIGH']);
+  });
+
+  test('air conditioner cooling only: switching on a unit left in heat on its remote also sets cool', async () => {
+    const { part, accessory, sent } = make('DEVICE_AIR_CONDITIONER', acThreeModes(), 'AC', true, { acModes: 'cool' });
+    part.update({ ...acOn, operation: { airConOperationMode: 'POWER_OFF' }, airConJobMode: { currentJobMode: 'HEAT' } });
+    await write(accessory.getServiceById(S.HeaterCooler, 'climate')!.getCharacteristic(C.Active), 1);
+    assert.deepEqual(sent, [{ operation: { airConOperationMode: 'POWER_ON' } }, { airConJobMode: { currentJobMode: 'COOL' } }]);
+    // Already cooling: just on
+    const b = make('DEVICE_AIR_CONDITIONER', acThreeModes(), 'AC', true, { acModes: 'cool' });
+    b.part.update({ ...acOn, operation: { airConOperationMode: 'POWER_OFF' } });
+    await write(b.accessory.getServiceById(S.HeaterCooler, 'climate')!.getCharacteristic(C.Active), 1);
+    assert.deepEqual(b.sent, [{ operation: { airConOperationMode: 'POWER_ON' } }]);
+    // A choice the unit can't do is logged
+    const c = make('DEVICE_AIR_CONDITIONER', fixture('air_conditioner', 'profile'), 'AC', true, { acModes: 'heat' });
+    assert.ok(c.lines.some((l) => l.startsWith('warn: [AC] Set to heating only, but this unit has no heat mode')));
   });
 
   test('basic fallback: an LG alert opens the problem sensor, and it closes again on its own', () => {

@@ -133,6 +133,12 @@ function defineTests(hap: Hap): void {
       value: u === 'F' ? { r: { min: 170, max: 550, step: 1 }, w: { min: 170, max: 550, step: 1 } } : { r: { min: 80, max: 285, step: 1 }, w: { min: 80, max: 285, step: 1 } } } })),
   })) });
 
+  const ovenState = (state: string, over: Record<string, unknown> = {}) => [{ location: { locationName: 'LOWER' }, runState: { currentState: state },
+    remoteControlEnable: { remoteControlEnabled: true }, ...over }];
+  const F = (v: number) => ({ temperature: { targetTemperature: v, unit: 'F' } });
+  const heatOn = (l: LaundryAccessory) => l.ovenThermostat!.getCharacteristic(C.TargetHeatingCoolingState).handleSetRequest(C.TargetHeatingCoolingState.HEAT);
+  const setTemp = (l: LaundryAccessory, c: number) => l.ovenThermostat!.getCharacteristic(C.TargetTemperature).handleSetRequest(c);
+
   test('oven: a thermostat per cavity that starts it at a temperature and stops it', async () => {
     const units = laundryUnits('DEVICE_OVEN', ovenProfile());
     assert.deepEqual(units.map((u) => [u.location, u.oven?.cookModes]), [['UPPER', ['BAKE']], ['LOWER', ['BAKE', 'CONVECTION_BAKE', 'CONVECTION_ROAST']]]);
@@ -140,53 +146,86 @@ function defineTests(hap: Hap): void {
     const { laundry, sent, lines } = setup({ name: 'Lower oven', allowControl: true }, undefined, lower);
     const t = laundry.ovenThermostat!;
     assert.equal(t.getCharacteristic(C.TargetTemperature).props.maxValue, 285);
-    assert.equal(value(t.getCharacteristic(C.TargetTemperature)), 177, 'starts from 350 °F');
-    const idle = laundryStatus(lower, [{ location: { locationName: 'LOWER' }, runState: { currentState: 'INITIAL' }, remoteControlEnable: { remoteControlEnabled: true } }]);
-    laundry.update(idle);
-    // A new temperature while off is kept for the start; nothing is sent
-    await t.getCharacteristic(C.TargetTemperature).handleSetRequest(200);
-    assert.equal(sent.length, 0);
-    await t.getCharacteristic(C.TargetHeatingCoolingState).handleSetRequest(C.TargetHeatingCoolingState.HEAT);
+    assert.equal(t.getCharacteristic(C.TargetTemperature).props.minStep, 0.5, 'half degrees, so every whole °F can be chosen');
+    // A US oven, idle, showing °F
+    laundry.update(laundryStatus(lower, ovenState('INITIAL', F(0))));
+    assert.equal(value(t.getCharacteristic(C.TemperatureDisplayUnits)), C.TemperatureDisplayUnits.FAHRENHEIT);
+    await heatOn(laundry);
     assert.deepEqual(sent, [{ operation: { ovenOperationMode: 'START' }, location: { locationName: 'LOWER' },
-      temperature: { targetTemperature: 200, unit: 'C' }, cook: { cookMode: 'BAKE' } }]);
-    assert.ok(lines.includes('info: [Lower oven] Sent start: bake, 200 °C.'));
-    // Cooking at 375 °F in convection
-    const cooking = laundryStatus(lower, [{ location: { locationName: 'LOWER' }, runState: { currentState: 'COOKING_IN_PROGRESS' },
-      remoteControlEnable: { remoteControlEnabled: true }, temperature: { targetTemperature: 375, unit: 'F' }, cook: { cookMode: 'CONVECTION_BAKE' } }]);
+      temperature: { targetTemperature: 350, unit: 'F' }, cook: { cookMode: 'BAKE' } }], 'starts at 350 °F, in bake');
+    assert.ok(lines.includes('info: [Lower oven] Sent start: bake, 350 °F.'));
+    // Cooking at 375 °F in convection: shown, and a new temperature is sent at once, keeping the mode
+    const cooking = laundryStatus(lower, ovenState('COOKING_IN_PROGRESS', { ...F(375), cook: { cookMode: 'CONVECTION_BAKE' } }));
     assert.deepEqual([cooking.running, cooking.setTemperature, cooking.cookMode], [true, { value: 375, unit: 'F' }, 'CONVECTION_BAKE']);
     laundry.update(cooking);
     assert.equal(value(t.getCharacteristic(C.CurrentHeatingCoolingState)), C.CurrentHeatingCoolingState.HEAT);
-    assert.equal(value(t.getCharacteristic(C.TargetTemperature)), 191, 'in whole degrees, as the oven takes them');
-    assert.equal(value(t.getCharacteristic(C.CurrentTemperature)), 190.5, 'LG gives no actual temperature: the set one shows');
-    assert.equal(value(t.getCharacteristic(C.TemperatureDisplayUnits)), C.TemperatureDisplayUnits.FAHRENHEIT);
-    // Changing it while cooking: sent at once, in the oven's unit, keeping its mode
-    await t.getCharacteristic(C.TargetTemperature).handleSetRequest(204);
+    assert.equal(value(t.getCharacteristic(C.TargetTemperature)), 190.5);
+    assert.equal(Math.round(Number(value(t.getCharacteristic(C.CurrentTemperature))) * 10) / 10, 190.6, 'LG gives no actual temperature: the set one shows');
+    await setTemp(laundry, 204.5);
     assert.deepEqual(sent.at(-1), { operation: { ovenOperationMode: 'START' }, location: { locationName: 'LOWER' },
-      temperature: { targetTemperature: 399, unit: 'F' }, cook: { cookMode: 'CONVECTION_BAKE' } });
+      temperature: { targetTemperature: 400, unit: 'F' }, cook: { cookMode: 'CONVECTION_BAKE' } });
+    // The chosen temperature holds while the oven still reports the old one
+    laundry.update(cooking);
+    assert.equal(value(t.getCharacteristic(C.TargetTemperature)), 204.5);
     await t.getCharacteristic(C.TargetHeatingCoolingState).handleSetRequest(C.TargetHeatingCoolingState.OFF);
     assert.deepEqual(sent.at(-1), { operation: { ovenOperationMode: 'STOP' }, location: { locationName: 'LOWER' } });
     // Cooling down afterwards isn't cooking; DONE is a finish
-    const cool = laundryStatus(lower, [{ location: { locationName: 'LOWER' }, runState: { currentState: 'COOLING' } }]);
+    const cool = laundryStatus(lower, ovenState('COOLING'));
     assert.deepEqual([cool.running, cool.done], [false, false]);
-    assert.equal(laundryStatus(lower, [{ location: { locationName: 'LOWER' }, runState: { currentState: 'DONE' } }]).done, true);
+    assert.equal(laundryStatus(lower, ovenState('DONE')).done, true);
+  });
+
+  test('oven: nothing restarts it by surprise (paused, self-cleaning, the main tile, a stale temperature)', async () => {
+    const lower = laundryUnits('DEVICE_OVEN', ovenProfile())[1];
+    const { laundry, sent, lines, acc } = setup({ name: 'Oven', allowControl: true }, undefined, lower);
+    // Paused: a new temperature is kept for later, not sent (START would resume it)
+    laundry.update(laundryStatus(lower, ovenState('PAUSED', F(350))));
+    await setTemp(laundry, 200);
+    assert.equal(sent.length, 0);
+    // Self-cleaning: no start and no temperature; stop still works
+    laundry.update(laundryStatus(lower, ovenState('CLEANING')));
+    await setTemp(laundry, 210);
+    assert.equal(sent.length, 0);
+    await heatOn(laundry); // shown as heating already: nothing to do
+    assert.equal(sent.length, 0);
+    assert.equal(value(laundry.ovenThermostat!.getCharacteristic(C.CurrentHeatingCoolingState)), C.CurrentHeatingCoolingState.HEAT);
+    // The main tile on an oven starts through the thermostat, with temperature and mode
+    laundry.update(laundryStatus(lower, ovenState('INITIAL', F(0))));
+    await acc.getService(S.Valve)!.getCharacteristic(C.Active).handleSetRequest(1);
+    assert.deepEqual(sent.at(-1), { operation: { ovenOperationMode: 'START' }, location: { locationName: 'LOWER' },
+      temperature: { targetTemperature: 410, unit: 'F' }, cook: { cookMode: 'BAKE' } }, 'the last temperature chosen in the Home app (210 °C)');
+    // A temperature set right after the start (same scene) is sent again, though the oven doesn't report cooking yet
+    await setTemp(laundry, 180);
+    assert.equal((sent.at(-1)!.temperature as { targetTemperature: number }).targetTemperature, 356);
+    // While idle, an old temperature reported by the oven doesn't replace the one chosen
+    const fresh = setup({ name: 'Oven', allowControl: true }, undefined, lower);
+    await setTemp(fresh.laundry, 150);
+    fresh.laundry.update(laundryStatus(lower, ovenState('INITIAL', F(400))));
+    await heatOn(fresh.laundry);
+    assert.equal((fresh.sent[0].temperature as { targetTemperature: number }).targetTemperature, 302);
+    // A paused oven isn't resumed from the main tile
+    fresh.laundry.update(laundryStatus(lower, ovenState('PAUSED', F(302))));
+    await assert.rejects(fresh.acc.getService(S.Valve)!.getCharacteristic(C.Active).handleSetRequest(1));
+    assert.ok(fresh.lines.includes('info: [Oven] The oven is paused: resume it at the oven.'));
+    assert.equal(fresh.sent.length, 1);
+    assert.ok(!lines.some((l) => l.includes('Sent temperature') && l.includes('210')));
   });
 
   test('oven: refused without control allowed or remote control on; a °F-only oven; no temperature, no thermostat', async () => {
     const [upper] = laundryUnits('DEVICE_OVEN', ovenProfile(['F']));
     const a = setup({ name: 'Oven' }, undefined, upper);
-    const heat = (l: LaundryAccessory) => l.ovenThermostat!.getCharacteristic(C.TargetHeatingCoolingState).handleSetRequest(C.TargetHeatingCoolingState.HEAT);
-    await assert.rejects(heat(a.laundry));
+    await assert.rejects(heatOn(a.laundry));
     assert.ok(a.lines.some((l) => l.includes('control is off in the plugin settings')));
     const b = setup({ name: 'Oven', allowControl: true }, undefined, upper);
     b.laundry.update(status({ state: 'INITIAL' }));
-    await assert.rejects(heat(b.laundry));
+    await assert.rejects(heatOn(b.laundry));
     assert.ok(b.lines.includes('info: [Oven] Can\'t start the oven: turn on remote control on the oven first (LG only accepts commands then).'));
     assert.equal(b.sent.length, 0);
     // °F only: limits converted for the Home app, and commands in °F
     assert.equal(b.laundry.ovenThermostat!.getCharacteristic(C.TargetTemperature).props.minValue, 76);
     b.laundry.update(status({ state: 'INITIAL', remoteControl: true }));
-    await heat(b.laundry);
-    assert.deepEqual(b.sent[0].temperature, { targetTemperature: 351, unit: 'F' });
+    await heatOn(b.laundry);
+    assert.deepEqual(b.sent[0].temperature, { targetTemperature: 350, unit: 'F' });
     // A washer has no oven thermostat
     assert.equal(setup().laundry.ovenThermostat, undefined);
   });

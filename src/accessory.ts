@@ -45,8 +45,16 @@ export interface Deps {
 /** Sends a command body for this unit to LG. */
 export type SendFn = (payload: Record<string, unknown>) => Promise<unknown>;
 
-/** 350 °F: where an oven starts if no temperature was chosen yet. */
-const DEFAULT_OVEN_C = 177;
+/** Where an oven starts if no temperature was chosen yet: 350 °F, or 175 °C. */
+const DEFAULT_OVEN_F = 350;
+const DEFAULT_OVEN_C = 175;
+/** How long a temperature chosen in the Home app wins over the one the oven last reported. */
+const OVEN_TARGET_HOLD_MS = 30_000;
+/** A thermostat set to heat waits this long, so a temperature set in the same Home app action goes with it. */
+const OVEN_START_DELAY_MS = 400;
+/** After a start, a new temperature this soon is sent again (the oven may not report running yet). */
+const OVEN_RESEND_MS = 10_000;
+const toC = (f: number): number => (f - 32) * 5 / 9;
 
 /** If a cycle stops being seen with this little time left, it counts as finished. */
 const NEAR_END = 3 * 60;
@@ -64,6 +72,12 @@ export class LaundryAccessory {
   readonly ovenThermostat: Service | undefined;
   /** The temperature to start the oven at (°C), from the Home app or the oven. */
   private ovenTarget = DEFAULT_OVEN_C;
+  /** Until when the Home app's temperature wins over the oven's report. */
+  private ovenTargetHeldUntil = 0;
+  /** When a start was last sent. */
+  private ovenStartedAt = 0;
+  /** The unit the oven shows, once it has reported one. */
+  private ovenUnit: 'C' | 'F' | undefined;
   status: LaundryStatus | null = null;
   private inferredDoneUntil = 0;
   private inferredTimer: NodeJS.Timeout | undefined;
@@ -128,10 +142,12 @@ export class LaundryAccessory {
     this.ovenThermostat = this.optional(!!unit.oven, S.Thermostat, `${name} temperature`, 'oven-temperature');
     if (this.ovenThermostat && unit.oven) {
       const r = unit.oven.ranges;
-      const c = r.C || { min: Math.floor((r.F!.min - 32) * 5 / 9), max: Math.ceil((r.F!.max - 32) * 5 / 9), step: 0.5 };
-      this.ovenTarget = Math.min(c.max, Math.max(c.min, DEFAULT_OVEN_C));
+      const c = r.C || { min: Math.floor(toC(r.F!.min)), max: Math.ceil(toC(r.F!.max)), step: 0.5 };
+      // Half degrees when the oven also works in °F, so every whole °F can be chosen; rounded for LG when sent
+      const step = r.F ? Math.min(0.5, c.step) : c.step;
+      this.ovenTarget = Math.min(c.max, Math.max(c.min, r.F ? toC(DEFAULT_OVEN_F) : DEFAULT_OVEN_C));
       const t = this.ovenThermostat;
-      limit(t.getCharacteristic(C.TargetTemperature), { minValue: c.min, maxValue: c.max, minStep: c.step });
+      limit(t.getCharacteristic(C.TargetTemperature), { minValue: c.min, maxValue: c.max, minStep: step });
       limit(t.getCharacteristic(C.CurrentTemperature), { minValue: 0, maxValue: Math.max(c.max, 100) });
       limit(t.getCharacteristic(C.TargetHeatingCoolingState), { validValues: [C.TargetHeatingCoolingState.OFF, C.TargetHeatingCoolingState.HEAT] });
       limit(t.getCharacteristic(C.CurrentHeatingCoolingState), { validValues: [C.CurrentHeatingCoolingState.OFF, C.CurrentHeatingCoolingState.HEAT] });
@@ -263,17 +279,22 @@ export class LaundryAccessory {
     if (this.ovenThermostat) {
       const t = this.ovenThermostat;
       const set_ = s?.setTemperature;
-      if (set_) { this.ovenTarget = set_.unit === 'F' ? Math.round((set_.value - 32) * 5 / 9 * 2) / 2 : set_.value; }
       const heating = !!(s?.running || s?.paused);
+      if (s?.temperatureUnit) { this.ovenUnit = s.temperatureUnit; }
+      // The oven's temperature counts while it's on, unless one was just chosen in the Home app
+      if (set_ && heating && Date.now() > this.ovenTargetHeldUntil) {
+        this.ovenTarget = set_.unit === 'F' ? toC(set_.value) : set_.value;
+      }
       const maxC = t.getCharacteristic(C.TargetTemperature).props.maxValue ?? 300;
       const minC = t.getCharacteristic(C.TargetTemperature).props.minValue ?? 0;
       set(t.getCharacteristic(C.TargetTemperature), Math.min(maxC, Math.max(minC, this.ovenTarget)));
-      set(t.getCharacteristic(C.CurrentTemperature), heating && set_ ? Math.min(this.ovenTarget, t.getCharacteristic(C.CurrentTemperature).props.maxValue ?? 300) : 0);
+      const shown = set_ ? Math.round((set_.unit === 'F' ? toC(set_.value) : set_.value) * 10) / 10 : 0;
+      set(t.getCharacteristic(C.CurrentTemperature), heating ? Math.min(shown, t.getCharacteristic(C.CurrentTemperature).props.maxValue ?? 300) : 0);
       set(t.getCharacteristic(C.CurrentHeatingCoolingState), heating ? C.CurrentHeatingCoolingState.HEAT : C.CurrentHeatingCoolingState.OFF);
       set(t.getCharacteristic(C.TargetHeatingCoolingState), heating ? C.TargetHeatingCoolingState.HEAT : C.TargetHeatingCoolingState.OFF);
-      if (s?.setTemperature) {
+      if (this.ovenUnit) {
         set(t.getCharacteristic(C.TemperatureDisplayUnits),
-          s.setTemperature.unit === 'F' ? C.TemperatureDisplayUnits.FAHRENHEIT : C.TemperatureDisplayUnits.CELSIUS);
+          this.ovenUnit === 'F' ? C.TemperatureDisplayUnits.FAHRENHEIT : C.TemperatureDisplayUnits.CELSIUS);
       }
     }
     for (const [phase, svc] of this.phaseSensors) {
@@ -302,33 +323,57 @@ export class LaundryAccessory {
     }
   }
 
+  /** Self-cleaning: no cooking commands (they could end the clean). */
+  private get ovenCleaning(): boolean {
+    return this.status?.state === 'CLEANING';
+  }
+
+  /** °F when the oven shows °F, or only takes °F. */
+  private get ovenPrefersF(): boolean {
+    return this.ovenUnit === 'F' || (!this.ovenUnit && !this.unit.oven?.ranges.C);
+  }
+
+  /** The cook mode for a start: the oven's current one if it accepts it, else its first (bake). */
+  private get ovenMode(): string | undefined {
+    const s = this.status;
+    return s?.cookMode && this.unit.oven?.cookModes.includes(s.cookMode) ? s.cookMode : this.unit.oven?.cookModes[0];
+  }
+
   /** The oven thermostat set to heat (start at the set temperature) or off (stop). */
   private async setOvenHeat(on: boolean): Promise<void> {
     const s = this.status;
     if (on === !!(s?.running || s?.paused)) { return; }
     this.checkControl(on ? 'start the oven' : 'stop the oven');
     if (!on) { return this.sendOperation('STOP', 'Sent stop.'); }
+    if (this.ovenCleaning) { this.refuse('The oven is self-cleaning: it can\'t be started now.'); }
     if (!this.unit.operations.includes('START')) { this.refuse('This oven doesn\'t accept START through LG\'s API.'); }
-    const mode = s?.cookMode && this.unit.oven?.cookModes.includes(s.cookMode) ? s.cookMode : this.unit.oven?.cookModes[0];
-    const payload = ovenStartPayload(this.unit, this.ovenTarget, mode, s?.setTemperature?.unit === 'F');
-    const t = payload.temperature as { targetTemperature: number; unit: string };
-    await this.sendPayload(payload, `Sent start: ${mode ? `${stateLabel(mode).toLowerCase()}, ` : ''}${t.targetTemperature} °${t.unit}.`, 'START');
+    // A scene or the thermostat screen may set the temperature in the same action: let it arrive first
+    await new Promise((r) => setTimeout(r, OVEN_START_DELAY_MS));
+    await this.sendOvenStart('Sent start');
   }
 
-  /** A new temperature from the Home app: sent right away while the oven is on, else used at the next start. */
+  private async sendOvenStart(label: string): Promise<void> {
+    const mode = this.ovenMode;
+    const payload = ovenStartPayload(this.unit, this.ovenTarget, mode, this.ovenPrefersF);
+    const t = payload.temperature as { targetTemperature: number; unit: string };
+    this.ovenStartedAt = Date.now();
+    await this.sendPayload(payload, `${label}: ${mode ? `${stateLabel(mode).toLowerCase()}, ` : ''}${t.targetTemperature} °${t.unit}.`, 'START');
+  }
+
+  /**
+   * A new temperature from the Home app: sent right away while the oven is cooking (or was just
+   * started), else kept for the next start. A paused oven isn't restarted by it.
+   */
   private async setOvenTemperature(celsius: number): Promise<void> {
     if (!Number.isFinite(celsius)) { return; }
     const s = this.status;
-    if (!(s?.running || s?.paused)) {
-      this.ovenTarget = celsius;
-      return;
-    }
-    this.checkControl('change the oven temperature');
-    const mode = s.cookMode && this.unit.oven?.cookModes.includes(s.cookMode) ? s.cookMode : undefined;
-    const payload = ovenStartPayload(this.unit, celsius, mode, s.setTemperature?.unit === 'F');
-    const t = payload.temperature as { targetTemperature: number; unit: string };
     this.ovenTarget = celsius;
-    await this.sendPayload(payload, `Sent temperature ${t.targetTemperature} °${t.unit}.`, 'START');
+    this.ovenTargetHeldUntil = Date.now() + OVEN_TARGET_HOLD_MS;
+    const cooking = !!s?.running && !this.ovenCleaning;
+    const justStarted = Date.now() - this.ovenStartedAt < OVEN_RESEND_MS && !s?.paused;
+    if (!cooking && !justStarted) { return; }
+    this.checkControl('change the oven temperature');
+    await this.sendOvenStart('Sent temperature');
   }
 
   private async sendOperation(operation: string, done: string): Promise<void> {
@@ -352,6 +397,11 @@ export class LaundryAccessory {
     const s = this.status;
     const wantOn = value === 1 || value === true;
     if (wantOn === !!s?.running) { return; }
+    if (this.ovenThermostat && wantOn) {
+      // An oven starts from its thermostat, always with a temperature and mode
+      if (s?.paused) { this.refuse('The oven is paused: resume it at the oven.'); }
+      return this.setOvenHeat(true);
+    }
     this.checkControl(wantOn ? 'start' : 'pause');
     const operation = wantOn ? 'START' : 'STOP';
     if (!this.unit.operations.includes(operation)) {
