@@ -6,7 +6,7 @@ import { collect } from '../bin/lg-thinq-diagnostics';
 
 /**
  * tested: confirmed on real appliances. checked: matches Home Assistant on real sample data
- * (needs "Experimental appliances"). laundry: other laundry, added without that setting.
+ * (added without "Experimental appliances"). laundry: other laundry, added without that setting.
  * experimental: needs "Experimental appliances". basic: experimental, and added only if LG
  * reports something useful.
  */
