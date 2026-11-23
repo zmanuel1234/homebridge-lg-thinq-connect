@@ -43,7 +43,8 @@
     "prepublishOnly": "npm run lint && npm test",
     "verify": "npm run lint && npm run build && npm test",
     "test:matrix": "npm run build && npm test",
-    "release:check": "npm run verify"
+    "release:check": "npm run verify",
+    "surface:update": "UPDATE_SURFACE=1 node --import tsx --test test/surface.test.ts"
   },
   "keywords": [
     "homebridge-plugin",

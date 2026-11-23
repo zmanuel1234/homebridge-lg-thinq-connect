@@ -1,0 +1,213 @@
+{
+  "ha air_conditioner": [
+    "AirQualitySensor/air-quality: Air Quality, Configured Name, Name",
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "FilterMaintenance/filter: Configured Name, Filter Change Indication, Name",
+    "HeaterCooler/climate: Active, Configured Name, Cooling Threshold Temperature, Current Heater-Cooler State, Current Temperature, Heating Threshold Temperature, Name, Rotation Speed, Swing Mode, Target Heater-Cooler State",
+    "HumiditySensor/humidity: Configured Name, Current Relative Humidity, Name",
+    "Switch/air-purify: Configured Name, Name, On",
+    "Switch/energy-saving: Configured Name, Name, On",
+    "Switch/mode-AIR_DRY: Configured Name, Name, On",
+    "Switch/swing-left-right: Configured Name, Name, On"
+  ],
+  "ha air_conditioner1": [
+    "HeaterCooler/climate: Active, Configured Name, Cooling Threshold Temperature, Current Heater-Cooler State, Current Temperature, Heating Threshold Temperature, Name, Rotation Speed, Target Heater-Cooler State",
+    "Switch/mode-AIR_DRY: Configured Name, Name, On",
+    "Switch/mode-FAN: Configured Name, Name, On"
+  ],
+  "ha air_conditioner2": [
+    "HeaterCooler/climate: Active, Configured Name, Cooling Threshold Temperature, Current Heater-Cooler State, Current Temperature, Heating Threshold Temperature, Name, Rotation Speed, Target Heater-Cooler State",
+    "Switch/mode-AIR_DRY: Configured Name, Name, On",
+    "Switch/mode-FAN: Configured Name, Name, On"
+  ],
+  "ha air_purifier": [
+    "AirPurifier/purifier: Active, Configured Name, Current Air Purifier State, Name, Target Air Purifier State"
+  ],
+  "ha dehumidifier": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "HumidifierDehumidifier/humidity: Active, Configured Name, Current Humidifier-Dehumidifier State, Current Relative Humidity, Name, Relative Humidity Dehumidifier Threshold, Rotation Speed, Target Humidifier-Dehumidifier State"
+  ],
+  "ha hood": [
+    "Fanv2/fan: Active, Configured Name, Name, Rotation Speed",
+    "Lightbulb/lamp: Brightness, Configured Name, Name, On"
+  ],
+  "air conditioner, everything": [
+    "AirQualitySensor/air-quality: Air Quality, Configured Name, Name",
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "FilterMaintenance/filter: Configured Name, Filter Change Indication, Name",
+    "HeaterCooler/climate: Active, Configured Name, Cooling Threshold Temperature, Current Heater-Cooler State, Current Temperature, Heating Threshold Temperature, Name, Rotation Speed, Swing Mode, Target Heater-Cooler State",
+    "HumiditySensor/humidity: Configured Name, Current Relative Humidity, Name",
+    "Switch/air-purify: Configured Name, Name, On",
+    "Switch/display-light: Configured Name, Name, On",
+    "Switch/energy-saving: Configured Name, Name, On",
+    "Switch/jet: Configured Name, Name, On",
+    "Switch/mode-AIR_DRY: Configured Name, Name, On",
+    "Switch/mode-FAN: Configured Name, Name, On",
+    "Switch/swing-left-right: Configured Name, Name, On",
+    "Switch/wind-airGuideWind: Configured Name, Name, On",
+    "Switch/wind-forestWind: Configured Name, Name, On"
+  ],
+  "air conditioner, options": [
+    "HeaterCooler/climate: Active, Configured Name, Cooling Threshold Temperature, Current Heater-Cooler State, Current Temperature, Heating Threshold Temperature, Name, Swing Mode, Target Heater-Cooler State",
+    "TemperatureSensor/room-temperature: Configured Name, Current Temperature, Name"
+  ],
+  "AeroTower": [
+    "AirPurifier/purifier: Active, Configured Name, Current Air Purifier State, Name, Rotation Speed, Target Air Purifier State",
+    "AirQualitySensor/air-quality: Air Quality, Configured Name, Name",
+    "HumiditySensor/humidity: Configured Name, Current Relative Humidity, Name",
+    "Switch/display-light: Configured Name, Name, On",
+    "Switch/sleep: Configured Name, Name, On",
+    "Switch/turbo: Configured Name, Name, On",
+    "Switch/uv-nano: Configured Name, Name, On",
+    "Switch/warm: Configured Name, Name, On",
+    "TemperatureSensor/temperature: Configured Name, Current Temperature, Name"
+  ],
+  "humidifier": [
+    "AirQualitySensor/air-quality: Air Quality, Configured Name, Name",
+    "HumidifierDehumidifier/humidity: Active, Configured Name, Current Humidifier-Dehumidifier State, Current Relative Humidity, Name, Relative Humidity Humidifier Threshold, Rotation Speed, Target Humidifier-Dehumidifier State",
+    "Switch/auto-mode: Configured Name, Name, On",
+    "Switch/display-light: Configured Name, Name, On",
+    "Switch/hygiene-dry: Configured Name, Name, On",
+    "Switch/mood-lamp: Configured Name, Name, On",
+    "Switch/sleep-mode: Configured Name, Name, On",
+    "Switch/warm: Configured Name, Name, On",
+    "TemperatureSensor/temperature: Configured Name, Current Temperature, Name"
+  ],
+  "ventilator": [
+    "AirQualitySensor/air-quality: Air Quality, Configured Name, Name",
+    "CarbonDioxideSensor/co2: Carbon Dioxide Detected, Configured Name, Name",
+    "Fanv2/fan: Active, Configured Name, Name, Rotation Speed",
+    "TemperatureSensor/temperature: Configured Name, Current Temperature, Name"
+  ],
+  "ceiling fan": [
+    "Fanv2/fan: Active, Configured Name, Name, Rotation Speed"
+  ],
+  "microwave": [
+    "Fanv2/fan: Active, Configured Name, Name, Rotation Speed",
+    "Lightbulb/lamp: Brightness, Configured Name, Name, On",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Valve Type"
+  ],
+  "cooktop": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/in-use: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/zone-LEFT_FRONT: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/zone-RIGHT_FRONT: Configured Name, Name, Occupancy Detected",
+    "Switch/power-off: Configured Name, Name, On"
+  ],
+  "refrigerator": [
+    "ContactSensor/door-MAIN: Configured Name, Contact Sensor State, Name",
+    "FilterMaintenance/filter-freshAirFilterRemainPercent: Configured Name, Filter Change Indication, Name",
+    "FilterMaintenance/filter-waterFilter2RemainPercent: Configured Name, Filter Change Indication, Name",
+    "FilterMaintenance/filter-waterFilter3RemainPercent: Configured Name, Filter Change Indication, Name",
+    "FilterMaintenance/filter: Configured Name, Filter Change Indication, Name",
+    "OccupancySensor/status-sabbathMode: Configured Name, Name, Occupancy Detected",
+    "Switch/switch-ecoFriendlyMode: Configured Name, Name, On",
+    "Switch/switch-expressFridge: Configured Name, Name, On",
+    "Switch/switch-expressMode: Configured Name, Name, On",
+    "Switch/switch-powerSaveEnabled: Configured Name, Name, On",
+    "Switch/switch-rapidFreeze: Configured Name, Name, On",
+    "Thermostat/temp-FREEZER: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units",
+    "Thermostat/temp-FRIDGE: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units"
+  ],
+  "wine cellar": [
+    "Lightbulb/light: Brightness, Configured Name, Name, On",
+    "OccupancySensor/status-sabbathMode: Configured Name, Name, Occupancy Detected",
+    "Switch/switch-optimalHumidity: Configured Name, Name, On",
+    "Thermostat/temp-WINE_UPPER: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units"
+  ],
+  "water heater": [
+    "Switch/mode-HEAT_PUMP: Configured Name, Name, On",
+    "Switch/mode-TURBO: Configured Name, Name, On",
+    "Switch/mode-VACATION: Configured Name, Name, On",
+    "Thermostat/water: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units"
+  ],
+  "heat pump": [
+    "Thermostat/hot-water: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units",
+    "Thermostat/room: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units"
+  ],
+  "robot vacuum": [
+    "Battery/battery: Charging State, Configured Name, Name, Status Low Battery",
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "Switch/clean: Configured Name, Name, On"
+  ],
+  "stick vacuum": [
+    "Battery/battery: Charging State, Configured Name, Name, Status Low Battery",
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name"
+  ],
+  "basic (unknown type)": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "Switch/power: Configured Name, Name, On",
+    "TemperatureSensor/temp-temperature: Configured Name, Current Temperature, Name"
+  ],
+  "ours DEVICE_WASHER MAIN": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/tub-clean: Configured Name, Name, Occupancy Detected",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
+  ],
+  "ours DEVICE_DRYER": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
+  ],
+  "ha washtower_dryer": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
+  ],
+  "dishwasher": [
+    "ContactSensor/door: Configured Name, Contact Sensor State, Name",
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/rinse-aid: Configured Name, Name, Occupancy Detected",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
+  ],
+  "oven (two cavities) UPPER": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "Thermostat/oven-temperature: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
+  ],
+  "oven (two cavities) LOWER": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "Thermostat/oven-temperature: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
+  ],
+  "settings": [
+    "(read) allowControl",
+    "(read) appliances",
+    "(read) country",
+    "(read) energy",
+    "(read) experimental",
+    "(read) extraControls",
+    "(read) ignore",
+    "(read) liveUpdates",
+    "(read) phaseSensors",
+    "(read) pollInterval",
+    "(read) runningPollInterval",
+    "(read) token",
+    "(read) tubCleanAfter",
+    "allowControl",
+    "appliances",
+    "appliances[].acModes",
+    "appliances[].acSwing",
+    "appliances[].extraControls",
+    "appliances[].name",
+    "appliances[].temperatureSensor",
+    "country",
+    "energy",
+    "experimental",
+    "extraControls",
+    "ignore",
+    "liveUpdates",
+    "name",
+    "phaseSensors",
+    "pollInterval",
+    "runningPollInterval",
+    "token",
+    "tubCleanAfter"
+  ]
+}
