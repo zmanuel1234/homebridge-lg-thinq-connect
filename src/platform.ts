@@ -29,6 +29,8 @@ export interface Settings {
   /** Changes pushed by LG the moment they happen, with scheduled checks as a backup. */
   liveUpdates: boolean;
   phaseSensors: string[];
+  /** Cycles counted by LG at which the tub-clean reminder turns on; 0 = off. */
+  tubCleanAfter: number;
   /** Appliance names (as in the ThinQ app) to leave out of the Home app. */
   ignore: string[];
 }
@@ -49,6 +51,7 @@ export function readSettings(config: PlatformConfig): Settings {
     allowControl: config.allowControl === true,
     liveUpdates: config.liveUpdates !== false,
     phaseSensors: strings(config.phaseSensors),
+    tubCleanAfter: clamp(config.tubCleanAfter, 0, 200, 0),
     ignore: strings(config.ignore).map((s) => s.toLowerCase()),
   };
 }
@@ -251,7 +254,8 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       accessory.context.location = unit.location;
       const serial = createHash('sha256').update(`${device.deviceId}:${unit.location}`).digest('hex').slice(0, 12).toUpperCase();
       machine.units.push(new LaundryAccessory(this, accessory, unit,
-        { name, model: modelName, serial, allowControl: this.settings.allowControl, phaseSensors: this.settings.phaseSensors },
+        { name, model: modelName, serial, allowControl: this.settings.allowControl,
+          phaseSensors: this.settings.phaseSensors, tubCleanAfter: this.settings.tubCleanAfter },
         (payload) => this.client!.control(device.deviceId, payload),
         () => this.schedule(machine, 3)));
       if (isNew) {

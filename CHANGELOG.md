@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-beta.3 - 2026-11-23
+
+### Added
+- **Tub clean reminder** (optional, off by default): a "tub clean" sensor on washers that count
+  their cycles, detected once LG's count reaches the number you set (for example 30). Turn on
+  notifications for it as a reminder. The log notes when it's due.
+
 ## 0.1.0-beta.2 - 2026-11-23
 
 ### Added

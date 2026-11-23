@@ -1,7 +1,7 @@
 {
   "name": "homebridge-lg-thinq-connect",
   "displayName": "LG ThinQ Connect",
-  "version": "0.1.0-beta.2",
+  "version": "0.1.0-beta.3",
   "description": "LG ThinQ appliances in Apple Home through LG's official ThinQ Connect API: washer and dryer time left, cycle-done and error alerts, sign-in with a personal access token.",
   "author": "Manuel Zamfir",
   "license": "MIT",

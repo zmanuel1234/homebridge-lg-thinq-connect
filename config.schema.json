@@ -59,6 +59,14 @@
           ]
         }
       },
+      "tubCleanAfter": {
+        "title": "Tub clean reminder after (cycles)",
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 200,
+        "description": "Adds a \"tub clean\" sensor to washers that count their cycles. It turns on when LG's count reaches this number (LG suggests a Tub Clean about every 30 washes); turn on notifications for it. 0 = no reminder."
+      },
       "ignore": {
         "title": "Leave out these appliances",
         "type": "array",
@@ -92,6 +100,10 @@
     "allowControl",
     "liveUpdates",
     "phaseSensors",
+    {
+      "key": "tubCleanAfter",
+      "type": "number"
+    },
     {
       "type": "fieldset",
       "title": "Advanced",
