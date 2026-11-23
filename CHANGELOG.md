@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- A compatibility promise for 1.0 (README, "Updates and compatibility"): 1.x never renames or
+  removes a tile, sensor, switch or setting. The tests now hold every appliance's HomeKit tiles
+  and the settings to a recorded list, so a change fails until it's deliberately approved
+  (`npm run surface:update`).
+
 ## 0.2.0-beta.8 - 2026-11-23
 
 From a pass through Home Assistant's LG integration (its 127 issues and its fixes) and LG's own

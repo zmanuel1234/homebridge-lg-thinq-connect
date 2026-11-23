@@ -237,6 +237,19 @@ about each appliance, with device IDs and serial numbers removed. Look it over, 
 [new appliance issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose),
 with what works and what doesn't.
 
+## Updates and compatibility
+
+Your scenes and automations are built on the tiles and sensors this plugin adds, so from 1.0 on:
+
+- **1.x updates never rename or remove** a tile, sensor or switch, or a setting. They may add new
+  ones (often off by default, or behind a setting).
+- Anything that would break that waits for a **2.0**, with a migration note in the CHANGELOG.
+- **Betas** (versions like `1.1.0-beta.1`) are published under npm's `beta` tag, so you only get
+  them if you ask for them; the Homebridge UI's normal update installs stable versions only.
+
+The plugin's tests hold every appliance's tiles and settings to a recorded list
+(`test/surface.snapshot.json`), so a change can't slip through by accident.
+
 ## Coming from homebridge-lg-thinq
 
 This plugin can run next to [homebridge-lg-thinq](https://github.com/nVuln/homebridge-lg-thinq),
