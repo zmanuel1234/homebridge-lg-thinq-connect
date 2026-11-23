@@ -37,6 +37,12 @@
         "default": false,
         "description": "Also add LG appliances not yet confirmed on real hardware: air conditioners, fridges, dishwashers, dehumidifiers, air purifiers and more (see the README). If you try one, please report how it works on GitHub."
       },
+      "extraControls": {
+        "title": "Extra switches for experimental appliances",
+        "type": "boolean",
+        "default": true,
+        "description": "Switches for what an appliance offers beyond its main tile: air conditioner air purify, energy saving, display light, left-right swing, jet, dry and fan modes; air purifier sleep mode. Turn off for a tidier Home app."
+      },
       "liveUpdates": {
         "title": "Live updates from LG",
         "type": "boolean",
@@ -105,6 +111,12 @@
     "country",
     "allowControl",
     "experimental",
+    {
+      "key": "extraControls",
+      "condition": {
+        "functionBody": "return model.experimental === true;"
+      }
+    },
     "liveUpdates",
     "phaseSensors",
     {

@@ -34,6 +34,8 @@ export interface Settings {
   tubCleanAfter: number;
   /** Add appliance types not yet confirmed on real hardware (everything but washers and dryers). */
   experimental: boolean;
+  /** Extra switches for experimental appliances (air conditioner modes, purifier sleep mode…). */
+  extraControls: boolean;
   /** Appliance names (as in the ThinQ app) to leave out of the Home app. */
   ignore: string[];
 }
@@ -56,6 +58,7 @@ export function readSettings(config: PlatformConfig): Settings {
     phaseSensors: strings(config.phaseSensors),
     tubCleanAfter: clamp(config.tubCleanAfter, 0, 200, 0),
     experimental: config.experimental === true,
+    extraControls: config.extraControls !== false,
     ignore: strings(config.ignore).map((s) => s.toLowerCase()),
   };
 }
@@ -324,6 +327,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       serial: createHash('sha256').update(`${device.deviceId}:`).digest('hex').slice(0, 12).toUpperCase(),
       send: (payload) => this.client!.control(device.deviceId, payload),
       refreshSoon: () => this.schedule(machine, 3),
+      extraControls: this.settings.extraControls,
     };
     machine.parts.push(mapping.create(ctx, profile));
     if (isNew) {

@@ -87,6 +87,7 @@ create a new one.
 | Country | US | The country of your LG account (two letters) |
 | Allow starting and pausing | Off | Tapping a machine's tile starts, pauses or resumes it (needs Remote Start on the machine) |
 | Experimental appliances | Off | Also add appliance types not yet confirmed on real hardware (see [Other appliances](#other-appliances)) |
+| Extra switches for experimental appliances | On | Air conditioner and air purifier mode switches; turn off for a tidier Home app |
 | Live updates from LG | On | Changes and alerts arrive the moment they happen; scheduled checks continue as a backup |
 | Phase sensors | None | Extra sensors that are on during a chosen phase |
 | Tub clean reminder after | 0 (off) | Cycles counted by LG at which the washer's tub-clean sensor turns on |
@@ -127,16 +128,19 @@ anyone using this plugin. If you try one, please
 | WashTower, wash combo | As washer and dryer, one set per drum | Experimental (always on) |
 | Dishwasher | As a washer, plus door and "rinse aid low" sensors | Experimental |
 | Styler, oven | As a washer: time left, done, problem | Experimental |
-| Air conditioner | Heater/cooler: on/off, cool / heat / auto (as the unit offers), room and set temperature, fan speed (Auto at the top of the slider), swing; "problem" for a full water tank | Experimental (from real sample data) |
+| Air conditioner | Heater/cooler: on/off, cool / heat / auto (as the unit offers), room and set temperature (separate heating and cooling set points in auto, on units with two-set), fan speed (Auto at the top of the slider), swing. Switches, where the unit offers them: air purify, energy saving, display light, left-right swing, jet mode, dry mode, fan mode. Air quality, humidity and filter sensors; "problem" for a full water tank | Experimental (from real sample data) |
 | Refrigerator, wine cellar | Door-open sensor per door; set temperature per compartment; express modes as switches; water filter | Experimental |
 | Dehumidifier, humidifier | Humidifier tile: on/off, humidity now and target, fan speed; "problem" for a full tank | Experimental (dehumidifier from real sample data) |
-| Air purifier | Air purifier tile: on/off, fan speed (Auto at the top); air quality (PM2.5, PM10) and filter life when reported | Experimental (from real sample data) |
+| Air purifier | Air purifier tile: on/off, auto or manual, fan speed (Auto at the top); a sleep mode switch; air quality (PM2.5, PM10), humidity and filter life when reported | Experimental (from real sample data) |
 | Ceiling fan, ventilator | Fan: on/off and speed | Experimental |
 | Range hood, over-the-range microwave | Fan with speed steps, and the light with brightness | Experimental (hood from real sample data) |
 | Water heater | Thermostat: on/off, tank and set temperature | Experimental |
 | Heat pump (system boiler) | Thermostat for room heating or cooling, and one for hot water | Experimental |
 | Robot vacuum | Switch, on while cleaning (on starts or resumes, off sends it home); battery | Experimental |
 | Anything else | What its profile shows: on/off, temperatures, humidity, LG's problem alerts | Experimental (basic) |
+
+Some air conditioners don't report air purify back; its switch then shows the last command. LG's
+official API has no quiet mode, and no Air Fast or light for air purifiers.
 
 Fridges report each compartment's **set** temperature, not the measured one, so that's what their
 tiles show. LG's API can't choose wash programs, cooking modes and the like on any appliance.

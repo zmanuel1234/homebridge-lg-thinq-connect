@@ -3,12 +3,11 @@
 // Home Assistant's integration; dehumidifier, air purifier and hood sample data is Home Assistant's.
 
 import type { CharacteristicValue, Service } from 'homebridge';
-import { field } from '../api';
 import { alertKind } from '../laundry';
-import { alertCodes } from './air-conditioner';
+import { AirSensors, alertCodes } from './sensors';
 import { Appliance, type ApplianceContext, set } from './base';
 import {
-  type Obj, type Range, fieldOf, levelFor, levelPercent, num, powerField, rangeOf, resources, speedLevels,
+  type Obj, type Range, enumValues, fieldOf, levelFor, levelPercent, num, powerField, rangeOf, resources, speedLevels,
   stateValue, writable,
 } from './profile';
 
@@ -82,74 +81,71 @@ abstract class Powered extends Appliance {
   }
 }
 
-// ---- Air quality and filters (air purifiers, some air conditioners and humidifiers) ----
-
-const AIR_QUALITY: Record<string, number> = { GOOD: 2, NORMAL: 3, BAD: 4, VERY_BAD: 5 };
-
-/** Filter life left in percent: filterRemainPercent, or from used and lifetime hours. */
-export function filterPercent(state: unknown): number | undefined {
-  const info = field(state, 'filterInfo');
-  const remain = num(field(info, 'filterRemainPercent')) ?? num(field(info, 'topFilterRemainPercent'));
-  if (remain !== undefined) { return Math.max(0, Math.min(100, remain)); }
-  const life = num(field(info, 'filterLifetime'));
-  const used = num(field(info, 'usedTime'));
-  return life && used !== undefined ? Math.max(0, Math.min(100, Math.round(100 * (1 - used / life)))) : undefined;
-}
-
+/**
+ * Air purifiers: on/off, fan speed, auto or manual mode (when the purifier has an AUTO mode), a
+ * sleep mode switch, and air quality, humidity and filter sensors when reported.
+ */
 export class AirPurifier extends Powered {
   readonly tile: Service;
-  private readonly quality?: Service;
-  private readonly filter?: Service;
-  private state: unknown = undefined;
+  readonly sleep?: Service;
+  private readonly sensors: AirSensors;
+  private readonly jobModes: string[];
+  private jobMode = '';
 
   constructor(ctx: ApplianceContext, profile: unknown) {
     super(ctx, profile);
     const { Service: S, Characteristic: C } = this.hap;
+    this.jobModes = enumValues(fieldOf(this.res, 'airPurifierJobMode', 'currentJobMode'), 'w');
     this.tile = this.service(S.AirPurifier, ctx.name, 'purifier');
     this.tile.setPrimaryService(true);
     this.tile.getCharacteristic(C.Active).onSet((v) => this.setPower(v));
-    this.tile.getCharacteristic(C.TargetAirPurifierState).setProps({ validValues: [C.TargetAirPurifierState.MANUAL] });
+    const T = C.TargetAirPurifierState;
+    const target = this.tile.getCharacteristic(T);
+    if (this.jobModes.includes('AUTO') && this.manualMode) {
+      target.setProps({ validValues: [T.MANUAL, T.AUTO] }).onSet((v) => this.setJobMode(v === T.AUTO ? 'AUTO' : this.manualMode!));
+    } else {
+      target.setProps({ validValues: [T.MANUAL] });
+    }
     this.speedCharacteristic(this.tile);
     const keep = new Set(['purifier']);
-    if (this.res.airQualitySensor) {
-      this.quality = this.service(S.AirQualitySensor, `${ctx.name} air quality`, 'air-quality');
-      keep.add('air-quality');
+    if (ctx.extraControls !== false && this.jobModes.includes('SLEEP')) {
+      this.sleep = this.service(S.Switch, `${ctx.name} sleep mode`, 'sleep');
+      this.sleep.getCharacteristic(C.On).onSet((v) => this.setJobMode(v === true || v === 1 ? 'SLEEP' : (this.manualMode || 'AUTO')));
+      keep.add('sleep');
     }
-    if (this.res.filterInfo) {
-      this.filter = this.service(S.FilterMaintenance, `${ctx.name} filter`, 'filter');
-      keep.add('filter');
-    }
+    this.sensors = new AirSensors(this, this.res, ctx.name, (t, n, s) => this.service(t, n, s), keep, true);
     this.problemFromProfile(profile, keep);
     this.prune(keep);
     this.update(undefined);
   }
 
+  /** The mode "manual" means: CLEAN if offered, otherwise the first that isn't AUTO or SLEEP. */
+  private get manualMode(): string | undefined {
+    return this.jobModes.includes('CLEAN') ? 'CLEAN' : this.jobModes.find((m) => m !== 'AUTO' && m !== 'SLEEP');
+  }
+
   update(state: unknown): void {
     const { Characteristic: C } = this.hap;
     this.readPower(state);
-    if (state !== null && state !== undefined) { this.state = state; }
+    if (state) {
+      const m = stateValue(state, 'airPurifierJobMode', 'currentJobMode');
+      if (typeof m === 'string') { this.jobMode = m; }
+      this.sensors.update(state);
+    }
     set(this.tile.getCharacteristic(C.Active), this.on ? 1 : 0);
     set(this.tile.getCharacteristic(C.CurrentAirPurifierState),
       this.on ? C.CurrentAirPurifierState.PURIFYING_AIR : C.CurrentAirPurifierState.INACTIVE);
+    set(this.tile.getCharacteristic(C.TargetAirPurifierState),
+      this.jobMode === 'AUTO' ? C.TargetAirPurifierState.AUTO : C.TargetAirPurifierState.MANUAL);
     if (this.speeds.length) { set(this.tile.getCharacteristic(C.RotationSpeed), this.speed); }
-    if (this.quality) {
-      const aq = field(this.state, 'airQualitySensor');
-      const level = field(aq, 'totalPollutionLevel');
-      set(this.quality.getCharacteristic(C.AirQuality), typeof level === 'string' ? AIR_QUALITY[level] ?? 0 : 0);
-      const pm25 = num(field(aq, 'PM2'));
-      const pm10 = num(field(aq, 'PM10'));
-      if (pm25 !== undefined) { set(this.quality.getCharacteristic(C.PM2_5Density), Math.min(pm25, 1000)); }
-      if (pm10 !== undefined) { set(this.quality.getCharacteristic(C.PM10Density), Math.min(pm10, 1000)); }
-    }
-    if (this.filter) {
-      const pct = filterPercent(this.state);
-      if (pct !== undefined) {
-        set(this.filter.getCharacteristic(C.FilterLifeLevel), pct);
-        set(this.filter.getCharacteristic(C.FilterChangeIndication),
-          pct <= 10 ? C.FilterChangeIndication.CHANGE_FILTER : C.FilterChangeIndication.FILTER_OK);
-      }
-    }
+    if (this.sleep) { set(this.sleep.getCharacteristic(C.On), this.jobMode === 'SLEEP'); }
     this.renderProblem();
+  }
+
+  private setJobMode(mode: string): Promise<void> {
+    if (mode === this.jobMode) { return Promise.resolve(); }
+    return this.command(`Mode ${mode.toLowerCase().split('_').join(' ')}`, { airPurifierJobMode: { currentJobMode: mode } })
+      .then(() => { this.jobMode = mode; });
   }
 }
 

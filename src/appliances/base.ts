@@ -17,6 +17,8 @@ export interface ApplianceContext {
   send: (payload: Record<string, unknown>) => Promise<unknown>;
   /** Asks the platform to check this appliance's state again shortly (after a command). */
   refreshSoon: () => void;
+  /** Add extra switches (air conditioner modes, air purifier sleep mode…); default true. */
+  extraControls?: boolean;
 }
 
 /** One appliance (or one part of one) in the Home app, kept up to date from LG's state. */
