@@ -30,9 +30,24 @@ export interface Part {
   alert(kind: 'finished' | 'problem' | 'other', pushCode: string): void;
   /** A cycle or similar is under way: check more often. */
   readonly busy: boolean;
+  /** Was busy at the last update before this one (an alert may arrive just after a cycle ends). */
+  readonly wasBusy?: boolean;
   /** For an appliance with two parts (a WashTower), which part an alert is about. */
   readonly alertKey?: string;
   stop(): void;
+}
+
+/**
+ * Narrows a characteristic's limits without HAP warnings: a new characteristic still holds HAP's
+ * default value (often outside the new limits), so a valid one is put in place first.
+ */
+export function limit(ch: Characteristic, props: { minValue?: number; maxValue?: number; minStep?: number; validValues?: number[] }): Characteristic {
+  let v = typeof ch.value === 'number' ? ch.value : undefined;
+  if (props.validValues?.length && (v === undefined || !props.validValues.includes(v))) { v = props.validValues[0]; }
+  if (v !== undefined && props.minValue !== undefined && v < props.minValue) { v = props.minValue; }
+  if (v !== undefined && props.maxValue !== undefined && v > props.maxValue) { v = props.maxValue; }
+  if (v !== undefined && v !== ch.value) { ch.value = v; } // no event: it's set up, not a change
+  return ch.setProps(props);
 }
 
 /** Update a characteristic only when its value changes. */

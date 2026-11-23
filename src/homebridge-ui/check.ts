@@ -1,8 +1,13 @@
-import { ThinQClient, type ClientOptions } from '../api';
+import { ThinQClient, ThinQError, type ClientOptions } from '../api';
 import { TESTED_TYPES, isCycleAppliance, isLaundry } from '../laundry';
 import { MAPPED_TYPES } from '../appliances';
 
-export type Support = 'supported' | 'experimental' | 'basic';
+/**
+ * supported: tested on real appliances. laundry: other laundry, added without the experimental
+ * setting. experimental: needs "Experimental appliances". basic: experimental, and added only if
+ * LG reports something useful.
+ */
+export type Support = 'supported' | 'laundry' | 'experimental' | 'basic';
 
 export interface CheckResult {
   ok: boolean;
@@ -14,7 +19,8 @@ export interface CheckResult {
 /** How well this plugin supports an LG appliance type. */
 export function supportOf(deviceType: string): Support {
   if (TESTED_TYPES.has(deviceType)) { return 'supported'; }
-  if (isLaundry(deviceType) || isCycleAppliance(deviceType) || MAPPED_TYPES.includes(deviceType)
+  if (isLaundry(deviceType)) { return 'laundry'; }
+  if (isCycleAppliance(deviceType) || MAPPED_TYPES.includes(deviceType)
     || deviceType === 'DEVICE_MICROWAVE_OVEN') { return 'experimental'; }
   return 'basic';
 }
@@ -37,11 +43,18 @@ export async function checkToken(
   if (!t) {
     return { ok: false, message: 'Paste your personal access token in the Token box first.', appliances: [] };
   }
+  let client: ThinQClient;
+  try {
+    client = makeClient({ token: t, country: c });
+  } catch (err) {
+    return { ok: false, message: (err as Error).message, appliances: [] };
+  }
   let devices;
   try {
-    devices = await makeClient({ token: t, country: c }).devices();
+    devices = await client.devices();
   } catch (err) {
-    return { ok: false, message: `LG refused: ${(err as Error).message}`, appliances: [] };
+    const why = (err as Error).message;
+    return { ok: false, message: err instanceof ThinQError && err.status ? `LG refused: ${why}` : `Couldn't reach LG: ${why}`, appliances: [] };
   }
   const appliances = devices.map((d) => ({
     name: d.deviceInfo.alias || typeName(d.deviceInfo.deviceType),

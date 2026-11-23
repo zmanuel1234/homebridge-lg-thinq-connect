@@ -29,6 +29,10 @@ export class FakeLG {
   readonly token = 'test-token';
   readonly requests: Recorded[] = [];
   devices: FakeDevice[] = realDevices();
+  /** Requests to matching paths fail with HTTP 503. */
+  failPath: RegExp | null = null;
+  /** Set to answer the device list with this instead (an odd answer from LG). */
+  listingOverride: unknown = undefined;
   /** Set to make the next requests fail: [HTTP status, LG code, message]. */
   failWith: [number, string, string] | null = null;
   /** The message server LG's route answer names. */
@@ -62,6 +66,7 @@ export class FakeLG {
   }
 
   private answer(req: IncomingMessage, path: string, body: unknown): [number, Record<string, unknown>] {
+    if (this.failPath?.test(path)) { return [503, { error: { code: '', message: 'Service unavailable' } }]; }
     if (this.failWith) {
       const [status, code, message] = this.failWith;
       return [status, { error: { code, message } }];
@@ -93,6 +98,7 @@ export class FakeLG {
       return [200, { response: {} }];
     }
     if (path === 'devices') {
+      if (this.listingOverride !== undefined) { return [200, { response: this.listingOverride }]; }
       return [200, { response: this.devices.map((d) => ({ deviceId: d.deviceId, deviceInfo: d.deviceInfo })) }];
     }
     const m = /^devices\/([^/]+)\/(profile|state|control)$/.exec(path);

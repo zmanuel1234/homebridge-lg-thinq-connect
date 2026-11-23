@@ -71,6 +71,8 @@ export class LiveUpdates {
   private retryTimer: NodeJS.Timeout | undefined;
   private renewTimer: NodeJS.Timeout | undefined;
   private failures = 0;
+  /** Failures connecting with the saved certificate (not route or certificate requests). */
+  private connectFailures = 0;
   private stopped = false;
   private deviceIds: string[] = [];
   connected = false;
@@ -86,6 +88,13 @@ export class LiveUpdates {
     return this.attempt();
   }
 
+  /** Adds an appliance set up after the start (for example after a failed first try). */
+  async addDevice(deviceId: string): Promise<void> {
+    if (this.deviceIds.includes(deviceId)) { return; }
+    this.deviceIds.push(deviceId);
+    if (this.connected) { await this.subscribeDevices(false, [deviceId]); }
+  }
+
   stop(): void {
     this.stopped = true;
     clearTimeout(this.retryTimer);
@@ -98,6 +107,7 @@ export class LiveUpdates {
   private async attempt(): Promise<void> {
     if (this.stopped) { return; }
     let stage = 'asking LG for its message server';
+    let connecting = false;
     try {
       const server = await this.o.client.messageServer();
       stage = 'getting a certificate from LG';
@@ -105,6 +115,7 @@ export class LiveUpdates {
       stage = 'subscribing the appliances';
       await this.subscribeDevices(false);
       stage = `connecting to ${server.host}`;
+      connecting = true;
       const socket = (this.o.connect || defaultConnect)(server, creds);
       const mqtt = new MqttClient(socket, { clientId: this.o.clientId, cleanSession: false, keepAliveSeconds: this.o.keepAliveSeconds ?? 60 });
       mqtt.on('message', (_topic: string, payload: Buffer) => this.onPayload(payload));
@@ -115,21 +126,28 @@ export class LiveUpdates {
       await mqtt.subscribe(creds.topic);
       if (this.stopped) { mqtt.end(); return; }
       this.failures = 0;
+      this.connectFailures = 0;
       this.setConnected(true);
       this.o.log.info('Live updates from LG connected: changes show in the Home app within seconds.');
     } catch (err) {
       this.mqtt?.end();
       this.mqtt = undefined;
-      this.fail(`Live updates from LG failed while ${stage}: ${(err as Error).message}`);
+      this.fail(`Live updates from LG failed while ${stage}: ${(err as Error).message}`, connecting);
     }
   }
 
-  private fail(message: string): void {
+  private fail(message: string, connecting = false): void {
     if (this.stopped) { return; }
     this.failures++;
-    if (this.failures === NEW_CERT_AFTER) {
-      // A certificate LG no longer accepts looks like a failed connection: start over with a new one
-      rmSync(this.o.storageFile, { force: true });
+    if (connecting) { this.connectFailures++; }
+    if (connecting && this.connectFailures === NEW_CERT_AFTER) {
+      // A certificate LG no longer accepts looks like a failed connection: start over with a new one.
+      // (An internet outage fails earlier, asking LG for the route, so it keeps a good certificate.)
+      try {
+        rmSync(this.o.storageFile, { force: true });
+      } catch (err) {
+        this.o.log.warn(`Couldn't remove the saved live-update certificate: ${(err as Error).message}`);
+      }
     }
     const wait = RETRY[Math.min(this.failures - 1, RETRY.length - 1)];
     const msg = `${message} Checking on a schedule meanwhile; trying again in ${wait < 60 ? `${wait} s` : `${wait / 60} min`}.`;
@@ -171,12 +189,16 @@ export class LiveUpdates {
       return;
     }
     const pushCode = field(json, 'pushCode');
-    this.o.onMessage({ deviceId, pushType, report: field(json, 'report'), pushCode: typeof pushCode === 'string' ? pushCode : undefined });
+    try {
+      this.o.onMessage({ deviceId, pushType, report: field(json, 'report'), pushCode: typeof pushCode === 'string' ? pushCode : undefined });
+    } catch (err) {
+      this.o.log.error(`Couldn't apply a live update: ${(err as Error | null)?.stack || String(err)}`);
+    }
   }
 
   /** Subscribes every appliance to state events and alerts. Failures are logged, not thrown. */
-  private async subscribeDevices(renewal: boolean): Promise<void> {
-    for (const id of this.deviceIds) {
+  private async subscribeDevices(renewal: boolean, ids = this.deviceIds): Promise<void> {
+    for (const id of ids) {
       for (const [what, call] of [['state changes', this.o.client.subscribeEvents], ['alerts', this.o.client.subscribePush]] as const) {
         if (renewal && what === 'alerts') { continue; } // alerts don't expire
         try {

@@ -86,3 +86,24 @@ test('end: a polite disconnect closes without an error', async (t) => {
   assert.equal((await closed)[0], undefined);
   assert.equal(client.connected, false);
 });
+
+test('a malformed packet closes the connection with the reason; a listener\'s error stays in the listener', async () => {
+  const { Duplex } = await import('node:stream');
+  const sock = new Duplex({ read() {}, write(_c, _e, cb) { cb(); } });
+  const m = new MqttClient(sock, { clientId: 'x', keepAliveSeconds: 0 });
+  const closed = once(m, 'close');
+  const connecting = m.connect();
+  sock.push(packet(2, 0, Buffer.from([0, 0])));
+  await connecting;
+  // A listener that throws: the message after it still arrives
+  const got: string[] = [];
+  m.on('message', (_t: string, p: Buffer) => { got.push(p.toString()); if (got.length === 1) { throw new Error('listener bug'); } });
+  sock.push(packet(3, 0, Buffer.from([0, 1, 0x41, 0x61])));
+  sock.push(packet(3, 0, Buffer.from([0, 1, 0x41, 0x62])));
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(got, ['a', 'b']);
+  // QoS 1 without its packet number
+  sock.push(packet(3, 2, Buffer.from([0, 1, 0x41])));
+  const [err] = await closed as [Error];
+  assert.match(err.message, /malformed packet/);
+});

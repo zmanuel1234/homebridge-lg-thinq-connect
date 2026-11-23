@@ -6,7 +6,7 @@ import type { CharacteristicValue, Service } from 'homebridge';
 import { alertKind } from '../laundry';
 import { AirSensors, alertCodes } from './sensors';
 import { cyclePhase } from '../laundry';
-import { Appliance, type ApplianceContext, set } from './base';
+import { Appliance, type ApplianceContext, set, limit } from './base';
 import {
   type Obj, type Range, enumValues, fieldOf, levelFor, levelPercent, num, powerField, rangeOf, resources, speedLevels,
   stateValue, writable,
@@ -103,9 +103,9 @@ export class AirPurifier extends Powered {
     const T = C.TargetAirPurifierState;
     const target = this.tile.getCharacteristic(T);
     if (this.jobModes.includes('AUTO') && this.manualMode) {
-      target.setProps({ validValues: [T.MANUAL, T.AUTO] }).onSet((v) => this.setJobMode(v === T.AUTO ? 'AUTO' : this.manualMode!));
+      limit(target, { validValues: [T.MANUAL, T.AUTO] }).onSet((v) => this.setJobMode(v === T.AUTO ? 'AUTO' : this.manualMode!));
     } else {
-      target.setProps({ validValues: [T.MANUAL] });
+      limit(target, { validValues: [T.MANUAL] });
     }
     this.speedCharacteristic(this.tile);
     const keep = new Set(['purifier']);
@@ -166,13 +166,12 @@ export class HumidityAppliance extends Powered {
     this.tile.setPrimaryService(true);
     this.tile.getCharacteristic(C.Active).onSet((v) => this.setPower(v));
     const T = C.TargetHumidifierDehumidifierState;
-    this.tile.getCharacteristic(T).setProps({ validValues: [kind === 'dehumidifier' ? T.DEHUMIDIFIER : T.HUMIDIFIER] });
+    limit(this.tile.getCharacteristic(T), { validValues: [kind === 'dehumidifier' ? T.DEHUMIDIFIER : T.HUMIDIFIER] });
     const desc = fieldOf(this.res, 'humidity', 'targetHumidity');
     this.range = writable(desc) ? rangeOf(desc, 'w') : undefined;
     const threshold = kind === 'dehumidifier' ? C.RelativeHumidityDehumidifierThreshold : C.RelativeHumidityHumidifierThreshold;
     if (this.range) {
-      this.tile.getCharacteristic(threshold)
-        .setProps({ minValue: this.range.min, maxValue: this.range.max, minStep: this.range.step })
+      limit(this.tile.getCharacteristic(threshold), { minValue: this.range.min, maxValue: this.range.max, minStep: this.range.step })
         .onSet((v) => this.setTarget(Number(v)));
     }
     this.speedCharacteristic(this.tile);
@@ -257,7 +256,7 @@ export class Hood extends Appliance {
       this.fan = this.service(S.Fanv2, `${ctx.name}${this.fanSuffix}`, 'fan');
       if (!this.keepAlso().length) { this.fan.setPrimaryService(true); }
       const steps = this.fanRange.max;
-      this.fan.getCharacteristic(C.RotationSpeed).setProps({ minValue: 0, maxValue: 100, minStep: 1 });
+      limit(this.fan.getCharacteristic(C.RotationSpeed), { minValue: 0, maxValue: 100, minStep: 1 });
       if (writable(fanDesc)) {
         this.fan.getCharacteristic(C.Active).onSet((v) => this.setFan(v === 1 || v === true ? Math.max(1, this.fanSpeed || 1) : 0));
         this.fan.getCharacteristic(C.RotationSpeed).onSet((v) => this.setFan(Math.round((Number(v) / 100) * steps)));
@@ -330,7 +329,7 @@ export class Microwave extends Hood {
     this.cycle = this.service(S.Valve, ctx.name, 'cycle');
     this.cycle.setPrimaryService(true);
     this.cycle.setCharacteristic(C.ValveType, C.ValveType.GENERIC_VALVE);
-    this.cycle.getCharacteristic(C.RemainingDuration).setProps({ maxValue: 86_400 });
+    limit(this.cycle.getCharacteristic(C.RemainingDuration), { maxValue: 86_400 });
     this.cycle.getCharacteristic(C.Active).onSet((v) => {
       if ((v === 1) === this.phase.running) { return; }
       this.ctx.log.info(`[${ctx.name}] It can't be started or stopped through LG's API.`);

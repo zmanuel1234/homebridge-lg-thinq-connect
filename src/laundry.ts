@@ -168,8 +168,10 @@ export interface LaundryStatus {
 
 // States that are not a cycle under way. Anything not listed here or in PAUSED counts as running,
 // so a state LG adds later (a new phase) shows as running rather than idle.
-const IDLE = new Set(['POWER_OFF', 'INITIAL', 'FROZEN_PREVENT_INITIAL', 'END', 'WRINKLE_CARE', 'ERROR', 'RESERVED', 'SLEEP', 'UNKNOWN']);
-const PAUSED = new Set(['PAUSE', 'FROZEN_PREVENT_PAUSE', 'RINSE_HOLD']);
+// Freeze protection runs on its own, without a timer: not a cycle the person started.
+const IDLE = new Set(['POWER_OFF', 'INITIAL', 'FROZEN_PREVENT_INITIAL', 'FROZEN_PREVENT_RUNNING', 'FROZEN_PREVENT_PAUSE',
+  'END', 'WRINKLE_CARE', 'ERROR', 'RESERVED', 'SLEEP', 'UNKNOWN']);
+const PAUSED = new Set(['PAUSE', 'RINSE_HOLD']);
 const DONE = new Set(['END', 'WRINKLE_CARE']);
 
 /** Running, paused or finished, from LG's state word: for any appliance that runs cycles. */
@@ -255,6 +257,8 @@ export function mergeState(base: unknown, patch: unknown): unknown {
 /** What an LG alert means: a finished cycle, a problem, or neither (just logged). */
 export function alertKind(pushCode: string): 'finished' | 'problem' | 'other' {
   if (/ERROR|FAIL|FULL|EMPTY|PROBLEM/.test(pushCode)) { return 'problem'; }
+  // An oven reaching its temperature isn't the end of cooking
+  if (/PREHEAT/.test(pushCode)) { return 'other'; }
   if (/COMPLETE|FINISH|DONE/.test(pushCode)) { return 'finished'; }
   return 'other';
 }

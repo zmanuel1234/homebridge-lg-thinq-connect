@@ -143,8 +143,9 @@ updates work. If LG can't be reached, the appliances stay in the Home app and sh
 three failed checks; the plugin keeps trying. If the appliance list can't be fetched at startup,
 nothing is removed from the Home app.
 
-The plugin has no dependencies to install: it talks to LG's API and message server directly,
-with the requests and headers LG documents and uses in its own toolkit.
+The plugin's only dependency is Homebridge's own helper for the settings page. It talks to LG's
+API and message server directly, with the requests and headers LG documents and uses in its own
+toolkit.
 
 ## Other appliances
 

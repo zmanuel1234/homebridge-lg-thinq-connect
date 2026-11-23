@@ -68,8 +68,12 @@ class LaundryPart implements Part {
   constructor(readonly laundry: LaundryAccessory) {}
   get accessory() { return this.laundry.accessory; }
   get alertKey(): string { return this.laundry.unit.kind; }
+  wasBusy = false;
   get busy(): boolean { return !!(this.laundry.status?.running || this.laundry.status?.paused); }
-  update(state: unknown): void { this.laundry.update(state === null ? null : laundryStatus(this.laundry.unit, state)); }
+  update(state: unknown): void {
+    this.wasBusy = this.busy;
+    this.laundry.update(state === null ? null : laundryStatus(this.laundry.unit, state));
+  }
   alert(kind: 'finished' | 'problem' | 'other', code: string): void { this.laundry.alert(kind, code); }
   stop(): void { this.laundry.stop(); }
 }
@@ -89,6 +93,10 @@ interface Machine {
 
 /** Waits between tries to list the appliances after a failure, in seconds. */
 const DISCOVERY_RETRY = [60, 120, 300, 900];
+/** Empty listings in a row before accessories are removed (LG may answer empty during an outage). */
+const EMPTY_LISTINGS_TO_REMOVE = 3;
+/** Seconds to wait after LG asks to slow down. */
+const RATE_LIMIT_RETRY = 600;
 /** Seconds between checks while LG rejects the token. */
 const AUTH_RETRY = 900;
 /** Failed checks in a row before the Home app shows the machine with a fault. */
@@ -110,6 +118,12 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
   liveOverrides: Partial<LiveOptions> = {};
   private discoveryTimer: NodeJS.Timeout | undefined;
   private discoveryTries = 0;
+  /** Appliances whose setup failed (LG didn't answer for its profile): tried again with a backoff. */
+  private failedSetups: Device[] = [];
+  private setupTries = 0;
+  private setupTimer: NodeJS.Timeout | undefined;
+  /** Successful listings in a row that came back empty while the Home app has accessories. */
+  private emptyListings = 0;
   stopped = false;
 
   constructor(log: Logging, config: PlatformConfig | undefined, api: API, client?: Client) {
@@ -156,14 +170,15 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     try {
       devices = await this.client.devices();
     } catch (err) {
-      const wait = DISCOVERY_RETRY[Math.min(this.discoveryTries, DISCOVERY_RETRY.length - 1)];
-      this.discoveryTries++;
-      this.log.error(`Couldn't list your LG appliances: ${(err as Error).message} Trying again in ${wait / 60} min. `
-        + 'Appliances already in the Home app stay there meanwhile.');
-      this.discoveryTimer = setTimeout(() => { void this.discover(); }, wait * 1000);
-      this.discoveryTimer.unref?.();
+      this.retryDiscovery(`Couldn't list your LG appliances: ${(err as Error).message}`);
       return;
     }
+    // An empty answer while the Home app has accessories may be a passing LG problem: confirm first
+    if (!devices.length && this.cached.size && ++this.emptyListings < EMPTY_LISTINGS_TO_REMOVE) {
+      this.retryDiscovery('LG listed no appliances on this account.');
+      return;
+    }
+    this.emptyListings = 0;
     this.discoveryTries = 0;
     if (!this.signedIn) {
       this.signedIn = true;
@@ -191,11 +206,14 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
           await this.setupOther(device, active);
         }
       } catch (err) {
-        this.log.error(`[${alias}] Couldn't set up this ${modelName || deviceType}: ${(err as Error).message}`);
+        this.log.error(`[${alias}] Couldn't set up this ${modelName || deviceType}: ${(err as Error).message} `
+          + 'Trying again shortly; meanwhile it shows with a fault in the Home app.');
         // Keep its cached accessories: this may be a passing failure
         for (const [uuid, acc] of this.cached) {
           if (acc.context.deviceId === device.deviceId) { active.add(uuid); }
         }
+        this.markFault(device.deviceId);
+        this.failedSetups.push(device);
       }
     }
 
@@ -205,23 +223,80 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, stale);
       stale.forEach((a) => { this.cached.delete(a.UUID); this.log.info(`Removed "${a.displayName}": it's no longer on the LG account or is ignored.`); });
     }
-    if (!this.machines.length) {
+    if (this.failedSetups.length) { this.scheduleSetupRetry(); }
+    if (this.machines.length) {
+      this.startLive();
+    } else if (!this.failedSetups.length) {
       this.log.warn('No supported LG appliances found on this account. Washers and dryers are supported; '
         + 'turn on "Experimental appliances" for other types.');
-    } else {
-      this.startLive();
     }
+  }
+
+  private retryDiscovery(why: string): void {
+    const wait = DISCOVERY_RETRY[Math.min(this.discoveryTries, DISCOVERY_RETRY.length - 1)];
+    this.discoveryTries++;
+    this.log.error(`${why} Trying again in ${wait / 60} min. Appliances already in the Home app stay there meanwhile.`);
+    clearTimeout(this.discoveryTimer);
+    this.discoveryTimer = setTimeout(() => { void this.discover(); }, wait * 1000);
+    this.discoveryTimer.unref?.();
+  }
+
+  /** Shows an appliance's cached accessories with a fault while it can't be set up. */
+  private markFault(deviceId: string): void {
+    const { Characteristic: C } = this.api.hap;
+    for (const acc of this.cached.values()) {
+      if (acc.context.deviceId !== deviceId) { continue; }
+      for (const service of acc.services) {
+        if (service.testCharacteristic(C.StatusFault)) { service.updateCharacteristic(C.StatusFault, C.StatusFault.GENERAL_FAULT); }
+      }
+    }
+  }
+
+  private scheduleSetupRetry(): void {
+    if (this.stopped) { return; }
+    const wait = DISCOVERY_RETRY[Math.min(this.setupTries, DISCOVERY_RETRY.length - 1)];
+    this.setupTries++;
+    clearTimeout(this.setupTimer);
+    this.setupTimer = setTimeout(() => { void this.retrySetups(); }, wait * 1000);
+    this.setupTimer.unref?.();
+  }
+
+  /** Tries again to set up the appliances that failed; their accessories are reused, never doubled. */
+  async retrySetups(): Promise<void> {
+    if (this.stopped) { return; }
+    const devices = this.failedSetups;
+    this.failedSetups = [];
+    for (const device of devices) {
+      if (this.machines.some((m) => m.device.deviceId === device.deviceId)) { continue; }
+      try {
+        if (isLaundry(device.deviceInfo.deviceType) || isCycleAppliance(device.deviceInfo.deviceType)) {
+          await this.setupLaundry(device, new Set());
+        } else {
+          await this.setupOther(device, new Set());
+        }
+        this.log.info(`[${device.deviceInfo.alias}] Set up now.`);
+        if (this.live) { await this.live.addDevice(device.deviceId); } else { this.startLive(); }
+      } catch (err) {
+        this.log.debug(`[${device.deviceInfo.alias}] Still couldn't set it up: ${(err as Error).message}`);
+        this.failedSetups.push(device);
+      }
+    }
+    if (this.failedSetups.length) { this.scheduleSetupRetry(); } else { this.setupTries = 0; }
   }
 
   private startLive(): void {
     if (!this.settings.liveUpdates || this.live || !this.client || !isLiveClient(this.client)) { return; }
     const clientId = clientIdFor(this.settings.token);
-    const storageDir = (this.api.user as { storagePath?: () => string } | undefined)?.storagePath?.() || '.';
+    const storageDir = (this.api.user as { storagePath?: () => string } | undefined)?.storagePath?.();
+    if (!storageDir && !this.liveOverrides.storageFile) {
+      this.log.warn('Live updates are off: Homebridge didn\'t give a storage folder for their certificate. Checking on a schedule instead.');
+      return;
+    }
     this.live = new LiveUpdates({
       client: this.client,
       clientId,
       log: this.log,
-      storageFile: join(storageDir, 'lg-thinq-connect', `live-${clientId.slice(-16)}.json`),
+      storageFile: join(storageDir || '', 'lg-thinq-connect', `live-${clientId.slice(-16)}.json`),
       onMessage: (m) => this.onLive(m),
       onConnected: (connected) => {
         // Back to normal checks soon after losing live updates
@@ -248,8 +323,14 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     } else if (message.pushType === 'DEVICE_PUSH' && message.pushCode) {
       const kind = alertKind(message.pushCode);
       const target = alertFor(message.pushCode);
-      const parts = machine.parts.length > 1 && target ? machine.parts.filter((p) => p.alertKey === target) : machine.parts;
-      (parts.length ? parts : machine.parts).forEach((p) => p.alert(kind, message.pushCode!));
+      let parts = machine.parts.length > 1 && target ? machine.parts.filter((p) => p.alertKey === target) : machine.parts;
+      if (!parts.length) { parts = machine.parts; }
+      // Two drums of one kind (a twin washer): the alert is for the one that was in use
+      if (parts.length > 1) {
+        const inUse = parts.filter((p) => p.busy || p.wasBusy);
+        if (inUse.length) { parts = inUse; }
+      }
+      parts.forEach((p) => p.alert(kind, message.pushCode!));
       this.schedule(machine, 2); // confirm with LG's full state
     } else {
       this.log.debug(`[${name}] Live update of type ${message.pushType}, ignored.`);
@@ -366,6 +447,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       machine.failures++;
       const auth = err instanceof ThinQError && err.isAuth;
       if (auth) { next = AUTH_RETRY; }
+      if (err instanceof ThinQError && err.isRateLimit) { next = Math.max(next, RATE_LIMIT_RETRY); }
       const msg = `[${name}] Couldn't get its state from LG: ${(err as Error).message}`;
       if (machine.failures === 1 || auth) { this.log.warn(msg); } else { this.log.debug(msg); }
       if (machine.failures === FAULT_AFTER) {
@@ -386,6 +468,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
   stop(): void {
     this.stopped = true;
     clearTimeout(this.discoveryTimer);
+    clearTimeout(this.setupTimer);
     this.live?.stop();
     for (const m of this.machines) {
       clearTimeout(m.timer);

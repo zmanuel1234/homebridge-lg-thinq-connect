@@ -70,13 +70,14 @@ test('which states count as running, paused, done and error', () => {
     const s = laundryStatus(unit, washerState(state, [0, 30], [1, 0]));
     return [s.running, s.paused, s.done, s.error];
   };
-  for (const st of ['RUNNING', 'RINSING', 'SPINNING', 'DETECTING', 'PREWASH', 'DRYING', 'REFRESHING', 'ADD_DRAIN', 'FROZEN_PREVENT_RUNNING', 'COOLING', 'SOME_NEW_PHASE']) {
+  for (const st of ['RUNNING', 'RINSING', 'SPINNING', 'DETECTING', 'PREWASH', 'DRYING', 'REFRESHING', 'ADD_DRAIN', 'COOLING', 'SOME_NEW_PHASE']) {
     assert.deepEqual(is(st), [true, false, false, false], st);
   }
-  for (const st of ['PAUSE', 'RINSE_HOLD', 'FROZEN_PREVENT_PAUSE']) { assert.deepEqual(is(st), [false, true, false, false], st); }
+  for (const st of ['PAUSE', 'RINSE_HOLD']) { assert.deepEqual(is(st), [false, true, false, false], st); }
   for (const st of ['END', 'WRINKLE_CARE']) { assert.deepEqual(is(st), [false, false, true, false], st); }
   assert.deepEqual(is('ERROR'), [false, false, false, true]);
-  for (const st of ['POWER_OFF', 'INITIAL', 'RESERVED', 'FROZEN_PREVENT_INITIAL']) { assert.deepEqual(is(st), [false, false, false, false], st); }
+  // Freeze protection runs on its own: not a cycle
+  for (const st of ['POWER_OFF', 'INITIAL', 'RESERVED', 'FROZEN_PREVENT_INITIAL', 'FROZEN_PREVENT_RUNNING', 'FROZEN_PREVENT_PAUSE']) { assert.deepEqual(is(st), [false, false, false, false], st); }
   // A paused cycle keeps its time; a finished one has none
   assert.equal(laundryStatus(unit, washerState('PAUSE', [0, 20], [1, 0])).remaining, 1200);
   assert.equal(laundryStatus(unit, washerState('END', [0, 1], [1, 0])).remaining, 0);
@@ -220,4 +221,9 @@ test('dishwasher: the course while running, and how long until a delayed start',
   const waiting = laundryStatus(unit, { runState: { currentState: 'RESERVED' }, timer: { relativeHourToStart: 3, relativeMinuteToStart: 15 } });
   assert.equal(waiting.startsIn, 3 * 3600 + 15 * 60);
   assert.equal(laundryStatus(unit, { runState: { currentState: 'RESERVED' } }).startsIn, undefined);
+});
+
+test('an oven reaching its temperature is not a finish', () => {
+  assert.equal(alertKind('PREHEATING_IS_COMPLETE'), 'other');
+  assert.equal(alertKind('COOKING_IS_COMPLETE'), 'finished');
 });

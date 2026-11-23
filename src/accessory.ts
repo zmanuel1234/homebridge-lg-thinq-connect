@@ -140,8 +140,9 @@ export class LaundryAccessory {
   update(next: LaundryStatus | null): void {
     const prev = this.status;
     if (next && prev && (prev.running || prev.paused) && !next.running && !next.paused && !next.done && !next.error
-      && prev.remaining <= NEAR_END) {
-      // Missed the END state between two looks (the machine went straight to off): still a finish
+      && prev.total > 0 && prev.state !== 'DETECTING' && prev.remaining <= NEAR_END) {
+      // Missed the END state between two looks (the machine went straight to off): still a finish.
+      // Only when a time was known: early on (DETECTING) LG reports 0 left, and stopping then isn't a finish.
       this.inferredDoneUntil = Date.now() + INFERRED_DONE_MS;
       clearTimeout(this.inferredTimer);
       this.inferredTimer = setTimeout(() => { this.inferredDoneUntil = 0; this.render(); }, INFERRED_DONE_MS);

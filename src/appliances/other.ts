@@ -80,6 +80,9 @@ export class RobotVacuum extends Appliance {
  * sensor, and LG's problem alerts on a problem sensor. Volunteers' reports turn these into proper
  * mappings.
  */
+/** Full state checks after an alert before a basic appliance's problem sensor closes again. */
+const CLEAR_ALERT_AFTER = 3;
+
 export class Basic extends Appliance {
   readonly power?: Service;
   readonly temperatures = new Map<string, Service>();
@@ -135,11 +138,18 @@ export class Basic extends Appliance {
   }
 
   override get busy(): boolean { return this.on; }
+  private cleanChecks = 0;
 
   update(state: unknown): void {
     const { Characteristic: C } = this.hap;
     if (state) {
+      const wasOn = this.on;
       if (this.powerInfo) { this.on = stateValue(state, 'operation', this.powerInfo.name) === 'POWER_ON'; }
+      // An alert ends when the appliance is switched on or off, or after a few normal checks
+      if (this.problemAlert && (wasOn !== this.on || ++this.cleanChecks >= CLEAR_ALERT_AFTER)) {
+        this.problemAlert = '';
+      }
+      if (!this.problemAlert) { this.cleanChecks = 0; }
       for (const key of this.temperatures.keys()) {
         const [resource, location] = key.split(':');
         const r = field(state, resource);

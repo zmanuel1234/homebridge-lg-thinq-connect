@@ -13,10 +13,10 @@
 import type { CharacteristicValue, Service } from 'homebridge';
 import { field } from '../api';
 import { alertKind } from '../laundry';
-import { Appliance, type ApplianceContext, set } from './base';
+import { Appliance, type ApplianceContext, set, limit } from './base';
 import { AirSensors, alertCodes } from './sensors';
 import {
-  type Obj, type Range, cToF, enumValues, fieldOf, levelFor, levelPercent, powerField, resources, speedLevels,
+  type Obj, type Range, cToF, enumValues, fToC, fieldOf, levelFor, levelPercent, powerField, resources, speedLevels,
   stateValue, temperatureC, temperatureRangeC, unitOf, writable,
 } from './profile';
 
@@ -89,7 +89,7 @@ export class AirConditioner extends Appliance {
     this.tile.getCharacteristic(C.Active).onSet((v) => this.setPower(v));
     const target = this.tile.getCharacteristic(C.TargetHeaterCoolerState);
     const valid = this.modes.map((m) => this.hkMode(m)).sort((a, b) => a - b);
-    if (valid.length) { target.setProps({ validValues: valid }); }
+    if (valid.length) { limit(target, { validValues: valid }); }
     target.onSet((v) => this.setMode(v));
     this.tile.getCharacteristic(C.CoolingThresholdTemperature).onSet((v) => this.setThreshold('cool', Number(v)));
     this.tile.getCharacteristic(C.HeatingThresholdTemperature).onSet((v) => this.setThreshold('heat', Number(v)));
@@ -169,7 +169,12 @@ export class AirConditioner extends Appliance {
   }
 
   private tempRange(name: string): Range | undefined {
-    return temperatureRangeC(this.res, 'temperatureInUnits', name) || temperatureRangeC(this.res, 'temperature', name);
+    const c = temperatureRangeC(this.res, 'temperatureInUnits', name);
+    if (c) { return c; }
+    // The plain resource is in the unit the AC displays: an air conditioner set point above 40 is °F
+    const r = temperatureRangeC(this.res, 'temperature', name);
+    if (!r || r.max <= 40) { return r; }
+    return { min: Math.round(fToC(r.min) * 2) / 2, max: Math.round(fToC(r.max) * 2) / 2, step: 0.5 };
   }
 
   private hkMode(m: Mode): number {
@@ -193,7 +198,7 @@ export class AirConditioner extends Appliance {
     ] as const;
     for (const [ch, range, value] of pairs) {
       const c = this.tile.getCharacteristic(ch);
-      c.setProps({ minValue: range.min, maxValue: range.max, minStep: range.step });
+      limit(c, { minValue: range.min, maxValue: range.max, minStep: range.step });
       set(c, Math.min(Math.max(value, range.min), range.max));
     }
   }

@@ -131,6 +131,46 @@ function defineTests(hap: Hap): void {
     assert.ok(hb.lines.some((l) => l.startsWith('error: Couldn\'t list your LG appliances: HTTP 503') && l.includes('Trying again in 1 min')));
   });
 
+  test('LG answering an empty list: nothing removed until it says so three times in a row', async (t) => {
+    const hb = await homebridge(t);
+    await hb.start();
+    const cached = hb.calls.registered.splice(0);
+    hb.lg.devices = [];
+    const platform = await hb.start(cached);
+    assert.equal(hb.calls.unregistered.length, 0);
+    assert.ok(hb.lines.some((l) => l.startsWith('error: LG listed no appliances on this account. Trying again in 1 min')));
+    await platform.discover();
+    assert.equal(hb.calls.unregistered.length, 0);
+    await platform.discover();
+    assert.deepEqual(hb.calls.unregistered.map((a) => a.displayName), ['Front Load Washer', 'Dryer']);
+  });
+
+  test('LG not answering for an appliance\'s details: its accessory shows a fault, and setup is tried again', async (t) => {
+    const hb = await homebridge(t);
+    await hb.start();
+    const cached = hb.calls.registered.splice(0);
+    hb.lg.failPath = /device-1\/profile$/;
+    const platform = await hb.start(cached);
+    assert.deepEqual(platform.machines.map((m) => m.device.deviceInfo.alias), ['Dryer']);
+    assert.equal(hb.calls.unregistered.length, 0);
+    const washer = cached.find((a) => a.displayName === 'Front Load Washer')!;
+    assert.equal(washer.getService(S.Valve)!.getCharacteristic(C.StatusFault).value, C.StatusFault.GENERAL_FAULT);
+    assert.ok(hb.lines.some((l) => l.startsWith('error: [Front Load Washer] Couldn\'t set up') && l.includes('Trying again shortly')));
+    hb.lg.failPath = null;
+    await platform.retrySetups();
+    assert.deepEqual(platform.machines.map((m) => m.device.deviceInfo.alias), ['Dryer', 'Front Load Washer']);
+    assert.equal(hb.calls.registered.length, 0, 'the cached accessory is reused, not added twice');
+    assert.equal(washer.getService(S.Valve)!.getCharacteristic(C.StatusFault).value, C.StatusFault.NO_FAULT);
+    assert.ok(hb.lines.includes('info: [Front Load Washer] Set up now.'));
+  });
+
+  test('every appliance failing to set up: no "nothing supported" warning', async (t) => {
+    const hb = await homebridge(t);
+    hb.lg.failPath = /profile$/;
+    await hb.start();
+    assert.ok(!hb.lines.some((l) => l.includes('No supported LG appliances')));
+  });
+
   test('other appliance types: left out unless "Experimental appliances" is on, with how to try them', async (t) => {
     const hb = await homebridge(t);
     hb.lg.devices.push({ deviceId: 'fridge', deviceInfo: { deviceType: 'DEVICE_REFRIGERATOR', alias: 'Fridge', modelName: 'X' }, profile: {}, state: {} });
@@ -254,6 +294,13 @@ function defineTests(hap: Hap): void {
     assert.equal(dryer.doneSensor.getCharacteristic(C.OccupancyDetected).value, C.OccupancyDetected.OCCUPANCY_DETECTED);
     assert.ok(hb.lines.includes('warn: [Dryer] LG alert: Drying failed.'));
     // Unknown appliances and types are ignored quietly
+    // An alert for one of two drums of the same kind goes to the one in use
+    const [a, b] = [{ busy: false, wasBusy: true, alertKey: 'washer', alerts: [] as string[] }, { busy: false, wasBusy: false, alertKey: 'washer', alerts: [] as string[] }]
+      .map((p) => Object.assign(p, { accessory: null, update() {}, stop() {}, alert(_k: string, c: string) { p.alerts.push(c); } }));
+    platform.machines.push({ device: { deviceId: 'twin', deviceInfo: { alias: 'Twin', deviceType: 'DEVICE_WASHER', modelName: '' } }, units: [], parts: [a, b] as never, failures: 0 });
+    platform.onLive({ deviceId: 'twin', pushType: 'DEVICE_PUSH', pushCode: 'WASHING_IS_COMPLETE' });
+    assert.deepEqual([a.alerts, b.alerts], [['WASHING_IS_COMPLETE'], []]);
+    platform.machines.pop();
     platform.onLive({ deviceId: 'nope', pushType: 'DEVICE_STATUS', report: {} });
     platform.onLive({ deviceId: 'device-2', pushType: 'DEVICE_REGISTERED' });
     assert.ok(hb.lines.some((l) => l.startsWith('debug: Live update for an appliance not in the Home app')));
