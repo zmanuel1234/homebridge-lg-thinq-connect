@@ -5,7 +5,9 @@
 //  - "<name> done", an occupancy sensor: detected when the cycle finishes, for a notification;
 //  - "<name> problem", a contact sensor: open while the machine reports an error, or after an LG
 //    alert such as "drying failed" until the next cycle starts or the machine is switched off;
-//  - optionally "<name> <phase>" occupancy sensors (e.g. spinning), for automations.
+//  - optionally "<name> <phase>" occupancy sensors (e.g. spinning), for automations;
+//  - optionally "<name> tub clean", an occupancy sensor: detected once the washer's cycle count
+//    (as LG counts it) reaches the setting, as a reminder to run Tub Clean.
 // Starting, pausing and resuming from the valve is off unless the "allow control" setting is on,
 // and LG only accepts it after Remote Start is pressed on the machine.
 
@@ -25,6 +27,8 @@ export interface LaundryOptions {
   allowControl: boolean;
   /** LG state words to expose as their own sensors, e.g. SPINNING. */
   phaseSensors: string[];
+  /** Cycles counted by LG at which the tub-clean reminder turns on; 0 = no reminder. */
+  tubCleanAfter: number;
 }
 
 export interface Deps {
@@ -45,6 +49,7 @@ export class LaundryAccessory {
   readonly doneSensor: Service;
   readonly problemSensor: Service;
   readonly phaseSensors = new Map<string, Service>();
+  readonly tubCleanSensor: Service | undefined;
   status: LaundryStatus | null = null;
   private inferredDoneUntil = 0;
   private inferredTimer: NodeJS.Timeout | undefined;
@@ -92,6 +97,14 @@ export class LaundryAccessory {
         accessory.removeService(svc);
       }
     }
+
+    // Tub-clean reminder: washers that report a cycle count, when the setting is on
+    const tubClean = accessory.getServiceById(S.OccupancySensor, 'tub-clean');
+    if (options.tubCleanAfter > 0 && unit.kind === 'washer' && unit.countsCycles) {
+      this.tubCleanSensor = this.service(S.OccupancySensor, `${name} tub clean`, 'tub-clean');
+    } else if (tubClean) {
+      accessory.removeService(tubClean);
+    }
     this.render();
   }
 
@@ -134,6 +147,11 @@ export class LaundryAccessory {
       if (next.error) {
         this.deps.log.warn(`[${this.options.name}] The machine reports an error${next.errorName ? `: ${next.errorName}` : ''}.`);
       }
+    }
+    const count = next?.cycleCount;
+    if (this.tubCleanSensor && count !== undefined && count >= this.options.tubCleanAfter
+      && (prev?.cycleCount === undefined || prev.cycleCount < this.options.tubCleanAfter)) {
+      this.deps.log.info(`[${this.options.name}] Time for a Tub Clean: LG counts ${count} cycles (reminder set at ${this.options.tubCleanAfter}).`);
     }
     if (next) { this.status = next; }
     this.render(next === null);
@@ -184,6 +202,11 @@ export class LaundryAccessory {
       this.done ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     set(this.problemSensor.getCharacteristic(C.ContactSensorState),
       this.problem ? C.ContactSensorState.CONTACT_NOT_DETECTED : C.ContactSensorState.CONTACT_DETECTED);
+    if (this.tubCleanSensor) {
+      const due = s?.cycleCount !== undefined && s.cycleCount >= this.options.tubCleanAfter;
+      set(this.tubCleanSensor.getCharacteristic(C.OccupancyDetected),
+        due ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    }
     for (const [phase, svc] of this.phaseSensors) {
       set(svc.getCharacteristic(C.OccupancyDetected),
         s?.state === phase ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);

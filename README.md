@@ -33,6 +33,10 @@ Each washer or dryer shows up as:
   also shows a fault.
 - **Phase sensors** (optional): a sensor that's on during a phase you choose, such as
   *Spinning* or *Drying*, for automations like "turn on the fan while the washer spins".
+- **"Washer tub clean"** (optional, washers that count their cycles): detected once LG's cycle
+  count reaches the number you set (LG suggests a Tub Clean about every 30 washes). Turn on
+  notifications for it as a reminder. The count is LG's own; it's expected to start again after a
+  Tub Clean.
 
 The names follow your machines' names in the ThinQ app.
 
@@ -83,6 +87,7 @@ create a new one.
 | Allow starting and pausing | Off | Tapping a machine's tile starts, pauses or resumes it (needs Remote Start on the machine) |
 | Live updates from LG | On | Changes and alerts arrive the moment they happen; scheduled checks continue as a backup |
 | Phase sensors | None | Extra sensors that are on during a chosen phase |
+| Tub clean reminder after | 0 (off) | Cycles counted by LG at which the washer's tub-clean sensor turns on |
 | Leave out these appliances | None | Names, as in the ThinQ app, to keep out of the Home app |
 | Check every (idle) | 60 s | How often to ask LG while nothing runs (at least 10 min while live updates work) |
 | Check every (during a cycle) | 30 s | How often to ask while a cycle runs (at least 2 min while live updates work) |

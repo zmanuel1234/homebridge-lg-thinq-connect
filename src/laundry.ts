@@ -37,6 +37,8 @@ export interface LaundryUnit {
   states: string[];
   /** The operation commands it accepts (START, STOP, POWER_OFF). */
   operations: string[];
+  /** The machine reports a cycle count (cycle.cycleCount), used for the tub-clean reminder. */
+  countsCycles: boolean;
   /** Where this unit's properties sit in a WashTower's state and commands. */
   towerKey?: 'washer' | 'dryer';
   /** Whether the state and commands carry location.locationName. */
@@ -73,6 +75,7 @@ function unitFrom(kind: LaundryKind, props: Props, location: string, usesLocatio
     location,
     states: enumValues(field(field(props, 'runState'), 'currentState'), 'r'),
     operations: enumValues(field(field(props, 'operation'), opKey), 'w'),
+    countsCycles: field(field(props, 'cycle'), 'cycleCount') !== undefined,
     towerKey,
     usesLocation,
   };

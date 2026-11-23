@@ -47,7 +47,7 @@ function defineTests(hap: Hap): void {
       .map((l) => [l, (m: string) => lines.push(`${l}: ${m}`)])) as unknown as Logging;
     const api = { hap } as unknown as API;
     const laundry = new LaundryAccessory({ log, api }, acc, unit,
-      { name: 'Washer', model: 'F3P2CYVAT__', serial: 'ABC123', allowControl: false, phaseSensors: [], ...options },
+      { name: 'Washer', model: 'F3P2CYVAT__', serial: 'ABC123', allowControl: false, phaseSensors: [], tubCleanAfter: 0, ...options },
       (payload) => { sent.push(payload); return sendResult(); },
       () => { refreshes++; });
     return {
@@ -214,6 +214,33 @@ function defineTests(hap: Hap): void {
     laundry.alert('other', 'TUB_CLEAN_RECOMMENDED');
     assert.ok(lines.includes('info: [Washer] LG alert: Tub clean recommended.'));
     assert.equal(value(laundry.problemSensor.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_DETECTED);
+  });
+
+  test('tub-clean reminder: on once LG\'s cycle count reaches the setting, logged once', () => {
+    const { acc, laundry, lines } = setup({ tubCleanAfter: 30 });
+    const sensor = acc.getServiceById(S.OccupancySensor, 'tub-clean')!;
+    assert.equal(value(sensor.getCharacteristic(C.ConfiguredName)), 'Washer tub clean');
+    laundry.update(status({ cycleCount: 29 }));
+    assert.equal(value(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    laundry.update(status({ cycleCount: 30 }));
+    laundry.update(status({ cycleCount: 31 }));
+    assert.equal(value(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(lines.filter((l) => l.includes('Time for a Tub Clean')).length, 1);
+    assert.ok(lines.includes('info: [Washer] Time for a Tub Clean: LG counts 30 cycles (reminder set at 30).'));
+    // After a Tub Clean, LG's count starts again
+    laundry.update(status({ cycleCount: 0 }));
+    assert.equal(value(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+  });
+
+  test('tub-clean reminder: none when off, for a dryer, or for a washer that doesn\'t count; removed when turned off', () => {
+    assert.equal(setup().acc.getServiceById(S.OccupancySensor, 'tub-clean'), undefined, 'off by default');
+    const [, dryerDevice] = realDevices();
+    const dryerUnit = laundryUnits('DEVICE_DRYER', dryerDevice.profile)[0];
+    assert.equal(dryerUnit.countsCycles, false);
+    assert.equal(unit.countsCycles, true, 'our washer counts its cycles');
+    const on = setup({ tubCleanAfter: 30 });
+    const off = setup({ tubCleanAfter: 0 }, on.acc);
+    assert.equal(off.acc.getServiceById(S.OccupancySensor, 'tub-clean'), undefined);
   });
 
   test('tapping the tile with control off: refused, the tile snaps back, the log says why', async () => {
