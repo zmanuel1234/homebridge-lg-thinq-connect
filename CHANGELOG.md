@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- **Copy diagnostics** on the settings page: what LG says about each appliance, with device IDs,
+  serial numbers and the token removed, ready to paste into an issue (no terminal needed).
+- README: what the plugin can change on your appliances and what each needs; troubleshooting
+  (from Home Assistant's and this plugin's issues); debug logging for this plugin only; a step-by-
+  step move from homebridge-lg-thinq, with how the tiles map.
 - **Support levels** (README, the log, the settings page's Check token): **tested** on a real
   appliance, **checked** against Home Assistant's LG integration on real-appliance data, or
   **experimental**. The tests compare what the Home app gets with what Home Assistant shows for its

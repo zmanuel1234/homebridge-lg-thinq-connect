@@ -152,6 +152,25 @@ The plugin's only dependency is Homebridge's own helper for the settings page. I
 API and message server directly, with the requests and headers LG documents and uses in its own
 toolkit.
 
+## What the plugin can change on your appliances
+
+The plugin only reads, unless you allow more. Everything that changes something on a real
+appliance, and what has to be true first:
+
+| Appliance | What it can do from the Home app | Needs |
+|---|---|---|
+| Washer, dryer, WashTower | Start, pause, resume | **Allow starting and pausing** on, and **Remote Start** pressed on the machine (LG refuses otherwise) |
+| Dishwasher, Styler | Start, pause, resume | The same, and **Experimental appliances** on |
+| Oven | Start at a temperature, change the temperature while cooking, stop | **Experimental appliances** and **Allow starting and pausing** on, and remote control on at the oven. Never restarts a paused or self-cleaning oven |
+| Cooktop | Switch every burner off | Models LG allows it for. It can never switch a burner on |
+| Air conditioner, purifier, humidifier, dehumidifier, fan, hood | On/off, modes, temperature, fan speed, the extra switches | **Experimental appliances** on (as LG's own app allows) |
+| Fridge, wine cellar, water heater, heat pump | Set temperatures, express and eco modes, water heater modes, the wine cellar light | **Experimental appliances** on |
+| Robot vacuum | Start, resume, send home | **Experimental appliances** on |
+
+Microwaves and stick vacuums are read-only, and so is anything LG marks read-only, such as a
+fridge's Sabbath mode. LG also refuses any command an appliance can't take in its current state;
+the Home app then shows an error and the log says why.
+
 ## Other appliances
 
 With **Experimental appliances** on, the plugin also adds the LG appliance types below. They're
@@ -246,6 +265,35 @@ about each appliance, with device IDs and serial numbers removed. Look it over, 
 [new appliance issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose),
 with what works and what doesn't.
 
+## Troubleshooting
+
+Most problems come from LG's side; these are the ones Home Assistant's and this plugin's users
+run into most.
+
+| What you see | What to do |
+|---|---|
+| "LG refused: … 1103 / 1218 / 1302" | The token isn't valid: create a new one, with every permission ticked (see [Signing in](#signing-in)) |
+| No appliances found, or not all of them | The token is on a different LG account than the ThinQ app's: sign in to the token page with the QR code. Check the country |
+| "LG error 1307 / 1309" | The country doesn't match the LG account: set the one the account was created in |
+| "LG error 1304" | LG has new terms: open the ThinQ app and accept them |
+| "LG error 1222" or the tile shows "No Response" | The appliance is off or offline: check it's on and connected in the ThinQ app |
+| Start or pause refused | Press **Remote Start** on the machine (it times out after a while), and check "Allow starting and pausing" |
+| A start ran a different program | Reported on some washers with LG's official API: start on the machine, and use the Home app for pause, resume and notifications |
+| Time left or status a little behind | Updates come live from LG; scheduled checks correct anything missed within 2 minutes during a cycle. Older Wi-Fi modules report less often |
+| Water heater or heat pump temperatures stale | An LG limit: they often update only when the ThinQ app is opened |
+| Energy shows nothing | LG updates energy daily, with a delay; some models (often dryers) have none |
+
+**Debug logging.** For a closer look, turn on debug logging for this plugin only: run it as a
+child bridge (in the Homebridge UI, the plugin's **Bridge Settings**), then turn on debug mode
+for that bridge, either there or by adding `"_bridge": { "debugModeEnabled": true }` to the
+plugin's config (with the child bridge's other `_bridge` settings). The log then shows each
+request to LG and each live update.
+
+**Reporting a problem.** Open the plugin's settings and press **Copy diagnostics**: it collects
+what LG says about each appliance, with device IDs, serial numbers and the token removed. Look
+it over, then paste it into a
+[new issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose).
+
 ## Updates and compatibility
 
 Your scenes and automations are built on the tiles and sensors this plugin adds, so from 1.0 on:
@@ -261,9 +309,30 @@ The plugin's tests hold every appliance's tiles and settings to a recorded list
 
 ## Coming from homebridge-lg-thinq
 
-This plugin can run next to [homebridge-lg-thinq](https://github.com/nVuln/homebridge-lg-thinq),
-so you can compare before switching. Its accessories are new to the Home app: set up your
-notifications and automations again on them, then remove the old plugin.
+This plugin can run next to [homebridge-lg-thinq](https://github.com/nVuln/homebridge-lg-thinq)
+(or one of its forks), so you can switch at your own pace:
+
+1. Install this plugin, create a token (see [Setup](#setup)) and add it. Both plugins now show
+   your appliances; this one's tiles are new to the Home app.
+2. To keep the Home app tidy meanwhile, add the appliances to **Leave out these appliances** in
+   one of the two plugins.
+3. Compare for a few cycles. The tiles map like this:
+
+   | homebridge-lg-thinq | This plugin |
+   |---|---|
+   | Washer/dryer valve (time left) | The same kind of tile, `<name>` |
+   | "Program finished" sensor (`washer_trigger`) | `<name> done` (always on) |
+   | Tub clean event (`washer_tub_clean`) | `<name> tub clean`, after the cycles you set |
+   | Door lock (`washer_door_lock`) | Not available: LG's official API doesn't report it |
+   | AC options (`ac_mode`, `ac_swing_mode`, `ac_temperature_sensor`) | **Options per appliance** |
+   | Fridge express/eco switches | The same switches, added automatically |
+
+4. Move your notifications, scenes and automations to the new tiles. The Home app doesn't carry
+   them over between plugins.
+5. Remove the old plugin. Its accessories disappear from the Home app.
+
+Older appliances that only work with LG's previous system (ThinQ1) aren't reachable through LG's
+official API: keep the old plugin for those, and leave them out of this one.
 
 ## Credits
 

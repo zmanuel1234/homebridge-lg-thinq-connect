@@ -2,6 +2,7 @@ import { ThinQClient, ThinQError, type ClientOptions } from '../api';
 import { isCycleAppliance, isLaundry } from '../laundry';
 import { MAPPED_TYPES } from '../appliances';
 import { supportLevel } from '../support';
+import { collect } from '../bin/lg-thinq-diagnostics';
 
 /**
  * tested: confirmed on real appliances. checked: matches Home Assistant on real sample data
@@ -70,4 +71,25 @@ export async function checkToken(
     : `Signed in to LG (${c}), but this account has no appliances. Create the token on the LG account `
       + 'the ThinQ app shows your appliances on.';
   return { ok: true, message, appliances };
+}
+
+/**
+ * The same report as lg-thinq-diagnostics, for the settings page's "Copy diagnostics": what LG
+ * says about each appliance, with device IDs, serials and network names removed. Never throws;
+ * never includes the token.
+ */
+export async function diagnostics(
+  token: unknown, country: unknown,
+  makeClient: (o: ClientOptions) => ThinQClient = (o) => new ThinQClient(o),
+): Promise<{ ok: boolean; message: string; report?: string }> {
+  const t = typeof token === 'string' ? token.trim() : '';
+  const c = typeof country === 'string' && country.trim() ? country.trim().toUpperCase() : 'US';
+  if (!t) { return { ok: false, message: 'Paste your personal access token in the Token box first.' }; }
+  try {
+    const report = await collect(makeClient({ token: t, country: c }), c, 'settings page');
+    const text = JSON.stringify(report, null, 2);
+    return { ok: true, message: `Diagnostics for ${report.appliances.length} appliance(s), with IDs and serial numbers removed.`, report: text.split(t).join('TOKEN-REMOVED') };
+  } catch (err) {
+    return { ok: false, message: `Couldn't get diagnostics: ${(err as Error).message}` };
+  }
 }
