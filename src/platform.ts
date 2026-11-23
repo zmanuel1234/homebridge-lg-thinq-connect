@@ -121,8 +121,20 @@ interface Machine {
   energyTimer?: NodeJS.Timeout;
 }
 
-/** How often energy use is checked (LG updates it slowly). */
-const ENERGY_EVERY = 3600;
+/** After a failure, energy setup is tried again after this long (seconds). */
+const ENERGY_RETRY = 3600;
+
+/**
+ * Milliseconds until the next daily energy check: a random time between 01:00 and 06:00 local,
+ * as Home Assistant does, so many installs don't all ask LG at once (LG updates the figures daily).
+ */
+export function untilNextEnergyCheck(now = new Date(), random = Math.random()): number {
+  const next = new Date(now);
+  next.setHours(1, 0, 0, 0);
+  next.setTime(next.getTime() + Math.floor(random * 5 * 3600 * 1000));
+  if (next.getTime() <= now.getTime()) { next.setDate(next.getDate() + 1); }
+  return next.getTime() - now.getTime();
+}
 
 /** Waits between tries to list the appliances after a failure, in seconds. */
 const DISCOVERY_RETRY = [60, 120, 300, 900];
@@ -486,7 +498,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     const { device } = machine;
     const retryLater = () => {
       if (this.stopped) { return; }
-      machine.energyTimer = setTimeout(() => { void this.setupEnergy(machine); }, ENERGY_EVERY * 1000);
+      machine.energyTimer = setTimeout(() => { void this.setupEnergy(machine); }, ENERGY_RETRY * 1000);
       machine.energyTimer.unref?.();
     };
     let props: string[];
@@ -510,6 +522,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     clear(machine.parts.filter((p) => !targets.some((t) => t.part === p)));
     if (!targets.length) { return; }
     const check = async () => {
+      let failed = false;
       for (const { part, property } of targets) {
         const svc = mainService(part.accessory.services, info);
         if (!svc) { continue; }
@@ -522,14 +535,16 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
             ch.updateValue(kwh);
           }
         } catch (err) {
+          failed = true;
           this.log.debug(`[${part.accessory.displayName}] Couldn't get energy use: ${(err as Error).message}`);
         }
       }
       if (this.stopped) { return; }
-      machine.energyTimer = setTimeout(() => { void check(); }, ENERGY_EVERY * 1000);
+      // A failed check is tried again within the hour, not tomorrow
+      machine.energyTimer = setTimeout(() => { void check(); }, failed ? ENERGY_RETRY * 1000 : untilNextEnergyCheck());
       machine.energyTimer.unref?.();
     };
-    this.log.info(`[${device.deviceInfo.alias}] Energy use this month is shown in the Eve app (LG updates it with a delay).`);
+    this.log.info(`[${device.deviceInfo.alias}] Energy use this month is shown in the Eve app (LG updates it daily).`);
     await check();
   }
 

@@ -56,6 +56,9 @@ const OVEN_START_DELAY_MS = 400;
 const OVEN_RESEND_MS = 10_000;
 const toC = (f: number): number => (f - 32) * 5 / 9;
 
+/** A "finished" alert while a cycle still has more than this left (seconds) is ignored as premature. */
+const EARLY_ALERT_LEFT = 10 * 60;
+
 /** If a cycle stops being seen with this little time left, it counts as finished. */
 const NEAR_END = 3 * 60;
 /** How long "done" stays detected when the finish was only inferred (the machine already powered off). */
@@ -81,6 +84,8 @@ export class LaundryAccessory {
   status: LaundryStatus | null = null;
   private inferredDoneUntil = 0;
   private inferredTimer: NodeJS.Timeout | undefined;
+  /** A "finished" alert that came with a lot of time still shown: applied unless the next state is still mid-cycle. */
+  private heldFinish = false;
   /** LG said the cycle finished (live alert); kept until the next cycle or switching off. */
   private finishedAlert = false;
   /** LG's problem alert (e.g. DRYING_FAILED); kept until the next cycle or switching off. */
@@ -181,14 +186,21 @@ export class LaundryAccessory {
   /** New status from LG; null when LG can't be reached. */
   update(next: LaundryStatus | null): void {
     const prev = this.status;
+    if (this.heldFinish && next) {
+      this.heldFinish = false;
+      if (next.running && next.remaining > EARLY_ALERT_LEFT) {
+        this.deps.log.debug(`[${this.options.name}] The earlier "finished" alert was premature: the cycle is still running.`);
+      } else if (!next.running && !next.paused) {
+        this.deps.log.info(`[${this.options.name}] LG says the cycle is finished.`);
+        this.finishedAlert = next.state !== 'POWER_OFF';
+        if (!this.finishedAlert) { this.briefDone(); }
+      }
+    }
     if (next && prev && (prev.running || prev.paused) && !next.running && !next.paused && !next.done && !next.error
       && prev.total > 0 && prev.state !== 'DETECTING' && prev.remaining <= NEAR_END) {
       // Missed the END state between two looks (the machine went straight to off): still a finish.
       // Only when a time was known: early on (DETECTING) LG reports 0 left, and stopping then isn't a finish.
-      this.inferredDoneUntil = Date.now() + INFERRED_DONE_MS;
-      clearTimeout(this.inferredTimer);
-      this.inferredTimer = setTimeout(() => { this.inferredDoneUntil = 0; this.render(); }, INFERRED_DONE_MS);
-      this.inferredTimer.unref?.();
+      this.briefDone();
     }
     if (next && (next.running || next.paused)) {
       // A new cycle (or a resumed one): earlier finishes and alerts no longer apply
@@ -218,6 +230,14 @@ export class LaundryAccessory {
     this.render(next === null);
   }
 
+  /** "Done" for a minute: the machine is already off, so nothing else would end it. */
+  private briefDone(): void {
+    this.inferredDoneUntil = Date.now() + INFERRED_DONE_MS;
+    clearTimeout(this.inferredTimer);
+    this.inferredTimer = setTimeout(() => { this.inferredDoneUntil = 0; this.render(); }, INFERRED_DONE_MS);
+    this.inferredTimer.unref?.();
+  }
+
   get done(): boolean {
     return !!this.status?.done || this.finishedAlert || this.inferredDoneUntil > Date.now();
   }
@@ -230,14 +250,22 @@ export class LaundryAccessory {
   alert(kind: 'finished' | 'problem' | 'other', pushCode: string): void {
     const name = this.options.name;
     if (kind === 'finished') {
-      this.deps.log.info(`[${name}] LG says the cycle is finished.`);
       const s = this.status;
+      // Some washers send "washing is complete" while still weighing the load: not a finish
+      if (s?.running && s.state === 'DETECTING') {
+        this.deps.log.debug(`[${name}] Ignored LG's "${pushCode}" alert: the machine is still detecting the load.`);
+        return;
+      }
+      // With a lot of time still shown, the next state decides (a sensor dry can end early)
+      if (s?.running && s.remaining > EARLY_ALERT_LEFT) {
+        this.deps.log.debug(`[${name}] LG's "${pushCode}" alert with ${Math.round(s.remaining / 60)} min still shown: waiting for the next state.`);
+        this.heldFinish = true;
+        return;
+      }
+      this.deps.log.info(`[${name}] LG says the cycle is finished.`);
       if (s && (s.state === 'POWER_OFF')) {
         // Already off: a brief "done", as when a finish is inferred
-        this.inferredDoneUntil = Date.now() + INFERRED_DONE_MS;
-        clearTimeout(this.inferredTimer);
-        this.inferredTimer = setTimeout(() => { this.inferredDoneUntil = 0; this.render(); }, INFERRED_DONE_MS);
-        this.inferredTimer.unref?.();
+        this.briefDone();
       } else {
         this.finishedAlert = true;
       }

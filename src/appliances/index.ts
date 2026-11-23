@@ -7,7 +7,7 @@ import { AirConditioner } from './air-conditioner';
 import { AirPurifier, Fan, Hood, HumidityAppliance, Microwave } from './air';
 import { Fridge } from './fridge';
 import { HeatPump, WaterHeater } from './heating';
-import { Basic, RobotVacuum, basicHasSomething } from './other';
+import { Basic, RobotVacuum, StickVacuum, basicHasSomething } from './other';
 import type { ApplianceContext, Part } from './base';
 import { resources } from './profile';
 
@@ -43,6 +43,7 @@ const MAPPINGS: Record<string, Mapping> = {
   DEVICE_REFRIGERATOR: { label: 'refrigerator', category: 'OTHER', create: (c, p) => new Fridge(c, p) },
   DEVICE_WINE_CELLAR: { label: 'wine cellar', category: 'OTHER', create: (c, p) => new Fridge(c, p) },
   DEVICE_COOKTOP: { label: 'cooktop', category: 'OTHER', create: (c, p) => new Cooktop(c, p) },
+  DEVICE_STICK_CLEANER: { label: 'stick vacuum', category: 'OTHER', create: (c, p) => new StickVacuum(c, p) },
   DEVICE_ROBOT_CLEANER: { label: 'robot vacuum', category: 'OTHER', create: (c, p) => new RobotVacuum(c, p) },
 };
 

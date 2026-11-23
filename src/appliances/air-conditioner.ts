@@ -8,6 +8,8 @@
 // mode, and dry and fan-only modes; air quality, humidity and filter sensors; and in auto mode,
 // separate heating and cooling set points when the unit uses two of them ("two-set"). Per
 // appliance (settings): cooling or heating only, which way the tile swings, a room temperature sensor.
+// Newer units' airflow styles (forest wind, air guide…) as switches, and errors (runState ERROR) on the
+// problem sensor. Fan speed reads windStrength, or windStrengthDetail on units with only that.
 //
 // LG modes without a heater/cooler equivalent (fan only, dry, air clean) show as on and idle.
 
@@ -28,6 +30,18 @@ type Mode = typeof MODES[number];
 
 const bool = (v: unknown): boolean | undefined => (typeof v === 'boolean' ? v : undefined);
 
+/** How long a mode picked while off waits for the same Home app action's on/off (ms). */
+const PENDING_ON_MS = 150;
+/** A mode written this soon after an off isn't a request to switch on (ms). */
+const RECENT_OFF_MS = 2000;
+
+/** Airflow styles some units offer (windDirection.*), with names for the Home app. */
+const AIRFLOW_STYLES: [string, string][] = [
+  ['airGuideWind', 'air guide'], ['autoFitWind', 'auto-fit airflow'], ['concentrationWind', 'focused airflow'],
+  ['forestWind', 'forest wind'], ['highCeilingWind', 'high ceiling'], ['longPowerWind', 'long-range airflow'],
+  ['mannerWind', 'gentle airflow'], ['swirlWind', 'swirl'],
+];
+
 /** An extra on/off control: how to read it from the state, and the command for on or off. */
 interface Extra {
   subtype: string;
@@ -47,6 +61,10 @@ export class AirConditioner extends Appliance {
   private readonly modes: Mode[];
   private readonly speeds: string[];
   private readonly swingFields: string[] = [];
+  /** windStrength, or windStrengthDetail on units that only have that. */
+  private readonly windKey: string;
+  /** The unit reports an error (runState ERROR). */
+  private error = false;
   /** The tile offers fewer modes than the unit has (cooling or heating only). */
   private readonly restricted: boolean;
   private readonly roomSensor?: Service;
@@ -80,7 +98,10 @@ export class AirConditioner extends Appliance {
     if (only && !offered.includes(only)) {
       ctx.log.warn(`[${ctx.name}] Set to ${opts.acModes === 'cool' ? 'cooling' : 'heating'} only, but this unit has no ${only.toLowerCase()} mode: showing all its modes.`);
     }
-    const wind = fieldOf(this.res, 'airFlow', 'windStrength');
+    // Fan speed: windStrength (it has Auto); windStrengthDetail only on units without it
+    this.windKey = writable(fieldOf(this.res, 'airFlow', 'windStrength')) ? 'windStrength'
+      : writable(fieldOf(this.res, 'airFlow', 'windStrengthDetail')) ? 'windStrengthDetail' : 'windStrength';
+    const wind = fieldOf(this.res, 'airFlow', this.windKey);
     this.speeds = writable(wind) ? speedLevels(wind) : [];
     const swings = ['rotateUpDown', 'rotateLeftRight'].filter((f) => writable(fieldOf(this.res, 'windDirection', f)));
     const wanted = opts.acSwing === 'left-right' ? ['rotateLeftRight'] : opts.acSwing === 'both' ? swings : ['rotateUpDown'];
@@ -125,7 +146,8 @@ export class AirConditioner extends Appliance {
 
     const keep = new Set(['climate']);
     // Portable units alert when their water tank is full: a problem sensor for that
-    if (alertCodes(profile).some((c) => alertKind(c) === 'problem')) {
+    const errorState = enumValues(fieldOf(this.res, 'runState', 'currentState'), 'r').includes('ERROR');
+    if (errorState || alertCodes(profile).some((c) => alertKind(c) === 'problem')) {
       this.addProblemSensor();
       keep.add('problem');
     }
@@ -178,10 +200,19 @@ export class AirConditioner extends Appliance {
           payload: (on) => ({ windDirection: { [f]: on } }) });
       }
     }
-    if (enumValues(fieldOf(this.res, 'airFlow', 'windStrength'), 'w').includes('POWER')) {
+    const windKey = this.windKey;
+    if (enumValues(fieldOf(this.res, 'airFlow', windKey), 'w').includes('POWER')) {
       add({ subtype: 'jet', label: 'jet mode',
-        read: (s) => { const v = stateValue(s, 'airFlow', 'windStrength'); return v === undefined ? undefined : v === 'POWER'; },
-        payload: (on) => ({ airFlow: { windStrength: on ? 'POWER' : (this.speeds.includes('AUTO') ? 'AUTO' : this.speeds.at(-1) || 'HIGH') } }) });
+        read: (s) => { const v = stateValue(s, 'airFlow', windKey); return v === undefined ? undefined : v === 'POWER'; },
+        payload: (on) => ({ airFlow: { [windKey]: on ? 'POWER' : (this.speeds.includes('AUTO') ? 'AUTO' : this.speeds.at(-1) || 'HIGH') } }) });
+    }
+    // Airflow styles on newer units (LG's Python toolkit 1.0.14), each on or off
+    for (const [name, label] of AIRFLOW_STYLES) {
+      const desc = fieldOf(this.res, 'windDirection', name);
+      if (!writable(desc) || field(desc, 'type') !== 'boolean') { continue; }
+      add({ subtype: `wind-${name}`, label,
+        read: (s) => bool(stateValue(s, 'windDirection', name)),
+        payload: (on) => ({ windDirection: { [name]: on } }) });
     }
     for (const [mode, label] of [['AIR_DRY', 'dry mode'], ['FAN', 'fan mode']] as const) {
       if (!jobModes.includes(mode)) { continue; }
@@ -233,6 +264,11 @@ export class AirConditioner extends Appliance {
       const wasOn = this.on;
       if (this.power) { this.on = stateValue(state, 'operation', this.power.name) === 'POWER_ON'; }
       if (this.on !== wasOn) { this.problemAlert = ''; } // switched off and on: an emptied tank
+      const run = stateValue(state, 'runState', 'currentState');
+      if (typeof run === 'string') {
+        if (run === 'ERROR' && !this.error) { this.ctx.log.warn(`[${this.ctx.name}] The air conditioner reports an error.`); }
+        this.error = run === 'ERROR';
+      }
       const mode = stateValue(state, 'airConJobMode', 'currentJobMode');
       if (typeof mode === 'string') {
         this.mode = mode;
@@ -251,7 +287,7 @@ export class AirConditioner extends Appliance {
         this.coolTarget = temperatureC(two, 'coolTargetTemperature') ?? this.coolTarget;
       }
       if (this.speeds.length) {
-        const w = stateValue(state, 'airFlow', 'windStrength');
+        const w = stateValue(state, 'airFlow', this.windKey);
         if (typeof w === 'string') { this.wind = w; }
         this.speed = levelPercent(this.speeds, this.wind) || 100;
       }
@@ -281,7 +317,7 @@ export class AirConditioner extends Appliance {
       set(this.tile.getCharacteristic(C.SwingMode), this.swing ? C.SwingMode.SWING_ENABLED : C.SwingMode.SWING_DISABLED);
     }
     for (const e of this.extras) { set(e.service!.getCharacteristic(C.On), e.value); }
-    this.renderProblem();
+    this.renderProblem(this.error);
   }
 
   override get busy(): boolean { return this.on; }
@@ -289,21 +325,82 @@ export class AirConditioner extends Appliance {
   private setPower(v: CharacteristicValue): Promise<void> {
     if (!this.power?.canWrite) { return this.refuse('This air conditioner can\'t be switched on or off through LG\'s API.'); }
     const on = v === 1 || v === true;
-    if (on === this.on) { return Promise.resolve(); }
+    this.powerWrite = { on, at: Date.now() };
+    // A mode picked while off waits briefly for this: off wins, on sends power then that mode once
+    const picked = this.cancelPendingOn();
+    if (on === this.on) { return this.switching ?? Promise.resolve(); }
+    if (!on) { return this.switchPower(false); }
     // Cooling or heating only: a unit left in another mode on its remote is switched to the tile's
-    // (two commands, one after the other: LG takes one kind of change per command)
-    const mode = on && this.restricted && !(this.modes as string[]).includes(this.mode) ? this.modes[0] : undefined;
-    const power = this.command(on ? 'Switched on' : 'Switched off', { operation: { [this.power.name]: on ? 'POWER_ON' : 'POWER_OFF' } })
-      .then(() => { this.on = on; });
-    if (!mode) { return power; }
-    return power.then(() => this.command(`Mode ${mode.toLowerCase()}`, { airConJobMode: { currentJobMode: mode } }))
-      .then(() => { this.mode = mode; this.lastMode = mode; });
+    const restrictedMode = this.restricted && !(this.modes as string[]).includes(this.mode) ? this.modes[0] : undefined;
+    return this.switchPower(true, picked ?? restrictedMode);
+  }
+
+  /** A mode picked on the tile while off, waiting to see whether the same action also switches it off. */
+  private pendingOn?: { mode: Mode; timer: NodeJS.Timeout; done: (p: Promise<void>) => void };
+
+  /** Cancels a waiting power-on; returns its mode (the caller now decides). */
+  private cancelPendingOn(): Mode | undefined {
+    const p = this.pendingOn;
+    if (!p) { return undefined; }
+    clearTimeout(p.timer);
+    this.pendingOn = undefined;
+    // The mode write itself succeeds: what happens next is the power write's
+    p.done(Promise.resolve());
+    return p.mode;
+  }
+
+  /** The last on/off written from the Home app: an off just written keeps a mode from switching it back on. */
+  private powerWrite?: { on: boolean; at: number };
+
+  /** The power change under way, so a second write in the same action shares its result. */
+  private switching?: Promise<void>;
+
+  /**
+   * Power, then (if given) a mode: two commands, one after the other, as LG takes one kind of
+   * change per command and refuses a mode while the unit is off.
+   */
+  private switchPower(on: boolean, mode?: Mode): Promise<void> {
+    this.on = on;
+    let run = this.command(on ? 'Switched on' : 'Switched off', { operation: { [this.power!.name]: on ? 'POWER_ON' : 'POWER_OFF' } })
+      .catch((err: unknown) => {
+        // Back to what it was, unless LG reported a newer state meanwhile
+        if (this.on === on) { this.on = !on; }
+        throw err;
+      });
+    if (mode) {
+      run = run.then(() => this.command(`Mode ${mode.toLowerCase()}`, { airConJobMode: { currentJobMode: mode } }))
+        .then(() => { this.mode = mode; this.lastMode = mode; this.applyRange(); });
+    }
+    const switching = run.finally(() => { if (this.switching === switching) { this.switching = undefined; } });
+    this.switching = switching;
+    return switching;
   }
 
   private setMode(v: CharacteristicValue): Promise<void> {
     const T = this.hap.Characteristic.TargetHeaterCoolerState;
     const mode: Mode = v === T.HEAT ? 'HEAT' : v === T.AUTO ? 'AUTO' : 'COOL';
     if (!this.modes.includes(mode)) { return this.refuse(`This air conditioner has no ${mode.toLowerCase()} mode.`); }
+    const justOff = this.powerWrite && !this.powerWrite.on && Date.now() - this.powerWrite.at < RECENT_OFF_MS;
+    if (justOff) {
+      // Switched off in the same action (a scene restoring "off, cooling"): keep the mode for next time
+      this.lastMode = mode;
+      this.applyRange();
+      return Promise.resolve();
+    }
+    if (!this.on && this.power?.canWrite && !this.switching) {
+      // A mode picked on an air conditioner that's off switches it on in that mode (LG refuses a
+      // mode change while off), unless the same Home app action switches it off or on itself
+      this.cancelPendingOn();
+      return new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          this.pendingOn = undefined;
+          this.switchPower(true, mode).then(resolve, reject);
+        }, PENDING_ON_MS);
+        this.pendingOn = { mode, timer, done: (p) => { p.then(resolve, reject); } };
+      });
+    }
+    // Switching on right now (same action): the mode follows the power command
+    if (this.switching) { return this.switching.then(() => this.setMode(v)); }
     if (mode === this.mode) { return Promise.resolve(); }
     return this.command(`Mode ${mode.toLowerCase()}`, { airConJobMode: { currentJobMode: mode } })
       .then(() => { this.lastMode = mode; this.mode = mode; this.applyRange(); });
@@ -332,7 +429,7 @@ export class AirConditioner extends Appliance {
     if (percent === 0) { return Promise.resolve(); } // the Home app sends 0 before switching off
     const level = levelFor(this.speeds, percent);
     if (level === this.wind) { return Promise.resolve(); }
-    return this.command(`Fan ${level.toLowerCase()}`, { airFlow: { windStrength: level } }).then(() => { this.wind = level; });
+    return this.command(`Fan ${level.toLowerCase()}`, { airFlow: { [this.windKey]: level } }).then(() => { this.wind = level; });
   }
 
   private setSwing(v: CharacteristicValue): Promise<void> {

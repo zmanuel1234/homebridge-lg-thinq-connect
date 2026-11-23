@@ -323,9 +323,17 @@ export function mergeState(base: unknown, patch: unknown): unknown {
     }
     return merged;
   }
-  const p = asObject(patch);
+  let p = asObject(patch);
   const b = asObject(base);
   if (!p) { return patch; }
+  // LG's live updates leave out fields that didn't change, but also leave remainHour out when it
+  // drops by one (reported below an hour on washers, dryers, WashTowers and dishwashers, where it
+  // should become 0). So minutes without hours keep the hour, unless the minutes wrapped round
+  // (1:00 → 0:59, 2:01 → 1:58): then the hour went down by one.
+  if ('remainMinute' in p && !('remainHour' in p) && b && typeof b.remainHour === 'number' && b.remainHour > 0
+    && typeof p.remainMinute === 'number' && typeof b.remainMinute === 'number' && p.remainMinute > b.remainMinute) {
+    p = { ...p, remainHour: b.remainHour - 1 };
+  }
   if (!b) {
     // A list-shaped state (washer) patched with one drum's object
     if (Array.isArray(base)) { return mergeState(base, [patch]); }

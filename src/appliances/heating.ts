@@ -51,18 +51,42 @@ export class WaterHeater extends Thermostats {
   on = false;
   private current?: number;
   private target?: number;
+  /** Modes beyond the default one (heat pump, turbo, vacation…) as switches; off returns to the default. */
+  readonly modeSwitches = new Map<string, Service>();
+  private readonly defaultMode?: string;
+  private mode = '';
 
   constructor(ctx: ApplianceContext, profile: unknown) {
     super(ctx);
     const res = resources(profile);
-    const { Characteristic: C } = this.hap;
+    const { Service: S, Characteristic: C } = this.hap;
     this.power = powerField(res);
     this.range = temperatureRangeC(res, 'temperatureInUnits', 'targetTemperature') || { min: 30, max: 70, step: 1 };
     const T = C.TargetHeatingCoolingState;
     this.tile = this.thermostat(ctx.name, 'water', this.range, [T.OFF, T.HEAT], (v) => this.setPower(v !== T.OFF), (c) => this.setTarget(c));
     this.tile.setPrimaryService(true);
-    this.prune(new Set(['water']));
+    const keep = new Set(['water']);
+    const modes = enumValues(fieldOf(res, 'waterHeaterJobMode', 'currentJobMode'), 'w');
+    this.defaultMode = modes.includes('AUTO') ? 'AUTO' : modes[0];
+    if ((ctx.options?.extraControls ?? ctx.extraControls) !== false && modes.length > 1) {
+      for (const mode of modes.filter((m) => m !== this.defaultMode)) {
+        const sub = `mode-${mode}`;
+        const svc = this.service(S.Switch, `${ctx.name} ${mode.toLowerCase().split('_').join(' ')}`, sub);
+        // Off only undoes this mode: switching off a mode that isn't on changes nothing
+        svc.getCharacteristic(C.On).onSet((v) => (v === true || v === 1 ? this.setMode(mode)
+          : this.mode === mode ? this.setMode(this.defaultMode!) : Promise.resolve()));
+        this.modeSwitches.set(mode, svc);
+        keep.add(sub);
+      }
+    }
+    this.prune(keep);
     this.update(undefined);
+  }
+
+  private setMode(mode: string): Promise<void> {
+    if (mode === this.mode) { return Promise.resolve(); }
+    return this.command(`Mode ${mode.toLowerCase().split('_').join(' ')}`, { waterHeaterJobMode: { currentJobMode: mode } })
+      .then(() => { this.mode = mode; this.update(undefined); });
   }
 
   update(state: unknown): void {
@@ -71,8 +95,11 @@ export class WaterHeater extends Thermostats {
       const t = field(state, 'temperatureInUnits') ?? field(state, 'temperature');
       this.current = temperatureC(t, 'currentTemperature') ?? this.current;
       this.target = temperatureC(t, 'targetTemperature') ?? this.target;
+      const mode = stateValue(state, 'waterHeaterJobMode', 'currentJobMode');
+      if (typeof mode === 'string') { this.mode = mode; }
     }
     this.show(this.tile, this.on, this.hap.Characteristic.TargetHeatingCoolingState.HEAT, this.current, this.target, this.range);
+    for (const [mode, svc] of this.modeSwitches) { set(svc.getCharacteristic(this.hap.Characteristic.On), this.mode === mode); }
   }
 
   override get busy(): boolean { return this.on; }

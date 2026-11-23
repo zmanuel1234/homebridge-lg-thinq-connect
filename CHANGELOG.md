@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.2.0-beta.8 - 2026-11-23
+
+From a pass through Home Assistant's LG integration (its 127 issues and its fixes) and LG's own
+toolkit and its issues: what real users of LG's official API ran into, and what Home Assistant
+offers that HomeKit can show.
+
+### Fixed (washers, dryers and other cycle appliances)
+- Time left could read an hour too long below one hour: LG's live updates leave the hours out
+  when they drop (instead of sending 0). Minutes that wrap round without hours now take the hour
+  down by one; otherwise the hour is kept (unchanged fields are left out too).
+- Some washers send "washing is complete" while still weighing the load: no longer a false "done".
+  It's ignored while the machine is detecting the load; with more than 10 minutes still shown, the
+  next state decides.
+- Energy (Eve) is checked once a day at a random time between 1 and 6 am instead of hourly, as
+  Home Assistant does, to spread the load on LG's servers; LG updates it daily.
+  A failed check is tried again within the hour.
+
+### Added (experimental appliances)
+- Air conditioners: fan speed on units that report it as `windStrengthDetail` (`windStrength`
+  stays preferred where both exist, as it has Auto); newer units' airflow styles as switches
+  (forest wind, air guide, high ceiling, swirl…); errors on the problem sensor, where the unit reports them;
+  picking a mode while it's off switches it on in that mode (LG refuses a mode change while off).
+- Humidifiers: auto, sleep, hygiene dry, warm mist, mood lamp and display light switches;
+  temperature and air quality sensors.
+- Ventilators: CO₂ (the Home app's alarm above 1,000 ppm), PM2.5/PM10 and temperature.
+- AeroTower: display light switch.
+- Fridges: power saving as a switch, Sabbath mode as a status sensor (LG doesn't allow changing
+  it), up to three water filters plus the air filter, ON/OFF settings such as rapid freeze as
+  switches.
+- Wine cellars: the light (refused, with a message, while LG blocks light control) and optimal
+  humidity.
+- Water heaters: their modes (heat pump, turbo, vacation…) as switches.
+- Cooktops: each burner's level and time left in the log.
+- Stick vacuums: battery and charging.
+
+### Checked
+- An independent review before release; fixed from it: a scene that switches an air conditioner
+  off while setting its mode no longer switches it back on (a mode picked while off waits briefly
+  for the same action's on/off), the hour rule above, a held instead of dropped early "finished"
+  alert, energy retries, water heater mode switches only undoing their own mode, and the wine
+  cellar light kept within LG's range.
+
+### Notes
+- Home Assistant users report that on some washers a start through LG's official API runs the
+  default program instead of the one on the dial (LG hasn't answered); see the README.
+
 ## 0.2.0-beta.7 - 2026-11-23
 
 Closing the gap with the other LG plugins, where LG's official API allows it.

@@ -306,6 +306,35 @@ function defineTests(hap: Hap): void {
     assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
   });
 
+  test('LG\'s "finished" alert while weighing the load is ignored; with lots of time shown, the next state decides', () => {
+    const { laundry, lines } = setup();
+    const done = () => value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected));
+    laundry.update(running({ state: 'DETECTING', remaining: 0, total: 0 }));
+    laundry.alert('finished', 'WASHING_IS_COMPLETE');
+    assert.equal(done(), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.ok(lines.some((l) => l.startsWith('debug: [Washer] Ignored LG\'s "WASHING_IS_COMPLETE" alert')));
+    // Premature: the next state is still mid-cycle
+    laundry.update(running({ remaining: 45 * 60 }));
+    laundry.alert('finished', 'WASHING_IS_COMPLETE');
+    assert.equal(done(), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    laundry.update(running({ remaining: 44 * 60 }));
+    assert.equal(done(), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    // Real: a sensor dry that ends early (the alert comes first, then the end)
+    const dryer = setup();
+    dryer.laundry.update(running({ remaining: 20 * 60 }));
+    dryer.laundry.alert('finished', 'DRYING_IS_COMPLETE');
+    dryer.laundry.update(status({ state: 'END', done: false }));
+    assert.equal(value(dryer.laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.ok(dryer.lines.includes('info: [Washer] LG says the cycle is finished.'));
+    // …or straight to off
+    const off = setup();
+    off.laundry.update(running({ remaining: 20 * 60 }));
+    off.laundry.alert('finished', 'DRYING_IS_COMPLETE');
+    off.laundry.update(status());
+    assert.equal(value(off.laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    off.laundry.stop();
+  });
+
   test('LG\'s "finished" alert when the machine is already off: a brief done', () => {
     const { laundry } = setup();
     laundry.update(status());
