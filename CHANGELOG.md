@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- **Support levels** (README, the log, the settings page's Check token): **tested** on a real
+  appliance, **checked** against Home Assistant's LG integration on real-appliance data, or
+  **experimental**. The tests compare what the Home app gets with what Home Assistant shows for its
+  samples, value by value (air conditioners, dehumidifier, range hood, air purifier, washer), read
+  straight from Home Assistant's own snapshot files; the one intentional difference (air
+  conditioner fan speed on units with two speed fields) is listed with its reason.
 - A compatibility promise for 1.0 (README, "Updates and compatibility"): 1.x never renames or
   removes a tile, sensor, switch or setting. The tests now hold every appliance's HomeKit tiles
   and the settings to a recorded list, so a change fails until it's deliberately approved

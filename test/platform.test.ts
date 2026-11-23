@@ -387,7 +387,7 @@ function defineTests(hap: Hap): void {
     hb.lg.devices.push({ deviceId: 'ac-1', deviceInfo: info, profile: read('profile.json'), state: read('status.json') });
     const platform = await hb.start([], { experimental: true });
     assert.deepEqual(hb.calls.registered.map((a) => a.displayName), ['Front Load Washer', 'Dryer', 'Test air conditioner']);
-    assert.ok(hb.lines.some((l) => l.startsWith('warn: [Test air conditioner] Added as an experimental air conditioner')));
+    assert.ok(hb.lines.some((l) => l.startsWith('info: [Test air conditioner] Added as an air conditioner (DEVICE_AIR_CONDITIONER), checked against Home Assistant')));
     const ac = hb.calls.registered[2];
     const tile = ac.getServiceById(S.HeaterCooler, 'climate')!;
     assert.equal(tile.getCharacteristic(C.CurrentTemperature).value, 25);

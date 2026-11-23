@@ -41,8 +41,6 @@ const OP_KEYS: Record<LaundryKind, string> = {
   oven: 'ovenOperationMode',
 };
 
-/** Device types tested on real machines; the rest are marked experimental in the log. */
-export const TESTED_TYPES = new Set(['DEVICE_WASHER', 'DEVICE_DRYER']);
 
 export function isLaundry(deviceType: string): boolean {
   return deviceType in TYPES;

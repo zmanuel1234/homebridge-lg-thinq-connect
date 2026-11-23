@@ -18,7 +18,7 @@ test('check token: lists the appliances and how well each is supported', async (
   const r = await checkToken(` ${lg.token} `, 'us', (o) => new ThinQClient({ ...o, baseUrl: lg.url }));
   assert.equal(r.ok, true);
   assert.equal(r.message, 'Signed in to LG (US): found Front Load Washer, Dryer.');
-  assert.deepEqual(r.appliances.map((a) => a.support), ['supported', 'supported']);
+  assert.deepEqual(r.appliances.map((a) => a.support), ['tested', 'tested']);
   assert.ok(!JSON.stringify(r).includes(lg.token), 'the token is never sent back');
 });
 
@@ -43,10 +43,10 @@ test('check token: an account with no appliances points at the other account', a
 });
 
 test('support levels and names for LG types', () => {
-  assert.equal(supportOf('DEVICE_DRYER'), 'supported');
+  assert.equal(supportOf('DEVICE_DRYER'), 'tested');
   assert.equal(supportOf('DEVICE_WASHTOWER_DRYER'), 'laundry');
   assert.equal(supportOf('DEVICE_DISH_WASHER'), 'experimental');
-  assert.equal(supportOf('DEVICE_AIR_CONDITIONER'), 'experimental');
+  assert.equal(supportOf('DEVICE_AIR_CONDITIONER'), 'checked');
   assert.equal(supportOf('DEVICE_MICROWAVE_OVEN'), 'experimental');
   assert.equal(supportOf('DEVICE_SOMETHING_NEW'), 'basic');
   assert.equal(typeName('DEVICE_WASHTOWER_DRYER'), 'washtower dryer');
