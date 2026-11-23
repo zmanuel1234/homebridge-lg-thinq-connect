@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0-beta.4 - 2026-11-23
+
+### Added
+- **Microwaves** (experimental): running and time left to the second, a "done" sensor and LG's
+  done alert, as well as the vent fan and light. LG's API doesn't give the cooking mode, power level
+  or temperature.
+- **Dishwashers**: the course (for example Eco) and a delayed start ("starts in 2 h 30 min") in
+  the log. Time left now counts seconds where an appliance reports them.
+
+### Fixed
+- README: how to run `lg-thinq-diagnostics` on a Homebridge Raspberry Pi or Docker setup, where
+  plugins are installed in Homebridge's own folder rather than globally.
+
 ## 0.2.0-beta.3 - 2026-11-23
 
 ### Added

@@ -59,7 +59,7 @@ test('helpers: levels, temperatures in either unit, filter life', () => {
 test('mappings: each type gets its own; microwaves with a fan get the hood; nothing to show is undefined', () => {
   assert.equal(mappingFor('DEVICE_AIR_CONDITIONER', {})?.label, 'air conditioner');
   assert.equal(mappingFor('DEVICE_SYSTEM_BOILER', {})?.label, 'heat pump');
-  assert.equal(mappingFor('DEVICE_MICROWAVE_OVEN', { property: { lamp: { lampBrightness: range(0, 2) } } })?.label, 'microwave (hood fan and light)');
+  assert.equal(mappingFor('DEVICE_MICROWAVE_OVEN', { property: { lamp: { lampBrightness: range(0, 2) } } })?.label, 'microwave');
   assert.equal(mappingFor('DEVICE_MICROWAVE_OVEN', {}), undefined);
   assert.equal(mappingFor('DEVICE_COOKTOP', { property: { operation: { operationMode: en(['POWER_ON', 'POWER_OFF']) } } })?.label, 'appliance (basic)');
   assert.equal(mappingFor('DEVICE_KIMCHI_REFRIGERATOR', fixture('kimchi_refrigerator', 'profile')), undefined);
@@ -336,6 +336,52 @@ function defineTests(hap: Hap): void {
     await write(fan.getCharacteristic(C.RotationSpeed), 60);
     await write(lamp.getCharacteristic(C.On), false);
     assert.deepEqual(sent, [{ ventilation: { fanSpeed: 3 } }, { lamp: { lampBrightness: 0 } }]);
+  });
+
+  test('microwave: running and time left to the second, done, and the vent fan and light', async () => {
+    const { part, accessory, sent, lines } = make('DEVICE_MICROWAVE_OVEN', { property: {
+      runState: { currentState: en(['INITIAL', 'RUNNING', 'PAUSE', 'END'], ['r']) },
+      timer: { remainMinute: { type: 'number', mode: ['r'] }, remainSecond: { type: 'number', mode: ['r'] } },
+      ventilation: { fanSpeed: range(0, 3) },
+      lamp: { lampBrightness: range(0, 2) },
+    } }, 'Microwave');
+    part.update({ runState: { currentState: 'RUNNING' }, timer: { remainMinute: 2, remainSecond: 30 }, ventilation: { fanSpeed: 0 }, lamp: { lampBrightness: 1 } });
+    const cycle = accessory.getServiceById(S.Valve, 'cycle')!;
+    const done = accessory.getServiceById(S.OccupancySensor, 'done')!;
+    assert.ok(cycle.isPrimaryService);
+    assert.equal(val(cycle.getCharacteristic(C.InUse)), 1);
+    assert.equal(val(cycle.getCharacteristic(C.RemainingDuration)), 150);
+    assert.equal(val(accessory.getServiceById(S.Fanv2, 'fan')!.getCharacteristic(C.ConfiguredName)), 'Microwave fan');
+    assert.equal(val(accessory.getServiceById(S.Lightbulb, 'lamp')!.getCharacteristic(C.Brightness)), 50);
+    assert.ok(part.busy);
+    part.update({ runState: { currentState: 'END' }, timer: { remainMinute: 0, remainSecond: 0 }, ventilation: { fanSpeed: 0 }, lamp: { lampBrightness: 0 } });
+    assert.equal(val(done.getCharacteristic(C.OccupancyDetected)), 1);
+    assert.equal(val(cycle.getCharacteristic(C.Active)), 0);
+    // LG's "done" alert after it already went back to idle, until the next start
+    part.update({ runState: { currentState: 'INITIAL' } });
+    part.alert('finished', 'COOKING_IS_COMPLETE');
+    assert.equal(val(done.getCharacteristic(C.OccupancyDetected)), 1);
+    assert.ok(lines.includes("info: [Microwave] LG says it's done."));
+    part.update({ runState: { currentState: 'RUNNING' }, timer: { remainMinute: 1, remainSecond: 0 } });
+    assert.equal(val(done.getCharacteristic(C.OccupancyDetected)), 0);
+    // It can't be started from the Home app; the fan still works
+    assert.equal(await write(cycle.getCharacteristic(C.Active), 0), hap.HAPStatus.READ_ONLY_CHARACTERISTIC);
+    await write(accessory.getServiceById(S.Fanv2, 'fan')!.getCharacteristic(C.Active), 1);
+    assert.deepEqual(sent, [{ ventilation: { fanSpeed: 1 } }]);
+  });
+
+  test('microwave from a cached accessory: its services are kept, not re-added', () => {
+    const profile = { property: { runState: { currentState: en(['RUNNING', 'END'], ['r']) }, lamp: { lampBrightness: range(0, 2) } } };
+    const first = make('DEVICE_MICROWAVE_OVEN', profile, 'Microwave');
+    const cycleId = first.accessory.getServiceById(S.Valve, 'cycle')!.iid;
+    const ctxAgain = mappingFor('DEVICE_MICROWAVE_OVEN', profile)!;
+    // Same accessory again, as after a restart
+    const log = { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} } as unknown as Logging;
+    ctxAgain.create({ log, api: { hap } as unknown as API, accessory: first.accessory, name: 'Microwave', serial: 'S1',
+      device: { deviceId: 'd1', deviceInfo: { deviceType: 'DEVICE_MICROWAVE_OVEN', alias: 'Microwave', modelName: 'M1' } },
+      send: () => Promise.resolve({}), refreshSoon: () => {} }, profile);
+    assert.equal(first.accessory.getServiceById(S.Valve, 'cycle')!.iid, cycleId);
+    assert.equal(first.accessory.services.filter((x) => x.UUID === S.Valve.UUID).length, 1);
   });
 
   test('ceiling fan and ventilator: a fan tile with on/off and speed (any operation field with POWER_ON)', async () => {

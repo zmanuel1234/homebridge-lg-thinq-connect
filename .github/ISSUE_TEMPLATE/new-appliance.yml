@@ -27,7 +27,7 @@ body:
     attributes:
       label: Diagnostics file
       description: |
-        On your Homebridge machine run `lg-thinq-diagnostics --country US` (your country), enter your token when asked (it isn't shown), and attach the `lg-diagnostics.json` it saves. Look it over first: device IDs and serial numbers are removed.
+        On your Homebridge machine run the diagnostics command (see "Help add or fix an appliance" in the README; on a Raspberry Pi: `cd ~ && PATH=/opt/homebridge/bin:$PATH /var/lib/homebridge/node_modules/.bin/lg-thinq-diagnostics --country US`, with your country), enter your token when asked (it isn't shown), and attach the `lg-diagnostics.json` it saves. Look it over first: device IDs and serial numbers are removed.
     validations:
       required: true
   - type: checkboxes

@@ -5,6 +5,7 @@
 import type { CharacteristicValue, Service } from 'homebridge';
 import { alertKind } from '../laundry';
 import { AirSensors, alertCodes } from './sensors';
+import { cyclePhase } from '../laundry';
 import { Appliance, type ApplianceContext, set } from './base';
 import {
   type Obj, type Range, enumValues, fieldOf, levelFor, levelPercent, num, powerField, rangeOf, resources, speedLevels,
@@ -234,7 +235,7 @@ export class Fan extends Powered {
   }
 }
 
-/** Range hoods (and over-the-range microwaves): the fan as a number of speeds, and the light. */
+/** Range hoods: the fan as a number of speeds, and the light. */
 export class Hood extends Appliance {
   readonly fan?: Service;
   readonly lamp?: Service;
@@ -251,10 +252,10 @@ export class Hood extends Appliance {
     const lampDesc = fieldOf(res, 'lamp', 'lampBrightness');
     this.fanRange = rangeOf(fanDesc, 'w') || rangeOf(fanDesc, 'r');
     this.lampRange = rangeOf(lampDesc, 'w') || rangeOf(lampDesc, 'r');
-    const keep = new Set<string>();
+    const keep = new Set<string>(this.keepAlso());
     if (this.fanRange) {
-      this.fan = this.service(S.Fanv2, ctx.name, 'fan');
-      this.fan.setPrimaryService(true);
+      this.fan = this.service(S.Fanv2, `${ctx.name}${this.fanSuffix}`, 'fan');
+      if (!this.keepAlso().length) { this.fan.setPrimaryService(true); }
       const steps = this.fanRange.max;
       this.fan.getCharacteristic(C.RotationSpeed).setProps({ minValue: 0, maxValue: 100, minStep: 1 });
       if (writable(fanDesc)) {
@@ -294,6 +295,10 @@ export class Hood extends Appliance {
 
   override get busy(): boolean { return this.fanSpeed > 0 || this.brightness > 0; }
 
+  /** Services a subclass adds, which pruning must keep. */
+  protected keepAlso(): string[] { return []; }
+  protected get fanSuffix(): string { return ''; }
+
   private setFan(speed: number): Promise<void> {
     const s = Math.max(0, Math.min(this.fanRange!.max, speed));
     if (s === this.fanSpeed) { return Promise.resolve(); }
@@ -307,3 +312,68 @@ export class Hood extends Appliance {
   }
 }
 
+/**
+ * Over-the-range microwaves: running and time left (to the second) on a tile, a "done" sensor for a
+ * notification, and the vent fan and light as for a range hood. LG's official API doesn't give the
+ * cooking mode, power level or temperature.
+ */
+export class Microwave extends Hood {
+  readonly cycle: Service;
+  readonly doneSensor: Service;
+  private phase = { running: false, paused: false, done: false, error: false };
+  private remaining = 0;
+  private finished = false;
+
+  constructor(ctx: ApplianceContext, profile: unknown) {
+    super(ctx, profile);
+    const { Service: S, Characteristic: C } = this.hap;
+    this.cycle = this.service(S.Valve, ctx.name, 'cycle');
+    this.cycle.setPrimaryService(true);
+    this.cycle.setCharacteristic(C.ValveType, C.ValveType.GENERIC_VALVE);
+    this.cycle.getCharacteristic(C.RemainingDuration).setProps({ maxValue: 86_400 });
+    this.cycle.getCharacteristic(C.Active).onSet((v) => {
+      if ((v === 1) === this.phase.running) { return; }
+      this.ctx.log.info(`[${ctx.name}] It can't be started or stopped through LG's API.`);
+      setTimeout(() => this.update(undefined), 50).unref?.();
+      throw new this.hap.HapStatusError(this.hap.HAPStatus.READ_ONLY_CHARACTERISTIC);
+    });
+    this.doneSensor = this.service(S.OccupancySensor, `${ctx.name} done`, 'done');
+    this.update(undefined);
+  }
+
+  protected override keepAlso(): string[] { return ['cycle', 'done']; }
+  protected override get fanSuffix(): string { return ' fan'; }
+
+  override update(state: unknown): void {
+    super.update(state);
+    // The hood's setup calls update() before this class has added its services
+    if (!(this as { cycle?: Service }).cycle) { return; }
+    const { Characteristic: C } = this.hap;
+    if (state) {
+      const word = stateValue(state, 'runState', 'currentState');
+      if (typeof word === 'string') {
+        const next = cyclePhase(word);
+        if (next.running || next.paused) { this.finished = false; }
+        this.phase = next;
+      }
+      const t = (n: string) => num(stateValue(state, 'timer', n)) ?? 0;
+      this.remaining = this.phase.running || this.phase.paused ? t('remainMinute') * 60 + t('remainSecond') : 0;
+    }
+    set(this.cycle.getCharacteristic(C.Active), this.phase.running ? 1 : 0);
+    set(this.cycle.getCharacteristic(C.InUse), this.phase.running ? 1 : 0);
+    set(this.cycle.getCharacteristic(C.RemainingDuration), this.remaining);
+    set(this.doneSensor.getCharacteristic(C.OccupancyDetected), this.phase.done || this.finished ? 1 : 0);
+  }
+
+  override alert(kind: 'finished' | 'problem' | 'other', pushCode: string): void {
+    if (kind === 'finished') {
+      this.finished = true;
+      this.ctx.log.info(`[${this.ctx.name}] LG says it's done.`);
+      this.update(undefined);
+      return;
+    }
+    super.alert(kind, pushCode);
+  }
+
+  override get busy(): boolean { return this.phase.running || this.phase.paused || super.busy; }
+}
