@@ -11,7 +11,7 @@ import type * as HapNodejs from '@homebridge/hap-nodejs';
 import { type ApplianceContext, categoryOf, mappingFor } from '../src/appliances';
 import type { LaundryContext } from '../src/accessory';
 import { filterPercent } from '../src/appliances/air';
-import { levelFor, levelPercent, temperatureC } from '../src/appliances/profile';
+import { levelFor, levelPercent, speedLevels, temperatureC } from '../src/appliances/profile';
 
 type Hap = typeof HapNodejs;
 let hap: Hap | null = null;
@@ -30,6 +30,17 @@ const fixture = (name: string, file: 'profile' | 'status' | 'device'): unknown =
 const en = (values: string[], mode: string[] = ['r', 'w']) => ({ type: 'enum', mode, value: Object.fromEntries(mode.map((m) => [m, values])) });
 const range = (min: number, max: number, step = 1, mode: string[] = ['r', 'w']) =>
   ({ type: 'range', mode, value: Object.fromEntries(mode.map((m) => [m, { min, max, step }])) });
+
+test('fan speeds: AUTO at the top of the slider, as the AC plugin does; other modes left out', () => {
+  const desc = (w: string[]) => ({ type: 'enum', mode: ['r', 'w'], value: { r: w, w } });
+  const levels = speedLevels(desc(['LOW', 'MID', 'HIGH', 'AUTO']));
+  assert.deepEqual(levels, ['LOW', 'MID', 'HIGH', 'AUTO']);
+  assert.deepEqual(levels.map((l) => levelPercent(levels, l)), [25, 50, 75, 100]);
+  assert.equal(levelFor(levels, 100), 'AUTO');
+  assert.equal(levelFor(levels, 75), 'HIGH');
+  assert.deepEqual(speedLevels(desc(['SLOW', 'LOW', 'MID', 'HIGH', 'NATURE', 'POWER', 'AUTO'])), ['SLOW', 'LOW', 'MID', 'HIGH', 'AUTO']);
+  assert.deepEqual(speedLevels(desc(['LOW', 'HIGH'])), ['LOW', 'HIGH'], 'no AUTO offered: none added');
+});
 
 test('helpers: levels, temperatures in either unit, filter life', () => {
   assert.equal(levelPercent(['LOW', 'MID', 'HIGH'], 'MID'), 67);
@@ -98,7 +109,7 @@ function defineTests(hap: Hap): void {
     assert.deepEqual(tile.getCharacteristic(C.TargetHeaterCoolerState).props.validValues, [C.TargetHeaterCoolerState.COOL]);
     assert.equal(tile.getCharacteristic(C.CoolingThresholdTemperature).props.minValue, 18);
     assert.equal(tile.getCharacteristic(C.CoolingThresholdTemperature).props.maxValue, 30);
-    assert.equal(val(tile.getCharacteristic(C.RotationSpeed)), 67, 'MID of LOW/MID/HIGH');
+    assert.equal(val(tile.getCharacteristic(C.RotationSpeed)), 50, 'MID of LOW/MID/HIGH/AUTO');
     assert.ok(tile.testCharacteristic(C.SwingMode));
     assert.ok(part.busy);
     assert.ok(accessory.getServiceById(S.ContactSensor, 'problem'), 'this model alerts WATER_IS_FULL');
@@ -114,7 +125,7 @@ function defineTests(hap: Hap): void {
     assert.equal(await write(tile.getCharacteristic(C.Active), C.Active.INACTIVE), undefined);
     assert.deepEqual(sent, [
       { temperature: { targetTemperature: 22 } },
-      { airFlow: { windStrength: 'HIGH' } },
+      { airFlow: { windStrength: 'AUTO' } },
       { windDirection: { rotateUpDown: true } },
       { operation: { airConOperationMode: 'POWER_OFF' } },
     ]);
@@ -186,7 +197,7 @@ function defineTests(hap: Hap): void {
     assert.equal(val(aq.getCharacteristic(C.PM2_5Density)), 14);
     const filter = full.accessory.getServiceById(S.FilterMaintenance, 'filter')!;
     assert.equal(val(filter.getCharacteristic(C.FilterChangeIndication)), C.FilterChangeIndication.CHANGE_FILTER);
-    assert.equal(val(full.accessory.getServiceById(S.AirPurifier, 'purifier')!.getCharacteristic(C.RotationSpeed)), 33);
+    assert.equal(val(full.accessory.getServiceById(S.AirPurifier, 'purifier')!.getCharacteristic(C.RotationSpeed)), 25);
   });
 
   test('dehumidifier: humidity now and target from real data, its two fan speeds, the full-tank alert', async () => {
