@@ -64,8 +64,10 @@ that. Choose those on the machine.
 
 ## Setup
 
-1. Go to **[connect-pat.lgthinq.com](https://connect-pat.lgthinq.com)** and sign in with the LG
-   account your appliances are on (see [Signing in](#signing-in) if you're not sure which one).
+1. Go to **[connect-pat.lgthinq.com](https://connect-pat.lgthinq.com)**. First choose your
+   **country** at the top of the page (it's required, and decides which LG sign-in you get), then
+   sign in with the LG account your appliances are on (see [Signing in](#signing-in) if you're not
+   sure which one).
 2. Choose **ADD NEW TOKEN**, name it (for example *Homebridge*), and **tick every permission**
    under *Scope of authority*.
 3. Choose **CREATE TOKEN** and copy it. Keep it private: it gives access to your appliances.
@@ -88,6 +90,8 @@ that. Choose those on the machine.
 - **Permissions:** tick every one. With some left out, LG refuses part of what the plugin asks
   (often starting and pausing, or live updates).
 - **Country:** the country the LG account was created in. LG serves each account from one region.
+  Choose the same country at the top of the token page before signing in, and in this plugin's
+  settings. With another country selected there, sign-in can fail even with the right password.
 - **No appliances found?** The token is on a different LG account than the app (use the QR code),
   or the appliances aren't registered in the ThinQ app yet.
 - The token keeps working until you delete it on the token page. To replace it, create a new one,

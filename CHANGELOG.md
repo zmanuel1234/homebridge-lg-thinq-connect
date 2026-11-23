@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- Sign-in steps (README, settings page): choose your country at the top of the token page first,
+  since it decides which LG sign-in you get; use the same country in the plugin's settings.
+
 ## 0.2.0-beta.5 - 2026-11-23
 
 ### Added

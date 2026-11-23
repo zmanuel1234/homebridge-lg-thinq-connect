@@ -4,7 +4,7 @@
   "singular": true,
   "customUi": true,
   "customUiPath": "./dist/homebridge-ui",
-  "headerDisplay": "LG ThinQ appliances in Apple Home through LG's official ThinQ Connect API. Create a personal access token at [connect-pat.lgthinq.com](https://connect-pat.lgthinq.com) with every device permission ticked, and paste it below. Washers and dryers are supported; other LG appliances can be tried with \"Experimental appliances\".",
+  "headerDisplay": "LG ThinQ appliances in Apple Home through LG's official ThinQ Connect API. Create a personal access token at [connect-pat.lgthinq.com](https://connect-pat.lgthinq.com) (choose your country at the top first, then sign in) with every device permission ticked, and paste it below. Washers and dryers are supported; other LG appliances can be tried with \"Experimental appliances\".",
   "footerDisplay": "Problems or a new appliance to add? [Open an issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues).",
   "schema": {
     "type": "object",
