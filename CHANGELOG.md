@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.0-beta.1 - 2026-11-23
+
+### Added
+- **Experimental appliances** (new setting, off by default): air conditioners, refrigerators and wine
+  cellars, dishwashers, Stylers, ovens, dehumidifiers, humidifiers, air purifiers, ceiling fans,
+  ventilators, range hoods and over-the-range microwaves, water heaters, heat pumps and robot vacuums,
+  plus a basic fallback (on/off, temperatures, humidity, problem alerts) for any other type. See the
+  README's table for what each shows. Built from LG's documentation, Home Assistant's integration and
+  its sample data from real air conditioners, an air purifier, a dehumidifier and a range hood, and
+  the MIT-licensed air conditioner and heat pump plugins. Not yet confirmed by users: reports welcome.
+- Dishwashers get door and "rinse aid low" sensors.
+- LG alerts about a full or empty tank now open the problem sensor too.
+
+### Changed
+- Appliance types other than washers and dryers are no longer just named in the log: with the new
+  setting on, they're added; without it, the log says how to try them.
+
 ## 0.1.0-beta.3 - 2026-11-23
 
 ### Added

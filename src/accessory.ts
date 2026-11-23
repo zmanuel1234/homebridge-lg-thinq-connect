@@ -6,6 +6,8 @@
 //  - "<name> problem", a contact sensor: open while the machine reports an error, or after an LG
 //    alert such as "drying failed" until the next cycle starts or the machine is switched off;
 //  - optionally "<name> <phase>" occupancy sensors (e.g. spinning), for automations;
+//  - dishwashers: "<name> door" (contact sensor) and "<name> rinse aid low" (occupancy sensor),
+//    when the machine reports them;
 //  - optionally "<name> tub clean", an occupancy sensor: detected once the washer's cycle count
 //    (as LG counts it) reaches the setting, as a reminder to run Tub Clean.
 // Starting, pausing and resuming from the valve is off unless the "allow control" setting is on,
@@ -50,6 +52,8 @@ export class LaundryAccessory {
   readonly problemSensor: Service;
   readonly phaseSensors = new Map<string, Service>();
   readonly tubCleanSensor: Service | undefined;
+  readonly doorSensor: Service | undefined;
+  readonly rinseAidSensor: Service | undefined;
   status: LaundryStatus | null = null;
   private inferredDoneUntil = 0;
   private inferredTimer: NodeJS.Timeout | undefined;
@@ -71,7 +75,7 @@ export class LaundryAccessory {
 
     accessory.getService(S.AccessoryInformation)!
       .setCharacteristic(C.Manufacturer, 'LG')
-      .setCharacteristic(C.Model, options.model || (unit.kind === 'washer' ? 'Washer' : 'Dryer'))
+      .setCharacteristic(C.Model, options.model || stateLabel(unit.kind))
       .setCharacteristic(C.SerialNumber, options.serial);
 
     // Main tile
@@ -98,6 +102,10 @@ export class LaundryAccessory {
       }
     }
 
+    // Dishwasher door and rinse aid, when reported
+    this.doorSensor = this.optional(unit.hasDoor, S.ContactSensor, `${name} door`, 'door');
+    this.rinseAidSensor = this.optional(unit.hasRinseAid, S.OccupancySensor, `${name} rinse aid low`, 'rinse-aid');
+
     // Tub-clean reminder: washers that report a cycle count, when the setting is on
     const tubClean = accessory.getServiceById(S.OccupancySensor, 'tub-clean');
     if (options.tubCleanAfter > 0 && unit.kind === 'washer' && unit.countsCycles) {
@@ -106,6 +114,14 @@ export class LaundryAccessory {
       accessory.removeService(tubClean);
     }
     this.render();
+  }
+
+  /** A service the machine may or may not have: added when it does, removed when it doesn't. */
+  private optional(wanted: boolean, type: typeof Service.Valve, name: string, subtype: string): Service | undefined {
+    if (wanted) { return this.service(type, name, subtype); }
+    const old = this.accessory.getServiceById(type, subtype);
+    if (old) { this.accessory.removeService(old); }
+    return undefined;
   }
 
   /** Get or add a service, and keep its name in step with the settings. */
@@ -202,6 +218,14 @@ export class LaundryAccessory {
       this.done ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     set(this.problemSensor.getCharacteristic(C.ContactSensorState),
       this.problem ? C.ContactSensorState.CONTACT_NOT_DETECTED : C.ContactSensorState.CONTACT_DETECTED);
+    if (this.doorSensor && s?.doorOpen !== undefined) {
+      set(this.doorSensor.getCharacteristic(C.ContactSensorState),
+        s.doorOpen ? C.ContactSensorState.CONTACT_NOT_DETECTED : C.ContactSensorState.CONTACT_DETECTED);
+    }
+    if (this.rinseAidSensor && s?.rinseAidLow !== undefined) {
+      set(this.rinseAidSensor.getCharacteristic(C.OccupancyDetected),
+        s.rinseAidLow ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    }
     if (this.tubCleanSensor) {
       const due = s?.cycleCount !== undefined && s.cycleCount >= this.options.tubCleanAfter;
       set(this.tubCleanSensor.getCharacteristic(C.OccupancyDetected),
