@@ -127,10 +127,10 @@ anyone using this plugin. If you try one, please
 | WashTower, wash combo | As washer and dryer, one set per drum | Experimental (always on) |
 | Dishwasher | As a washer, plus door and "rinse aid low" sensors | Experimental |
 | Styler, oven | As a washer: time left, done, problem | Experimental |
-| Air conditioner | Heater/cooler: on/off, cool / heat / auto (as the unit offers), room and set temperature, fan speed, swing; "problem" for a full water tank | Experimental (from real sample data) |
+| Air conditioner | Heater/cooler: on/off, cool / heat / auto (as the unit offers), room and set temperature, fan speed (Auto at the top of the slider), swing; "problem" for a full water tank | Experimental (from real sample data) |
 | Refrigerator, wine cellar | Door-open sensor per door; set temperature per compartment; express modes as switches; water filter | Experimental |
 | Dehumidifier, humidifier | Humidifier tile: on/off, humidity now and target, fan speed; "problem" for a full tank | Experimental (dehumidifier from real sample data) |
-| Air purifier | Air purifier tile: on/off, fan speed; air quality (PM2.5, PM10) and filter life when reported | Experimental (from real sample data) |
+| Air purifier | Air purifier tile: on/off, fan speed (Auto at the top); air quality (PM2.5, PM10) and filter life when reported | Experimental (from real sample data) |
 | Ceiling fan, ventilator | Fan: on/off and speed | Experimental |
 | Range hood, over-the-range microwave | Fan with speed steps, and the light with brightness | Experimental (hood from real sample data) |
 | Water heater | Thermostat: on/off, tank and set temperature | Experimental |

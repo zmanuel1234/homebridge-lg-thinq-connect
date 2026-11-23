@@ -139,7 +139,13 @@ export function levelFor(levels: string[], percent: number): string {
   return levels[i];
 }
 
-/** Speed levels from an enum field's write values, in LG's order, without AUTO-like modes. */
+/**
+ * Speed levels from an enum field's write values: the named speeds in LG's order, then AUTO at the
+ * top of the slider when the appliance offers it, as homebridge-lg-thinqconnect-ac does
+ * (LOW/MID/HIGH/AUTO is 25/50/75/100 %). Other modes (NATURE, POWER) aren't speeds and are left out.
+ */
 export function speedLevels(desc: Obj | undefined): string[] {
-  return enumValues(desc, 'w').filter((v) => !/AUTO|NATURE|POWER|TURBO_AUTO/.test(v));
+  const values = enumValues(desc, 'w');
+  const speeds = values.filter((v) => !/AUTO|NATURE|POWER/.test(v));
+  return values.includes('AUTO') ? [...speeds, 'AUTO'] : speeds;
 }

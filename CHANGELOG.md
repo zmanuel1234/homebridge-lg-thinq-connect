@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-beta.2 - 2026-11-23
+
+### Added
+- **Auto fan speed** (experimental appliances): for air conditioners, air purifiers and fans that
+  offer it, Auto sits at the top of the speed slider, after the named speeds. A Low / Medium /
+  High / Auto unit is 25 / 50 / 75 / 100 %, as in homebridge-lg-thinqconnect-ac.
+
 ## 0.2.0-beta.1 - 2026-11-23
 
 ### Added

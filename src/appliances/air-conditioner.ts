@@ -1,5 +1,5 @@
 // Air conditioners as a heater/cooler tile: on/off, cool / heat / auto, the room temperature, the
-// set temperature, fan speed and swing. The approach follows homebridge-lg-thinqconnect-ac (MIT),
+// set temperature, fan speed (Auto at the top of the slider) and swing. The approach follows homebridge-lg-thinqconnect-ac (MIT),
 // which runs this on the same LG API; the sample data is Home Assistant's (see test fixtures).
 //
 // LG modes without a heater/cooler equivalent (fan only, dry, air clean) show as on and idle.
