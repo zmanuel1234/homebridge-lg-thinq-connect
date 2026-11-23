@@ -85,7 +85,8 @@ function defineTests(hap: Hap): void {
     const hb = await homebridge(t);
     await hb.start([], { token: '' });
     assert.equal(hb.calls.registered.length, 0);
-    assert.ok(hb.lines.some((l) => l.startsWith('warn: No LG personal access token set') && l.includes('connect-pat.lgthinq.com')));
+    assert.ok(hb.lines.includes('warn: No LG personal access token set. Create one at https://connect-pat.lgthinq.com '
+      + 'and paste it in this plugin\'s settings.'));
   });
 
   test('our washer and dryer are added, named as in the ThinQ app, and checked right away', async (t) => {
