@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isLaundry, laundryStatus, laundryUnits, operationPayload, stateLabel } from '../src/laundry';
+import { alertFor, alertKind, isLaundry, laundryStatus, laundryUnits, mergeState, operationPayload, stateLabel } from '../src/laundry';
 import { realDevices } from './fake-lg';
 
 const [washer, dryer] = realDevices();
@@ -141,4 +141,44 @@ test('state labels', () => {
   assert.equal(stateLabel('END'), 'Finished');
   assert.equal(stateLabel('RUNNING'), 'Washing');
   assert.equal(stateLabel('RUNNING', 'dryer'), 'Drying');
+});
+
+test('merging live updates: only what changed, washer drums matched by location', () => {
+  const unit = laundryUnits('DEVICE_WASHER', washer.profile)[0];
+  const base = washerState('RINSING', [0, 30], [1, 0], { remoteControlEnable: { remoteControlEnabled: true } });
+  const merged = mergeState(base, [{ runState: { currentState: 'SPINNING' }, timer: { remainMinute: 12 }, location: { locationName: 'MAIN' } }]);
+  const s = laundryStatus(unit, merged);
+  assert.equal(s.state, 'SPINNING');
+  assert.equal(s.remaining, 12 * 60);
+  assert.equal(s.total, 3600, 'total kept from before');
+  assert.equal(s.remoteControl, true, 'untouched fields kept');
+  assert.equal((base[0].runState as { currentState: string }).currentState, 'RINSING', 'the old state is not changed in place');
+  // An update as a single object, without a list
+  assert.equal(laundryStatus(unit, mergeState(base, { runState: { currentState: 'END' } })).state, 'END');
+  // A dryer (one object) and a first update with no earlier state
+  const dryerUnit = laundryUnits('DEVICE_DRYER', dryer.profile)[0];
+  assert.equal(laundryStatus(dryerUnit, mergeState(dryer.state, { runState: { currentState: 'COOLING' } })).state, 'COOLING');
+  assert.equal(laundryStatus(dryerUnit, mergeState(undefined, { runState: { currentState: 'RUNNING' } })).state, 'RUNNING');
+  assert.equal(mergeState(base, undefined), base);
+});
+
+test('merging live updates: two drums, only one changes', () => {
+  const state = [
+    { runState: { currentState: 'RUNNING' }, location: { locationName: 'MAIN' } },
+    { runState: { currentState: 'END' }, location: { locationName: 'MINI' } },
+  ];
+  const merged = mergeState(state, [{ runState: { currentState: 'PAUSE' }, location: { locationName: 'MINI' } }]) as typeof state;
+  assert.deepEqual(merged.map((d) => d.runState.currentState), ['RUNNING', 'PAUSE']);
+});
+
+test('LG alerts: finished or problem, and which machine', () => {
+  assert.equal(alertKind('WASHING_IS_COMPLETE'), 'finished');
+  assert.equal(alertKind('DRYING_IS_COMPLETE'), 'finished');
+  assert.equal(alertKind('DRYING_FAILED'), 'problem');
+  assert.equal(alertKind('ERROR_DURING_WASHING'), 'problem');
+  assert.equal(alertKind('SOMETHING_NEW'), 'other');
+  assert.equal(alertFor('WASHING_IS_COMPLETE'), 'washer');
+  assert.equal(alertFor('ERROR_DURING_WASHING'), 'washer');
+  assert.equal(alertFor('DRYING_FAILED'), 'dryer');
+  assert.equal(alertFor('SOMETHING_NEW'), undefined);
 });

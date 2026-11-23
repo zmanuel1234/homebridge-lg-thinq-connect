@@ -31,6 +31,12 @@
         "default": false,
         "description": "Tapping the machine's tile starts, pauses or resumes it. LG only accepts this after Remote Start is pressed on the machine. Off: the tile only shows the cycle."
       },
+      "liveUpdates": {
+        "title": "Live updates from LG",
+        "type": "boolean",
+        "default": true,
+        "description": "LG sends changes and alerts (cycle complete, drying failed) the moment they happen. Scheduled checks continue as a backup. Turn off only if live updates cause problems."
+      },
       "phaseSensors": {
         "title": "Phase sensors",
         "type": "array",
@@ -84,6 +90,7 @@
     "token",
     "country",
     "allowControl",
+    "liveUpdates",
     "phaseSensors",
     {
       "type": "fieldset",

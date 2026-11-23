@@ -161,6 +161,50 @@ export function laundryStatus(unit: LaundryUnit, state: unknown): LaundryStatus 
   };
 }
 
+/**
+ * A live update applied to the last known state. LG sends only what changed, in the same shape
+ * as the full state: objects are merged key by key, and a washer's list of drums is matched by
+ * location (a drum not in the update keeps its last state).
+ */
+export function mergeState(base: unknown, patch: unknown): unknown {
+  if (patch === undefined) { return base; }
+  if (Array.isArray(patch)) {
+    if (!Array.isArray(base)) { return patch; }
+    const merged: unknown[] = (base as unknown[]).slice();
+    for (const item of patch as unknown[]) {
+      const loc = locationOf(asObject(item) || {});
+      const i = loc ? merged.findIndex((b) => locationOf(asObject(b) || {}) === loc) : (merged.length === 1 ? 0 : -1);
+      if (i >= 0) { merged[i] = mergeState(merged[i], item); } else { merged.push(item); }
+    }
+    return merged;
+  }
+  const p = asObject(patch);
+  const b = asObject(base);
+  if (!p) { return patch; }
+  if (!b) {
+    // A list-shaped state (washer) patched with one drum's object
+    if (Array.isArray(base)) { return mergeState(base, [patch]); }
+    return patch;
+  }
+  const out: Props = { ...b };
+  for (const [k, v] of Object.entries(p)) { out[k] = mergeState(b[k], v); }
+  return out;
+}
+
+/** What an LG alert means: a finished cycle, a problem, or neither (just logged). */
+export function alertKind(pushCode: string): 'finished' | 'problem' | 'other' {
+  if (/ERROR|FAIL/.test(pushCode)) { return 'problem'; }
+  if (/COMPLETE|FINISH|DONE/.test(pushCode)) { return 'finished'; }
+  return 'other';
+}
+
+/** Which machine an alert is about, for a WashTower that has both (WASHING_… or DRYING_…). */
+export function alertFor(pushCode: string): LaundryKind | undefined {
+  if (pushCode.startsWith('WASHING') || pushCode.includes('WASH')) { return 'washer'; }
+  if (pushCode.startsWith('DRYING') || pushCode.includes('DRY')) { return 'dryer'; }
+  return undefined;
+}
+
 /** The command body for an operation (START, STOP, POWER_OFF) on a unit. */
 export function operationPayload(unit: LaundryUnit, operation: string): Record<string, unknown> {
   const opKey = unit.kind === 'washer' ? 'washerOperationMode' : 'dryerOperationMode';

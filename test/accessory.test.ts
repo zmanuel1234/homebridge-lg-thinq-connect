@@ -177,6 +177,45 @@ function defineTests(hap: Hap): void {
     assert.equal(value(again.laundry.valve.getCharacteristic(C.ConfiguredName)), 'Laundry room washer');
   });
 
+  test('LG\'s "finished" alert: done right away, until the machine is switched off or starts again', () => {
+    const { laundry, lines } = setup();
+    laundry.update(running({ remaining: 60 }));
+    laundry.alert('finished', 'WASHING_IS_COMPLETE');
+    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.ok(lines.includes('info: [Washer] LG says the cycle is finished.'));
+    laundry.update(status({ state: 'END', done: true }));
+    laundry.update(status());
+    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+  });
+
+  test('LG\'s "finished" alert when the machine is already off: a brief done', () => {
+    const { laundry } = setup();
+    laundry.update(status());
+    laundry.alert('finished', 'DRYING_IS_COMPLETE');
+    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    laundry.stop();
+  });
+
+  test('LG\'s problem alert (drying failed): the problem sensor opens until the next cycle', () => {
+    const { laundry, lines } = setup();
+    laundry.update(status({ state: 'END', done: true }));
+    laundry.alert('problem', 'DRYING_FAILED');
+    assert.equal(value(laundry.problemSensor.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_NOT_DETECTED);
+    assert.equal(value(laundry.valve.getCharacteristic(C.StatusFault)), C.StatusFault.GENERAL_FAULT);
+    assert.ok(lines.includes('warn: [Washer] LG alert: Drying failed.'));
+    laundry.update(status({ state: 'END', done: true }));
+    assert.equal(value(laundry.problemSensor.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_NOT_DETECTED, 'still open');
+    laundry.update(running());
+    assert.equal(value(laundry.problemSensor.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_DETECTED);
+  });
+
+  test('other LG alerts are only logged', () => {
+    const { laundry, lines } = setup();
+    laundry.alert('other', 'TUB_CLEAN_RECOMMENDED');
+    assert.ok(lines.includes('info: [Washer] LG alert: Tub clean recommended.'));
+    assert.equal(value(laundry.problemSensor.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_DETECTED);
+  });
+
   test('tapping the tile with control off: refused, the tile snaps back, the log says why', async () => {
     const { laundry, lines, sent } = setup();
     laundry.update(running({ remoteControl: true }));

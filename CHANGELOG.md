@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0-beta.2 - 2026-11-23
+
+### Added
+- **Live updates from LG** (on by default): state changes and alerts arrive the moment they
+  happen, instead of at the next check. LG's "washing complete" and "drying complete" alerts
+  trigger the done sensor right away; "drying failed" and "error during washing" open the problem
+  sensor until the next cycle starts or the machine is switched off. Scheduled checks continue as a
+  backup (every 10 minutes idle, 2 minutes during a cycle, while live updates work). The plugin
+  reconnects on its own after a drop and still has no dependencies to install.
+
+### Changed
+- Friendlier words in the log and phase sensor names: Paused, Ready, Detecting load, Finished, and
+  Washing or Drying for the main phase.
+
 ## 0.1.0-beta.1 - 2026-11-23
 
 First version.

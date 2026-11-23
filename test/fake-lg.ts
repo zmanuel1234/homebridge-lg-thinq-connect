@@ -31,6 +31,11 @@ export class FakeLG {
   devices: FakeDevice[] = realDevices();
   /** Set to make the next requests fail: [HTTP status, LG code, message]. */
   failWith: [number, string, string] | null = null;
+  /** The message server LG's route answer names. */
+  mqttServer = 'ssl://example-ats.iot.us-west-2.amazonaws.com:8883';
+  /** Certificates issued, and devices subscribed to events and alerts. */
+  readonly certificates: string[] = [];
+  readonly subscribed = { event: [] as string[], push: [] as string[] };
   private server: Server | undefined;
   url = '';
 
@@ -66,6 +71,26 @@ export class FakeLG {
     }
     for (const h of ['x-country', 'x-message-id', 'x-client-id', 'x-api-key', 'x-service-phase']) {
       if (!req.headers[h]) { return [400, { error: { code: '1101', message: `Missing ${h}` } }]; }
+    }
+    if (path === 'route') {
+      return [200, { response: { apiServer: 'https://api-aic.lgthinq.com', mqttServer: this.mqttServer } }];
+    }
+    if (path === 'client' && req.method === 'POST') {
+      return [200, { response: {} }];
+    }
+    if (path === 'client/certificate' && req.method === 'POST') {
+      const csr = String((body as { csr?: unknown } | undefined)?.csr ?? '');
+      if (!csr.startsWith('-----BEGIN CERTIFICATE REQUEST-----')) { return [400, { error: { code: '1101', message: 'Bad CSR' } }]; }
+      this.certificates.push(csr);
+      return [200, { response: { result: { certificatePem: `CERT-${this.certificates.length}`, subscriptions: [`app/clients/${String(req.headers['x-client-id'])}/push`] } } }];
+    }
+    const sub = /^(event|push)\/([^/]+)\/subscribe$/.exec(path);
+    if (sub && req.method === 'POST') {
+      const list = this.subscribed[sub[1] as 'event' | 'push'];
+      const id = decodeURIComponent(sub[2]);
+      if (list.includes(id)) { return [400, { error: { code: '1207', message: 'Already subscribed push' } }]; }
+      list.push(id);
+      return [200, { response: {} }];
     }
     if (path === 'devices') {
       return [200, { response: this.devices.map((d) => ({ deviceId: d.deviceId, deviceInfo: d.deviceInfo })) }];
