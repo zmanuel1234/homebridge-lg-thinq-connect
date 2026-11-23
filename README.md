@@ -18,12 +18,15 @@ finishes or stops on an error, and sensors for automations. Other LG appliances 
 Each washer or dryer shows up as:
 
 - **The machine** (a valve tile): on while it runs, with the **minutes left** on the tile. While
-  paused, it's off and keeps the time left.
+  paused, it's off and keeps the time left. For the first minute or so of a wash the machine is
+  still sensing the load and hasn't worked out the time, so none is shown yet.
 - **"Washer done"** (occupancy sensor): detected when the cycle finishes, until the machine
   starts again or is switched off. **Turn on notifications for it** in the Home app to be told
   when the laundry is ready.
 - **"Washer problem"** (contact sensor): open while the machine reports an error (door, drain,
-  water supply, unbalanced load and so on). The machine's tile also shows a fault.
+  water supply, unbalanced load and so on), or after LG's "drying failed" or "error during
+  washing" alert, until the next cycle starts or the machine is switched off. The machine's tile
+  also shows a fault.
 - **Phase sensors** (optional): a sensor that's on during a phase you choose, such as
   *Spinning* or *Drying*, for automations like "turn on the fan while the washer spins".
 
@@ -74,20 +77,30 @@ create a new one.
 | Personal access token | | Your token from connect-pat.lgthinq.com |
 | Country | US | The country of your LG account (two letters) |
 | Allow starting and pausing | Off | Tapping a machine's tile starts, pauses or resumes it (needs Remote Start on the machine) |
+| Live updates from LG | On | Changes and alerts arrive the moment they happen; scheduled checks continue as a backup |
 | Phase sensors | None | Extra sensors that are on during a chosen phase |
 | Leave out these appliances | None | Names, as in the ThinQ app, to keep out of the Home app |
-| Check every (idle) | 60 s | How often to ask LG while nothing runs |
-| Check every (during a cycle) | 30 s | How often to ask while a cycle runs |
+| Check every (idle) | 60 s | How often to ask LG while nothing runs (at least 10 min while live updates work) |
+| Check every (during a cycle) | 30 s | How often to ask while a cycle runs (at least 2 min while live updates work) |
 
 ## How it works
 
-The plugin asks LG's ThinQ Connect API for each appliance's state on a schedule: every 60 seconds
-while idle and every 30 seconds during a cycle. If LG can't be reached, the appliances stay in
-the Home app and show a fault after three failed checks; the plugin keeps trying. If the
-appliance list can't be fetched at startup, nothing is removed from the Home app.
+**Live updates.** The plugin connects to LG's message server, the way LG's own toolkit and Home
+Assistant do: LG signs a certificate for a key made on your Homebridge machine, and then sends
+each change (phase, time left, finished, error) and each alert (cycle complete, drying failed) the
+moment it happens. The key and certificate are kept in Homebridge's storage folder
+(`lg-thinq-connect/`), readable only by Homebridge's user, so a restart reconnects without a new
+certificate. If the connection drops, the plugin reconnects on its own, and checks on a schedule
+meanwhile.
 
-The plugin has no dependencies to install: it talks to LG's API directly, with the requests and
-headers LG documents and uses in its own toolkit.
+**Scheduled checks.** The plugin also asks LG for each appliance's state: every 60 seconds while
+idle and every 30 seconds during a cycle, or every 10 and 2 minutes as a backup while live
+updates work. If LG can't be reached, the appliances stay in the Home app and show a fault after
+three failed checks; the plugin keeps trying. If the appliance list can't be fetched at startup,
+nothing is removed from the Home app.
+
+The plugin has no dependencies to install: it talks to LG's API and message server directly,
+with the requests and headers LG documents and uses in its own toolkit.
 
 ## More appliances
 

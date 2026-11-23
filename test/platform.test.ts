@@ -8,6 +8,11 @@ import type * as HapNodejs from '@homebridge/hap-nodejs';
 import { LGThinQPlatform, readSettings } from '../src/platform';
 import { ThinQClient } from '../src/api';
 import { FakeLG } from './fake-lg';
+import { FakeBroker } from './fake-broker';
+import { connect } from 'node:net';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 type Hap = typeof HapNodejs;
 let hap: Hap | null = null;
@@ -21,12 +26,12 @@ try {
 
 test('settings: defaults, limits and clean-up', () => {
   const s = readSettings({ platform: 'LGThinQConnect' } as PlatformConfig);
-  assert.deepEqual(s, { token: '', country: 'US', pollInterval: 60, runningPollInterval: 30, allowControl: false, phaseSensors: [], ignore: [] });
+  assert.deepEqual(s, { token: '', country: 'US', pollInterval: 60, runningPollInterval: 30, allowControl: false, liveUpdates: true, phaseSensors: [], ignore: [] });
   const t = readSettings({
     platform: 'LGThinQConnect', token: ' abc ', country: 'gb', pollInterval: 5, runningPollInterval: '9999',
-    allowControl: 'yes', phaseSensors: ['SPINNING', '', 3], ignore: [' Dryer '],
+    allowControl: 'yes', liveUpdates: false, phaseSensors: ['SPINNING', '', 3], ignore: [' Dryer '],
   } as unknown as PlatformConfig);
-  assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, phaseSensors: ['SPINNING'], ignore: ['dryer'] });
+  assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, liveUpdates: false, phaseSensors: ['SPINNING'], ignore: ['dryer'] });
 });
 
 if (!hap) {
@@ -56,10 +61,17 @@ function defineTests(hap: Hap): void {
     t.after(async () => { platforms.forEach((p) => p.stop()); await lg.stop(); });
 
     /** Start a platform with these cached accessories; resolves once its first discovery is done. */
-    const start = async (cached: PlatformAccessory[] = [], over: Record<string, unknown> = {}) => {
-      const cfg = { platform: 'LGThinQConnect', token: lg.token, ...config, ...over } as PlatformConfig;
+    const start = async (cached: PlatformAccessory[] = [], over: Record<string, unknown> = {}, broker?: FakeBroker) => {
+      const cfg = { platform: 'LGThinQConnect', token: lg.token, liveUpdates: !!broker, ...config, ...over } as PlatformConfig;
       const client = new ThinQClient({ token: String(cfg.token || 'x'), country: 'US', baseUrl: lg.url });
       const platform = new LGThinQPlatform(log, cfg, api as unknown as API, client);
+      if (broker) {
+        platform.liveOverrides = {
+          connect: () => connect(broker.port, '127.0.0.1'),
+          newIdentity: () => ({ privateKeyPem: 'KEY', csrPem: '-----BEGIN CERTIFICATE REQUEST-----\nx\n-----END CERTIFICATE REQUEST-----\n' }),
+          storageFile: join(mkdtempSync(join(tmpdir(), 'lg-platform-')), 'live.json'),
+        };
+      }
       platforms.push(platform);
       cached.forEach((a) => platform.configureAccessory(a));
       await platform.start();
@@ -180,5 +192,66 @@ function defineTests(hap: Hap): void {
     const sent = hb.lg.requests.find((r) => r.method === 'POST');
     assert.equal(sent?.path, 'devices/device-1/control');
     assert.deepEqual(sent?.body, { operation: { washerOperationMode: 'STOP' }, location: { locationName: 'MAIN' } });
+  });
+
+  const until = async (check: () => boolean): Promise<void> => {
+    const end = Date.now() + 3000;
+    while (!check()) {
+      if (Date.now() > end) { throw new Error('timed out waiting'); }
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  };
+
+  test('live updates: connected after finding the appliances; a state update moves the tile right away', async (t) => {
+    const hb = await homebridge(t);
+    const broker = await new FakeBroker().start();
+    t.after(() => broker.stop());
+    const platform = await hb.start([], {}, broker);
+    await until(() => !!platform.live?.connected);
+    assert.deepEqual(hb.lg.subscribed.event, ['device-1', 'device-2']);
+    const topic = broker.clients[0].topics[0];
+    broker.publish(topic, { deviceId: 'device-1', deviceType: 'DEVICE_WASHER', pushType: 'DEVICE_STATUS',
+      report: [{ runState: { currentState: 'RINSING' }, timer: { remainHour: 0, remainMinute: 25, totalHour: 1, totalMinute: 0 }, location: { locationName: 'MAIN' } }] });
+    const washer = platform.machines[0].units[0];
+    await until(() => washer.status?.state === 'RINSING');
+    assert.equal(washer.valve.getCharacteristic(C.RemainingDuration).value, 25 * 60);
+    assert.ok(hb.lines.includes('info: [Front Load Washer] Rinsing, 25 min left.'));
+    // Scheduled checks become a backup while live updates work
+    const interval = (platform as unknown as { interval(m: unknown): number }).interval.bind(platform);
+    assert.equal(interval(platform.machines[0]), 120);
+    assert.equal(interval(platform.machines[1]), 600);
+    broker.dropAll();
+    await until(() => !platform.live?.connected);
+    assert.equal(interval(platform.machines[1]), 60, 'back to normal checks');
+  });
+
+  test('live alerts: the dryer\'s "drying failed" opens its problem sensor; "complete" triggers done', async (t) => {
+    const hb = await homebridge(t);
+    const broker = await new FakeBroker().start();
+    t.after(() => broker.stop());
+    const platform = await hb.start([], {}, broker);
+    await until(() => !!platform.live?.connected);
+    const topic = broker.clients[0].topics[0];
+    const dryer = platform.machines[1].units[0];
+    // The dryer finishing: drying, then LG's alerts
+    platform.onLive({ deviceId: 'device-2', pushType: 'DEVICE_STATUS', report: { runState: { currentState: 'COOLING' } } });
+    broker.publish(topic, { deviceId: 'device-2', pushType: 'DEVICE_PUSH', pushCode: 'DRYING_FAILED' });
+    await until(() => !!dryer.problemAlert);
+    assert.equal(dryer.problemSensor.getCharacteristic(C.ContactSensorState).value, C.ContactSensorState.CONTACT_NOT_DETECTED);
+    broker.publish(topic, { deviceId: 'device-2', pushType: 'DEVICE_PUSH', pushCode: 'DRYING_IS_COMPLETE' });
+    await until(() => dryer.done);
+    assert.equal(dryer.doneSensor.getCharacteristic(C.OccupancyDetected).value, C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.ok(hb.lines.includes('warn: [Dryer] LG alert: Drying failed.'));
+    // Unknown appliances and types are ignored quietly
+    platform.onLive({ deviceId: 'nope', pushType: 'DEVICE_STATUS', report: {} });
+    platform.onLive({ deviceId: 'device-2', pushType: 'DEVICE_REGISTERED' });
+    assert.ok(hb.lines.some((l) => l.startsWith('debug: Live update for an appliance not in the Home app')));
+  });
+
+  test('live updates off in the settings: no connection attempted', async (t) => {
+    const hb = await homebridge(t);
+    const platform = await hb.start();
+    assert.equal(platform.live, undefined);
+    assert.ok(!hb.lg.requests.some((r) => r.path === 'route'));
   });
 }

@@ -31,6 +31,12 @@
         "default": false,
         "description": "Tapping the machine's tile starts, pauses or resumes it. LG only accepts this after Remote Start is pressed on the machine. Off: the tile only shows the cycle."
       },
+      "liveUpdates": {
+        "title": "Live updates from LG",
+        "type": "boolean",
+        "default": true,
+        "description": "LG sends changes and alerts (cycle complete, drying failed) the moment they happen. Scheduled checks continue as a backup. Turn off only if live updates cause problems."
+      },
       "phaseSensors": {
         "title": "Phase sensors",
         "type": "array",
@@ -41,10 +47,10 @@
           "oneOf": [
             { "title": "Detecting load", "enum": ["DETECTING"] },
             { "title": "Prewash", "enum": ["PREWASH"] },
-            { "title": "Washing", "enum": ["RUNNING"] },
+            { "title": "Main phase (washing, or drying on a dryer)", "enum": ["RUNNING"] },
             { "title": "Rinsing", "enum": ["RINSING"] },
             { "title": "Spinning", "enum": ["SPINNING"] },
-            { "title": "Drying", "enum": ["DRYING"] },
+            { "title": "Drying (washer-dryer combos)", "enum": ["DRYING"] },
             { "title": "Cooling (dryer)", "enum": ["COOLING"] },
             { "title": "Wrinkle care (dryer)", "enum": ["WRINKLE_CARE"] },
             { "title": "Rinse hold", "enum": ["RINSE_HOLD"] },
@@ -84,6 +90,7 @@
     "token",
     "country",
     "allowControl",
+    "liveUpdates",
     "phaseSensors",
     {
       "type": "fieldset",

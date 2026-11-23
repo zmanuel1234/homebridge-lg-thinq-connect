@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
+import { join } from 'node:path';
 import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { type Device, ThinQClient, ThinQError } from './api';
-import { TESTED_TYPES, isLaundry, laundryStatus, laundryUnits, stateLabel } from './laundry';
+import { type Device, ThinQClient, ThinQError, clientIdFor } from './api';
+import { TESTED_TYPES, alertFor, alertKind, isLaundry, laundryStatus, laundryUnits, mergeState, stateLabel } from './laundry';
 import { type LaundryContext, LaundryAccessory } from './accessory';
+import { type LiveClient, type LiveMessage, type LiveOptions, LiveUpdates } from './live';
 
 /** What the platform needs from LG; ThinQClient in Homebridge, a stand-in in tests. */
 export interface Client {
@@ -13,6 +15,10 @@ export interface Client {
   control(deviceId: string, payload: Record<string, unknown>): Promise<unknown>;
 }
 
+const isLiveClient = (c: Client): c is Client & LiveClient =>
+  ['messageServer', 'registerClient', 'issueCertificate', 'subscribeEvents', 'subscribePush']
+    .every((m) => typeof (c as unknown as Record<string, unknown>)[m] === 'function');
+
 export interface Settings {
   token: string;
   country: string;
@@ -20,6 +26,8 @@ export interface Settings {
   pollInterval: number;
   runningPollInterval: number;
   allowControl: boolean;
+  /** Changes pushed by LG the moment they happen, with scheduled checks as a backup. */
+  liveUpdates: boolean;
   phaseSensors: string[];
   /** Appliance names (as in the ThinQ app) to leave out of the Home app. */
   ignore: string[];
@@ -39,6 +47,7 @@ export function readSettings(config: PlatformConfig): Settings {
     pollInterval: clamp(config.pollInterval, 30, 3600, 60),
     runningPollInterval: clamp(config.runningPollInterval, 15, 600, 30),
     allowControl: config.allowControl === true,
+    liveUpdates: config.liveUpdates !== false,
     phaseSensors: strings(config.phaseSensors),
     ignore: strings(config.ignore).map((s) => s.toLowerCase()),
   };
@@ -48,6 +57,8 @@ export function readSettings(config: PlatformConfig): Settings {
 interface Machine {
   device: Device;
   units: LaundryAccessory[];
+  /** The last full state from LG, which live updates are merged into. */
+  state?: unknown;
   timer?: NodeJS.Timeout;
   failures: number;
 }
@@ -58,6 +69,9 @@ const DISCOVERY_RETRY = [60, 120, 300, 900];
 const AUTH_RETRY = 900;
 /** Failed checks in a row before the Home app shows the machine with a fault. */
 const FAULT_AFTER = 3;
+/** With live updates connected, scheduled checks are only a backup: at least this far apart (s). */
+const LIVE_IDLE = 600;
+const LIVE_RUNNING = 120;
 
 export class LGThinQPlatform implements DynamicPlatformPlugin {
   readonly log: Logging;
@@ -67,6 +81,9 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
   readonly machines: Machine[] = [];
   settings: Settings;
   client: Client | undefined;
+  live: LiveUpdates | undefined;
+  /** For tests: replaces parts of the live-update setup (connection, key, storage). */
+  liveOverrides: Partial<LiveOptions> = {};
   private discoveryTimer: NodeJS.Timeout | undefined;
   private discoveryTries = 0;
   stopped = false;
@@ -154,7 +171,60 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     }
     if (!this.machines.length) {
       this.log.warn('No supported LG appliances found on this account (this version supports washers and dryers).');
+    } else {
+      this.startLive();
     }
+  }
+
+  private startLive(): void {
+    if (!this.settings.liveUpdates || this.live || !this.client || !isLiveClient(this.client)) { return; }
+    const clientId = clientIdFor(this.settings.token);
+    const storageDir = (this.api.user as { storagePath?: () => string } | undefined)?.storagePath?.() || '.';
+    this.live = new LiveUpdates({
+      client: this.client,
+      clientId,
+      log: this.log,
+      storageFile: join(storageDir, 'lg-thinq-connect', `live-${clientId.slice(-16)}.json`),
+      onMessage: (m) => this.onLive(m),
+      onConnected: (connected) => {
+        // Back to normal checks soon after losing live updates
+        if (!connected) { this.machines.forEach((m) => this.schedule(m, 5)); }
+      },
+      ...this.liveOverrides,
+    });
+    void this.live.start(this.machines.map((m) => m.device.deviceId));
+  }
+
+  /** A live update from LG: a partial state, or an alert. */
+  onLive(message: LiveMessage): void {
+    const machine = this.machines.find((m) => m.device.deviceId === message.deviceId);
+    if (!machine) {
+      this.log.debug(`Live update for an appliance not in the Home app (${message.pushType}), ignored.`);
+      return;
+    }
+    const name = machine.device.deviceInfo.alias;
+    if (message.pushType === 'DEVICE_STATUS' && message.report !== undefined) {
+      this.log.debug(`[${name}] Live update: ${JSON.stringify(message.report)}`);
+      machine.state = mergeState(machine.state, message.report);
+      for (const acc of machine.units) { acc.update(laundryStatus(acc.unit, machine.state)); }
+      this.schedule(machine, this.interval(machine));
+    } else if (message.pushType === 'DEVICE_PUSH' && message.pushCode) {
+      const kind = alertKind(message.pushCode);
+      const target = alertFor(message.pushCode);
+      const units = machine.units.length > 1 && target ? machine.units.filter((u) => u.unit.kind === target) : machine.units;
+      (units.length ? units : machine.units).forEach((u) => u.alert(kind, message.pushCode!));
+      this.schedule(machine, 2); // confirm with LG's full state
+    } else {
+      this.log.debug(`[${name}] Live update of type ${message.pushType}, ignored.`);
+    }
+  }
+
+  /** Seconds until the next scheduled check for a machine. */
+  private interval(machine: Machine): number {
+    const running = machine.units.some((u) => u.status?.running || u.status?.paused);
+    const live = !!this.live?.connected;
+    if (running) { return live ? Math.max(this.settings.runningPollInterval, LIVE_RUNNING) : this.settings.runningPollInterval; }
+    return live ? Math.max(this.settings.pollInterval, LIVE_IDLE) : this.settings.pollInterval;
   }
 
   private async setupLaundry(device: Device, active: Set<string>): Promise<void> {
@@ -201,16 +271,18 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     if (this.stopped) { return; }
     clearTimeout(machine.timer);
     const name = machine.device.deviceInfo.alias;
-    let next = this.settings.pollInterval;
+    let next: number;
     try {
       const state = await this.client!.state(machine.device.deviceId);
       if (machine.failures >= FAULT_AFTER) { this.log.info(`[${name}] Reachable again.`); }
       machine.failures = 0;
+      machine.state = state;
       for (const acc of machine.units) {
         acc.update(laundryStatus(acc.unit, state));
       }
-      if (machine.units.some((u) => u.status?.running || u.status?.paused)) { next = this.settings.runningPollInterval; }
+      next = this.interval(machine);
     } catch (err) {
+      next = this.settings.pollInterval;
       machine.failures++;
       const auth = err instanceof ThinQError && err.isAuth;
       if (auth) { next = AUTH_RETRY; }
@@ -234,6 +306,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
   stop(): void {
     this.stopped = true;
     clearTimeout(this.discoveryTimer);
+    this.live?.stop();
     for (const m of this.machines) {
       clearTimeout(m.timer);
       m.units.forEach((u) => u.stop());

@@ -161,6 +161,50 @@ export function laundryStatus(unit: LaundryUnit, state: unknown): LaundryStatus 
   };
 }
 
+/**
+ * A live update applied to the last known state. LG sends only what changed, in the same shape
+ * as the full state: objects are merged key by key, and a washer's list of drums is matched by
+ * location (a drum not in the update keeps its last state).
+ */
+export function mergeState(base: unknown, patch: unknown): unknown {
+  if (patch === undefined) { return base; }
+  if (Array.isArray(patch)) {
+    if (!Array.isArray(base)) { return patch; }
+    const merged: unknown[] = (base as unknown[]).slice();
+    for (const item of patch as unknown[]) {
+      const loc = locationOf(asObject(item) || {});
+      const i = loc ? merged.findIndex((b) => locationOf(asObject(b) || {}) === loc) : (merged.length === 1 ? 0 : -1);
+      if (i >= 0) { merged[i] = mergeState(merged[i], item); } else { merged.push(item); }
+    }
+    return merged;
+  }
+  const p = asObject(patch);
+  const b = asObject(base);
+  if (!p) { return patch; }
+  if (!b) {
+    // A list-shaped state (washer) patched with one drum's object
+    if (Array.isArray(base)) { return mergeState(base, [patch]); }
+    return patch;
+  }
+  const out: Props = { ...b };
+  for (const [k, v] of Object.entries(p)) { out[k] = mergeState(b[k], v); }
+  return out;
+}
+
+/** What an LG alert means: a finished cycle, a problem, or neither (just logged). */
+export function alertKind(pushCode: string): 'finished' | 'problem' | 'other' {
+  if (/ERROR|FAIL/.test(pushCode)) { return 'problem'; }
+  if (/COMPLETE|FINISH|DONE/.test(pushCode)) { return 'finished'; }
+  return 'other';
+}
+
+/** Which machine an alert is about, for a WashTower that has both (WASHING_… or DRYING_…). */
+export function alertFor(pushCode: string): LaundryKind | undefined {
+  if (pushCode.startsWith('WASHING') || pushCode.includes('WASH')) { return 'washer'; }
+  if (pushCode.startsWith('DRYING') || pushCode.includes('DRY')) { return 'dryer'; }
+  return undefined;
+}
+
 /** The command body for an operation (START, STOP, POWER_OFF) on a unit. */
 export function operationPayload(unit: LaundryUnit, operation: string): Record<string, unknown> {
   const opKey = unit.kind === 'washer' ? 'washerOperationMode' : 'dryerOperationMode';
@@ -169,9 +213,25 @@ export function operationPayload(unit: LaundryUnit, operation: string): Record<s
   return unit.towerKey ? { [unit.towerKey]: body } : body;
 }
 
-/** "Spinning" from SPINNING, for log lines and sensor names. */
-export function stateLabel(state: string): string {
-  const words = state.toLowerCase().split('_').filter(Boolean);
-  const text = words.join(' ');
+// Words for LG's states, where its own name reads oddly. RUNNING is the main phase: washing or drying.
+const LABELS: Record<string, string> = {
+  POWER_OFF: 'Off',
+  INITIAL: 'Ready',
+  PAUSE: 'Paused',
+  DETECTING: 'Detecting load',
+  END: 'Finished',
+  RESERVED: 'Delayed start waiting',
+  FROZEN_PREVENT_INITIAL: 'Freeze protection',
+  FROZEN_PREVENT_RUNNING: 'Freeze protection running',
+  FROZEN_PREVENT_PAUSE: 'Freeze protection paused',
+  ADD_DRAIN: 'Draining',
+  DETERGENT_AMOUNT: 'Measuring detergent',
+};
+
+/** "Spinning" from SPINNING, "Paused" from PAUSE, "Washing" or "Drying" from RUNNING: for the log and sensor names. */
+export function stateLabel(state: string, kind: LaundryKind = 'washer'): string {
+  if (state === 'RUNNING') { return kind === 'washer' ? 'Washing' : 'Drying'; }
+  if (LABELS[state]) { return LABELS[state]; }
+  const text = state.toLowerCase().split('_').filter(Boolean).join(' ');
   return text ? text[0].toUpperCase() + text.slice(1) : state;
 }

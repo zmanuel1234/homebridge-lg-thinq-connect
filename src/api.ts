@@ -12,6 +12,9 @@ export const API_KEY = 'ZkVkqP9jq44HuWkbNX9EKzZmmn7ToPY3A4vQ4tY8';
 
 export type Region = 'aic' | 'eic' | 'kic';
 
+/** LG's error code for "this subscription already exists". */
+export const ALREADY_SUBSCRIBED = '1207';
+
 // Which LG server holds accounts from each country (LG's toolkit, CountryPreset).
 const REGIONS: Record<Region, string> = {
   kic: 'AU BD CN HK ID IN JP KH KR LA LK MM MY NP NZ PH SG TH TW VN',
@@ -138,6 +141,53 @@ export class ThinQClient {
   /** Send a command. LG refuses it unless the appliance can take it right now (conditional control). */
   control(deviceId: string, payload: Record<string, unknown>): Promise<unknown> {
     return this.request('POST', `devices/${encodeURIComponent(deviceId)}/control`, payload, { 'x-conditional-control': 'true' });
+  }
+
+  // ---- Live updates (MQTT) ----
+
+  /** The message server for this account's region: host and port. */
+  async messageServer(): Promise<{ host: string; port: number }> {
+    const server = field(await this.request('GET', 'route'), 'mqttServer');
+    if (typeof server !== 'string' || !server) { throw new ThinQError(0, '', 'LG gave no message server'); }
+    // e.g. ssl://a3phael99lf879-ats.iot.us-west-2.amazonaws.com:8883
+    const url = new URL(server.includes('://') ? server : `ssl://${server}`);
+    return { host: url.hostname, port: url.port ? Number(url.port) : 8883 };
+  }
+
+  /** Registers this client (its x-client-id) for live updates; fine if it already is. */
+  async registerClient(): Promise<void> {
+    await this.request('POST', 'client', { 'type': 'MQTT', 'service-code': 'SVC202', 'device-type': '607', 'allowExist': true });
+  }
+
+  /** Has LG sign a certificate request; returns the certificate and the topic to subscribe to. */
+  async issueCertificate(csrPem: string): Promise<{ certificatePem: string; topic: string }> {
+    const result = field(await this.request('POST', 'client/certificate', { 'service-code': 'SVC202', 'csr': csrPem }), 'result');
+    const certificatePem = field(result, 'certificatePem');
+    const topics = field(result, 'subscriptions');
+    const topic: unknown = Array.isArray(topics) ? (topics as unknown[])[0] : undefined;
+    if (typeof certificatePem !== 'string' || typeof topic !== 'string') {
+      throw new ThinQError(0, '', 'LG\'s certificate answer is missing the certificate or topic');
+    }
+    return { certificatePem, topic };
+  }
+
+  /** Asks LG to send an appliance's state changes as live updates (for about six months). */
+  async subscribeEvents(deviceId: string): Promise<void> {
+    await this.alreadyOk(this.request('POST', `event/${encodeURIComponent(deviceId)}/subscribe`, { expire: { unit: 'HOUR', timer: 4464 } }));
+  }
+
+  /** Asks LG to send an appliance's alerts (cycle complete, error) as live updates. */
+  async subscribePush(deviceId: string): Promise<void> {
+    await this.alreadyOk(this.request('POST', `push/${encodeURIComponent(deviceId)}/subscribe`));
+  }
+
+  /** LG answers 1207 when a subscription already exists: that's success here. */
+  private async alreadyOk(p: Promise<unknown>): Promise<void> {
+    try {
+      await p;
+    } catch (err) {
+      if (!(err instanceof ThinQError && err.code === ALREADY_SUBSCRIBED)) { throw err; }
+    }
   }
 
   private async request(method: string, path: string, body?: unknown, extra: Record<string, string> = {}): Promise<unknown> {
