@@ -1,0 +1,38 @@
+name: New appliance
+description: Ask for an LG appliance this plugin doesn't support yet, or that works badly.
+title: "Add: "
+labels: [new appliance]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping add an appliance. The diagnostics file is what makes it possible: it shows what LG reports and accepts for your model.
+  - type: input
+    id: appliance
+    attributes:
+      label: Appliance and model
+      description: As in the ThinQ app, and the model from the plugin's log or the diagnostics file.
+      placeholder: Refrigerator, LRMVS3006S
+    validations:
+      required: true
+  - type: textarea
+    id: wanted
+    attributes:
+      label: What would you like in the Home app?
+      placeholder: Door open alert, temperatures, ice maker on/off...
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics file
+      description: |
+        On your Homebridge machine run `lg-thinq-diagnostics --country US` (your country), enter your token when asked (it isn't shown), and attach the `lg-diagnostics.json` it saves. Look it over first: device IDs and serial numbers are removed.
+    validations:
+      required: true
+  - type: checkboxes
+    id: test
+    attributes:
+      label: Testing
+      options:
+        - label: I can try a beta version and report back.
