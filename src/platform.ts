@@ -148,6 +148,8 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
   }
 
   /** List the account's appliances and set up the supported ones. */
+  private signedIn = false;
+
   async discover(): Promise<void> {
     if (this.stopped || !this.client) { return; }
     let devices: Device[];
@@ -163,6 +165,11 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       return;
     }
     this.discoveryTries = 0;
+    if (!this.signedIn) {
+      this.signedIn = true;
+      const names = devices.map((d) => d.deviceInfo.alias).filter(Boolean);
+      this.log.info(`Signed in to LG (${this.settings.country}): found ${names.length ? names.join(', ') : 'no appliances'}.`);
+    }
 
     const active = new Set<string>();
     for (const device of devices) {

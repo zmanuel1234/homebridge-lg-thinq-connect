@@ -1,0 +1,73 @@
+<div class="card card-body mb-3">
+  <h5 class="mb-2">Signing in to LG</h5>
+  <ol class="mb-2 ps-3">
+    <li>On a computer, open
+      <a href="https://connect-pat.lgthinq.com" target="_blank" rel="noopener">connect-pat.lgthinq.com</a>.</li>
+    <li>Sign in with the <strong>same LG account the ThinQ app shows your appliances on</strong>.
+      If you signed up in the app with Google, Apple or Facebook, or aren't sure which account it is,
+      choose <strong>sign in with QR code</strong> and scan it with the phone that has the ThinQ app.</li>
+    <li>Choose <strong>ADD NEW TOKEN</strong>, name it (for example <em>Homebridge</em>), <strong>tick every permission</strong>
+      under <em>Scope of authority</em>, then choose <strong>CREATE TOKEN</strong>.</li>
+    <li>Copy the token, paste it in the <strong>Token</strong> box below, set your <strong>Country</strong>, then press <strong>Check token</strong>.</li>
+  </ol>
+  <p class="small text-muted mb-2">The token works until you delete it on that page. Keep it private: it's only stored in this
+    Homebridge's settings. Checking it here doesn't save anything; press <strong>Save</strong> when you're done.</p>
+  <div>
+    <button id="lg-check" type="button" class="btn btn-primary m-0">Check token</button>
+  </div>
+  <div id="lg-result" class="mt-3" style="display: none"></div>
+</div>
+
+<script>
+  (async () => {
+    const { homebridge } = window;
+    const button = document.getElementById('lg-check');
+    const result = document.getElementById('lg-result');
+    const SUPPORT = {
+      supported: 'supported',
+      experimental: 'experimental: turn on "Experimental appliances" to add it',
+      basic: 'not mapped yet: with "Experimental appliances" on, it\'s added only if LG reports something useful',
+    };
+
+    let config = {};
+    try { [config = {}] = await homebridge.getPluginConfig(); } catch (e) { /* new install */ }
+    // The form below changes the config before it's saved: always check what's typed now
+    homebridge.addEventListener('configChanged', (event) => { config = (event.data && event.data[0]) || {}; });
+
+    function show(ok, message, appliances) {
+      result.replaceChildren();
+      result.className = 'mt-3 alert ' + (ok ? 'alert-success' : 'alert-danger');
+      const p = document.createElement('div');
+      p.textContent = message;
+      result.appendChild(p);
+      if (appliances && appliances.length) {
+        const ul = document.createElement('ul');
+        ul.className = 'mb-0 mt-2';
+        for (const a of appliances) {
+          const li = document.createElement('li');
+          li.textContent = a.name + ' (' + a.type.replace(/^DEVICE_/, '').replace(/_/g, ' ').toLowerCase() + '): ' + SUPPORT[a.support];
+          ul.appendChild(li);
+        }
+        result.appendChild(ul);
+      }
+      result.style.display = 'block';
+    }
+
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      homebridge.showSpinner();
+      try {
+        const answer = await homebridge.request('/check', { token: config.token, country: config.country });
+        show(answer.ok, answer.message, answer.appliances);
+      } catch (e) {
+        show(false, 'Couldn\'t check: ' + (e && e.message ? e.message : e));
+      } finally {
+        homebridge.hideSpinner();
+        button.disabled = false;
+      }
+    });
+
+    homebridge.showSchemaForm();
+    homebridge.hideSpinner();
+  })();
+</script>

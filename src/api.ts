@@ -61,22 +61,43 @@ export class ThinQError extends Error {
 
   /** True when the token is missing, wrong, expired or lacks a permission. */
   get isAuth(): boolean {
-    return this.status === 401 || this.status === 403;
+    return this.status === 401 || this.status === 403 || ['1103', '1218', '1302', '1303', '1305'].includes(this.code);
   }
 
   static describe(status: number, code: string, message: string): string {
     const lg = [code && `LG error ${code}`, message].filter(Boolean).join(': ');
     const base = status ? `HTTP ${status}${lg ? ` (${lg})` : ''}` : lg || 'no answer';
-    if (status === 401 || status === 403) {
-      return `${base}. Check the personal access token: it must be copied whole, not deleted at connect-pat.lgthinq.com, `
-        + 'and created with every device permission. The account must also be in the selected country.';
-    }
-    if (status === 429) {
-      return `${base}. LG is limiting how often this account can ask; the plugin will retry more slowly.`;
-    }
-    return base;
+    const hint = LG_HINTS[code] || (status === 401 || status === 403 ? TOKEN_HINT : status === 429 ? LG_HINTS['1306'] : '');
+    return hint ? `${base}. ${hint}` : base;
   }
 }
+
+const TOKEN_HINT = 'Check the personal access token: copied whole, still listed at connect-pat.lgthinq.com, '
+  + 'created with every permission ticked, on the LG account your appliances are on. See "Signing in" in the README.';
+
+/**
+ * What LG's error codes mean for the user (codes and names from LG's thinqconnect toolkit). Codes
+ * not listed get LG's own message only.
+ */
+const LG_HINTS: Record<string, string> = {
+  1103: TOKEN_HINT, // INVALID_TOKEN
+  1218: TOKEN_HINT, // INVALID_TOKEN_AGAIN
+  1302: TOKEN_HINT, // NOT_FOUND_TOKEN
+  1303: 'LG doesn\'t know this account. Create the token while signed in to the account your appliances are on.',
+  1304: 'LG wants its updated terms accepted: open the LG ThinQ app, accept them, then try again.',
+  1305: 'This token isn\'t allowed this request. Create a new token with every permission ticked.',
+  1306: 'LG is limiting how often this account can ask; the plugin will retry more slowly.',
+  1307: 'LG doesn\'t serve this account from the selected country. Set the country your LG account was created in.',
+  1308: 'This token can\'t control appliances. Create a new token with every permission ticked.',
+  1309: 'LG refused for now (often a country that doesn\'t match the account). Check the country, then try again later.',
+  1222: 'The appliance isn\'t connected to LG right now: check that it\'s on and on Wi-Fi (the ThinQ app shows it).',
+  1221: 'LG\'s official API doesn\'t support this appliance.',
+  2301: 'Press Remote Start on the appliance first.',
+  2302: 'The appliance can\'t do that in its current state.',
+  2303: 'The appliance reports an error; clear it on the appliance first.',
+  2304: 'The appliance is switched off.',
+  2209: 'The appliance answered LG too slowly; try again.',
+};
 
 export type FetchFn = (url: string, init: { method: string; headers: Record<string, string>; body?: string; signal: AbortSignal }) => Promise<{
   status: number;

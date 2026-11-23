@@ -2,6 +2,8 @@
   "pluginAlias": "LGThinQConnect",
   "pluginType": "platform",
   "singular": true,
+  "customUi": true,
+  "customUiPath": "./dist/homebridge-ui",
   "headerDisplay": "LG ThinQ appliances in Apple Home through LG's official ThinQ Connect API. Create a personal access token at [connect-pat.lgthinq.com](https://connect-pat.lgthinq.com) with every device permission ticked, and paste it below. Washers and dryers are supported; other LG appliances can be tried with \"Experimental appliances\".",
   "footerDisplay": "Problems or a new appliance to add? [Open an issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues).",
   "schema": {
@@ -57,17 +59,72 @@
         "items": {
           "type": "string",
           "oneOf": [
-            { "title": "Detecting load", "enum": ["DETECTING"] },
-            { "title": "Prewash", "enum": ["PREWASH"] },
-            { "title": "Main phase (washing, or drying on a dryer)", "enum": ["RUNNING"] },
-            { "title": "Rinsing", "enum": ["RINSING"] },
-            { "title": "Spinning", "enum": ["SPINNING"] },
-            { "title": "Drying (washer-dryer combos)", "enum": ["DRYING"] },
-            { "title": "Cooling (dryer)", "enum": ["COOLING"] },
-            { "title": "Wrinkle care (dryer)", "enum": ["WRINKLE_CARE"] },
-            { "title": "Rinse hold", "enum": ["RINSE_HOLD"] },
-            { "title": "Paused", "enum": ["PAUSE"] },
-            { "title": "Delayed start waiting", "enum": ["RESERVED"] }
+            {
+              "title": "Detecting load",
+              "enum": [
+                "DETECTING"
+              ]
+            },
+            {
+              "title": "Prewash",
+              "enum": [
+                "PREWASH"
+              ]
+            },
+            {
+              "title": "Main phase (washing, or drying on a dryer)",
+              "enum": [
+                "RUNNING"
+              ]
+            },
+            {
+              "title": "Rinsing",
+              "enum": [
+                "RINSING"
+              ]
+            },
+            {
+              "title": "Spinning",
+              "enum": [
+                "SPINNING"
+              ]
+            },
+            {
+              "title": "Drying (washer-dryer combos)",
+              "enum": [
+                "DRYING"
+              ]
+            },
+            {
+              "title": "Cooling (dryer)",
+              "enum": [
+                "COOLING"
+              ]
+            },
+            {
+              "title": "Wrinkle care (dryer)",
+              "enum": [
+                "WRINKLE_CARE"
+              ]
+            },
+            {
+              "title": "Rinse hold",
+              "enum": [
+                "RINSE_HOLD"
+              ]
+            },
+            {
+              "title": "Paused",
+              "enum": [
+                "PAUSE"
+              ]
+            },
+            {
+              "title": "Delayed start waiting",
+              "enum": [
+                "RESERVED"
+              ]
+            }
           ]
         }
       },
@@ -133,7 +190,9 @@
           "key": "ignore",
           "type": "array",
           "buttonText": "Add appliance",
-          "items": ["ignore[]"]
+          "items": [
+            "ignore[]"
+          ]
         },
         {
           "key": "pollInterval",

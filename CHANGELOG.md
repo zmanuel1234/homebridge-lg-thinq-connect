@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0-beta.5 - 2026-11-23
+
+### Added
+- **Check token** in the plugin's settings: step-by-step sign-in help, and a button that tries the
+  token with LG and lists the appliances it can see and how well each is supported, before you
+  save or restart.
+- The log now starts with who LG signed in and what it found, for example
+  `Signed in to LG (US): found Front Load Washer, Dryer.`
+- LG's error codes now come with what to do (new terms to accept, wrong country, a missing
+  permission, an offline appliance, Remote Start), and a README section on signing in.
+
 ## 0.2.0-beta.4 - 2026-11-23
 
 ### Added
