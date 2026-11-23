@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { ThinQClient, ThinQError } from '../src/api';
 import { checkToken, supportOf, typeName } from '../src/homebridge-ui/check';
 import { FakeLG } from './fake-lg';
@@ -28,7 +29,9 @@ test('check token: a refused token says what to do, and nothing is thrown', asyn
   assert.equal(r.ok, false);
   assert.match(r.message, /^LG refused: .*LG error 1103.*every permission ticked.*Signing in/);
   assert.deepEqual(await checkToken('', 'US'), { ok: false, message: 'Paste your personal access token in the Token box first.', appliances: [] });
-  assert.match((await checkToken('t', 'ZZ')).message, /doesn't serve the country "ZZ"/);
+  const zz = (await checkToken('t', 'ZZ')).message;
+  assert.match(zz, /doesn't serve the country "ZZ"/);
+  assert.doesNotMatch(zz, /LG refused/, 'a local check is not LG refusing');
 });
 
 test('check token: an account with no appliances points at the other account', async (t) => {
@@ -41,7 +44,7 @@ test('check token: an account with no appliances points at the other account', a
 
 test('support levels and names for LG types', () => {
   assert.equal(supportOf('DEVICE_DRYER'), 'supported');
-  assert.equal(supportOf('DEVICE_WASHTOWER_DRYER'), 'experimental');
+  assert.equal(supportOf('DEVICE_WASHTOWER_DRYER'), 'laundry');
   assert.equal(supportOf('DEVICE_DISH_WASHER'), 'experimental');
   assert.equal(supportOf('DEVICE_AIR_CONDITIONER'), 'experimental');
   assert.equal(supportOf('DEVICE_MICROWAVE_OVEN'), 'experimental');
@@ -70,4 +73,9 @@ test('settings page: Homebridge loads it from the build', () => {
     assert.ok(existsSync('dist/homebridge-ui/server.js'));
     assert.ok(existsSync('dist/homebridge-ui/public/index.html'));
   }
+});
+
+test('settings page: the server\'s helper library loads from the plugin\'s CommonJS build', () => {
+  const out = spawnSync(process.execPath, ['-e', "process.stdout.write(typeof require('@homebridge/plugin-ui-utils').HomebridgePluginUiServer)"], { encoding: 'utf8' });
+  assert.equal(out.stdout, 'function', out.stderr);
 });

@@ -56,15 +56,19 @@ test('devices, profile and state come back unwrapped', async (t) => {
   assert.ok(await client.profile('device-2'));
 });
 
-test('devices: malformed entries are skipped, a missing model becomes empty', async (t) => {
+test('devices: an unreadable list fails (never an empty account); a missing name or model is filled in', async (t) => {
   const lg = await new FakeLG().start();
   t.after(() => lg.stop());
+  const client = new ThinQClient({ token: lg.token, country: 'US', baseUrl: lg.url });
+  lg.devices = [{ deviceId: 'a', deviceInfo: { deviceType: 'DEVICE_WASHER' }, profile: {}, state: {} }] as never;
+  assert.deepEqual(await client.devices(), [{ deviceId: 'a', deviceInfo: { deviceType: 'DEVICE_WASHER', alias: 'DEVICE_WASHER', modelName: '' } }]);
   lg.devices = [
     { deviceId: 'a', deviceInfo: { deviceType: 'DEVICE_WASHER', alias: 'W' }, profile: {}, state: {} },
     { deviceId: 'b', deviceInfo: { alias: 'no type' }, profile: {}, state: {} },
-  ];
-  const devices = await new ThinQClient({ token: lg.token, country: 'US', baseUrl: lg.url }).devices();
-  assert.deepEqual(devices, [{ deviceId: 'a', deviceInfo: { deviceType: 'DEVICE_WASHER', alias: 'W', modelName: '' } }]);
+  ] as never;
+  await assert.rejects(client.devices(), /appliance list this plugin can't read/);
+  lg.listingOverride = {};
+  await assert.rejects(client.devices(), (err: ThinQError) => err.message === 'LG sent an appliance list this plugin can\'t read');
 });
 
 test('control: posts the body with LG\'s conditional-control header', async (t) => {

@@ -12,3 +12,4 @@ dist/
 *.key
 *.p12
 *.pfx
+lg-thinq-connect/

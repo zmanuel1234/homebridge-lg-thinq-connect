@@ -122,6 +122,16 @@ function defineTests(hap: Hap): void {
     laundry.stop();
   });
 
+  test('stopped early, before LG knew the time (0 left while detecting the load), is not a finish', () => {
+    const { laundry } = setup();
+    laundry.update(running({ state: 'DETECTING', remaining: 0, total: 0 }));
+    laundry.update(status());
+    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    laundry.update(running({ state: 'RUNNING', remaining: 0, total: 0 }));
+    laundry.update(status());
+    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+  });
+
   test('a cycle cancelled with plenty of time left is not a finish', () => {
     const { laundry } = setup();
     laundry.update(running({ remaining: 40 * 60 }));

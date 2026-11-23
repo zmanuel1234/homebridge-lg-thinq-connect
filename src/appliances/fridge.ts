@@ -7,7 +7,7 @@
 
 import type { Service } from 'homebridge';
 import { field } from '../api';
-import { Appliance, type ApplianceContext, set } from './base';
+import { Appliance, type ApplianceContext, set, limit } from './base';
 import { type Range, asObj, fToC, locations, num, rangeOf, resources, writable } from './profile';
 import { stateLabel } from '../laundry';
 
@@ -50,9 +50,9 @@ export class Fridge extends Appliance {
       const sub = `temp-${location}`;
       const svc = this.service(S.Thermostat, `${ctx.name} ${stateLabel(location || 'fridge').toLowerCase()}`, sub);
       const T = C.TargetHeatingCoolingState;
-      svc.getCharacteristic(T).setProps({ validValues: [T.COOL] });
-      svc.getCharacteristic(C.TargetTemperature).setProps({ minValue: range.min, maxValue: range.max, minStep: range.step });
-      svc.getCharacteristic(C.CurrentTemperature).setProps({ minValue: -40, maxValue: 100 });
+      limit(svc.getCharacteristic(T), { validValues: [T.COOL] });
+      limit(svc.getCharacteristic(C.TargetTemperature), { minValue: range.min, maxValue: range.max, minStep: range.step });
+      limit(svc.getCharacteristic(C.CurrentTemperature), { minValue: -40, maxValue: 100 });
       const comp: Compartment = { location, service: svc, range, unitF: !rc };
       if (writable(rc ? c : f)) {
         svc.getCharacteristic(C.TargetTemperature).onSet((v) => this.setTarget(comp, Number(v)));

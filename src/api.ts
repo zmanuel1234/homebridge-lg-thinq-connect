@@ -59,6 +59,11 @@ export class ThinQError extends Error {
     this.name = 'ThinQError';
   }
 
+  /** True when LG asks to slow down. */
+  get isRateLimit(): boolean {
+    return this.status === 429 || this.code === '1306';
+  }
+
   /** True when the token is missing, wrong, expired or lacks a permission. */
   get isAuth(): boolean {
     return this.status === 401 || this.status === 403 || ['1103', '1218', '1302', '1303', '1305'].includes(this.code);
@@ -66,7 +71,7 @@ export class ThinQError extends Error {
 
   static describe(status: number, code: string, message: string): string {
     const lg = [code && `LG error ${code}`, message].filter(Boolean).join(': ');
-    const base = status ? `HTTP ${status}${lg ? ` (${lg})` : ''}` : lg || 'no answer';
+    const base = status && (status < 200 || status >= 300) ? `HTTP ${status}${lg ? ` (${lg})` : ''}` : lg || 'no answer';
     const hint = LG_HINTS[code] || (status === 401 || status === 403 ? TOKEN_HINT : status === 429 ? LG_HINTS['1306'] : '');
     return hint ? `${base}. ${hint}` : base;
   }
@@ -142,10 +147,17 @@ export class ThinQClient {
   /** The appliances on the account. */
   async devices(): Promise<Device[]> {
     const answer = await this.request('GET', 'devices');
-    if (!Array.isArray(answer)) { return []; }
-    return answer.filter(isDevice).map((d) => ({
+    // An unreadable list must fail, never look like an empty account (that would remove accessories)
+    if (!Array.isArray(answer) || !answer.every(isDevice)) {
+      throw new ThinQError(200, '', 'LG sent an appliance list this plugin can\'t read');
+    }
+    return answer.map((d) => ({
       deviceId: d.deviceId,
-      deviceInfo: { ...d.deviceInfo, modelName: typeof d.deviceInfo.modelName === 'string' ? d.deviceInfo.modelName : '' },
+      deviceInfo: {
+        ...d.deviceInfo,
+        alias: typeof d.deviceInfo.alias === 'string' && d.deviceInfo.alias.trim() ? d.deviceInfo.alias : d.deviceInfo.deviceType,
+        modelName: typeof d.deviceInfo.modelName === 'string' ? d.deviceInfo.modelName : '',
+      },
     }));
   }
 
@@ -264,6 +276,5 @@ export function field(value: unknown, key: string): unknown {
 function isDevice(value: unknown): value is Device {
   const info = field(value, 'deviceInfo');
   return typeof field(value, 'deviceId') === 'string'
-    && typeof field(info, 'deviceType') === 'string'
-    && typeof field(info, 'alias') === 'string';
+    && typeof field(info, 'deviceType') === 'string';
 }

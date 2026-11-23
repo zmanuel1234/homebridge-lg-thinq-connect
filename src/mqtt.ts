@@ -175,12 +175,19 @@ export class MqttClient extends EventEmitter {
       return;
     }
     for (const p of packets) {
-      switch (p.type) {
-        case Type.CONNACK: this.settle('connack', p.body); break;
-        case Type.SUBACK: this.settle(`suback:${p.body.readUInt16BE(0)}`, p.body); break;
-        case Type.PINGRESP: clearTimeout(this.pongTimer); break;
-        case Type.PUBLISH: this.onPublish(p.flags, p.body); break;
-        default: break;
+      if (this.closed) { return; }
+      try {
+        switch (p.type) {
+          case Type.CONNACK: this.settle('connack', p.body); break;
+          case Type.SUBACK: this.settle(`suback:${p.body.readUInt16BE(0)}`, p.body); break;
+          case Type.PINGRESP: clearTimeout(this.pongTimer); break;
+          case Type.PUBLISH: this.onPublish(p.flags, p.body); break;
+          default: break;
+        }
+      } catch (err) {
+        // A malformed packet: the stream can't be trusted any more
+        this.shutdown(new Error(`malformed packet from the MQTT server (${(err as Error).message})`));
+        return;
       }
     }
   }
@@ -188,6 +195,7 @@ export class MqttClient extends EventEmitter {
   private onPublish(flags: number, body: Buffer): void {
     const qos = (flags >> 1) & 0x03;
     const topicLen = body.readUInt16BE(0);
+    if (2 + topicLen > body.length) { throw new Error('topic longer than the packet'); }
     const topic = body.subarray(2, 2 + topicLen).toString('utf8');
     let offset = 2 + topicLen;
     if (qos > 0) {
@@ -196,7 +204,9 @@ export class MqttClient extends EventEmitter {
       // QoS 1: acknowledge so the server doesn't send it again. (LG doesn't use QoS 2.)
       try { this.write(packet(Type.PUBACK, 0, Buffer.from([id >> 8, id & 0xff]))); } catch { /* closing */ }
     }
-    this.emit('message', topic, body.subarray(offset));
+    const payload = body.subarray(offset);
+    // A listener's own error must not look like a broken connection, nor escape into the socket
+    try { this.emit('message', topic, payload); } catch { /* the listener logs its own errors */ }
   }
 
   private schedulePing(): void {

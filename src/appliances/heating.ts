@@ -4,7 +4,7 @@
 
 import type { Service } from 'homebridge';
 import { field } from '../api';
-import { Appliance, type ApplianceContext, set } from './base';
+import { Appliance, type ApplianceContext, set, limit } from './base';
 import { type Obj, type Range, asObj, enumValues, fieldOf, num, powerField, resources, stateValue, temperatureC, temperatureRangeC } from './profile';
 
 /** A °C range from an …InUnits resource's min/max values in the state (hot water), if given. */
@@ -22,11 +22,10 @@ abstract class Thermostats extends Appliance {
     onMode: (v: number) => Promise<void>, onTarget: (c: number) => Promise<void>): Service {
     const { Service: S, Characteristic: C } = this.hap;
     const svc = this.service(S.Thermostat, name, subtype);
-    svc.getCharacteristic(C.TargetHeatingCoolingState).setProps({ validValues: modes }).onSet((v) => onMode(Number(v)));
-    svc.getCharacteristic(C.TargetTemperature)
-      .setProps({ minValue: range.min, maxValue: range.max, minStep: range.step })
+    limit(svc.getCharacteristic(C.TargetHeatingCoolingState), { validValues: modes }).onSet((v) => onMode(Number(v)));
+    limit(svc.getCharacteristic(C.TargetTemperature), { minValue: range.min, maxValue: range.max, minStep: range.step })
       .onSet((v) => onTarget(Number(v)));
-    svc.getCharacteristic(C.CurrentTemperature).setProps({ minValue: -40, maxValue: 100 });
+    limit(svc.getCharacteristic(C.CurrentTemperature), { minValue: -40, maxValue: 100 });
     return svc;
   }
 
@@ -153,7 +152,7 @@ export class HeatPump extends Thermostats {
       const r = rangeFromState(state, 'hotWaterTemperatureInUnits');
       if (r && this.water && (r.min !== this.waterRange.min || r.max !== this.waterRange.max)) {
         this.waterRange = r;
-        this.water.getCharacteristic(C.TargetTemperature).setProps({ minValue: r.min, maxValue: r.max, minStep: 1 });
+        limit(this.water.getCharacteristic(C.TargetTemperature), { minValue: r.min, maxValue: r.max, minStep: 1 });
       }
     }
     const mode = this.jobMode === 'COOL' ? T.COOL : this.jobMode === 'AUTO' ? T.AUTO : T.HEAT;

@@ -4,7 +4,7 @@
 // property names.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { API, Characteristic, Logging, PlatformAccessory } from 'homebridge';
 import type * as HapNodejs from '@homebridge/hap-nodejs';
@@ -515,4 +515,44 @@ function defineTests(hap: Hap): void {
     await write(accessory.getServiceById(S.Switch, 'power')!.getCharacteristic(C.On), false);
     assert.deepEqual(sent, [{ operation: { operationMode: 'POWER_OFF' } }]);
   });
+  test('basic fallback: an LG alert opens the problem sensor, and it closes again on its own', () => {
+    const { part, accessory } = make('DEVICE_COOKTOP', { property: { operation: { operationMode: en(['POWER_ON', 'POWER_OFF']) } } });
+    const problem = () => accessory.getServiceById(S.ContactSensor, 'problem')!.getCharacteristic(C.ContactSensorState).value;
+    const on = { operation: { operationMode: 'POWER_ON' } };
+    part.update(on);
+    part.alert('problem', 'SOMETHING_ERROR');
+    assert.equal(problem(), C.ContactSensorState.CONTACT_NOT_DETECTED);
+    part.update(on);
+    part.update(on);
+    assert.equal(problem(), C.ContactSensorState.CONTACT_NOT_DETECTED);
+    part.update(on);
+    assert.equal(problem(), C.ContactSensorState.CONTACT_DETECTED, 'closed after three normal checks');
+    part.alert('problem', 'SOMETHING_ERROR');
+    part.update({ operation: { operationMode: 'POWER_OFF' } });
+    assert.equal(problem(), C.ContactSensorState.CONTACT_DETECTED, 'closed when switched off');
+  });
+
+  /* eslint-disable no-console -- HAP prints value warnings to the console */
+  test('every Home Assistant sample appliance is set up without HAP warnings about its values', () => {
+    const warnings: string[] = [];
+    const orig = { warn: console.warn, log: console.log };
+    const catchWarning = (...a: unknown[]) => { const m = a.map(String).join(' '); if (/illegal value|not contained|exceeded/.test(m)) { warnings.push(m); } };
+    console.warn = catchWarning;
+    console.log = catchWarning;
+    try {
+      for (const name of readdirSync(join(__dirname, 'fixtures', 'ha')).filter((n) => !n.includes('.'))) {
+        const info = fixture(name, 'device') as { deviceInfo?: { deviceType: string }; deviceType?: string };
+        const type = info.deviceInfo?.deviceType || info.deviceType || '';
+        const profile = fixture(name, 'profile');
+        if (!mappingFor(type, profile)) { continue; }
+        const { part, accessory } = make(type, profile);
+        accessory.on('characteristic-warning' as never, ((w: { message: string }) => warnings.push(`${name}: ${w.message}`)) as never);
+        part.update(fixture(name, 'status'));
+      }
+    } finally {
+      Object.assign(console, orig);
+    }
+    assert.deepEqual(warnings, []);
+  });
+  /* eslint-enable no-console */
 }

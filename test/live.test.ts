@@ -141,3 +141,31 @@ test('a real key and certificate request is accepted by the stand-in LG', async 
   const saved = JSON.parse(readFileSync(s.storageFile, 'utf8')) as { privateKeyPem: string };
   assert.match(saved.privateKeyPem, /^-----BEGIN PRIVATE KEY-----/);
 });
+
+test('an internet outage (LG\'s route failing) keeps a good certificate', async (t) => {
+  const s = await setup(t);
+  await s.live.start(['device-1']);
+  s.live.stop();
+  s.lg.failPath = /^route$/;
+  const attempt = (s.live as unknown as { attempt(): Promise<void>; stopped: boolean });
+  attempt.stopped = false;
+  for (let i = 0; i < 4; i++) { await attempt.attempt(); }
+  assert.ok(existsSync(s.storageFile), 'the certificate is kept');
+  s.live.stop();
+});
+
+test('a platform error while applying a live update is logged, not thrown into the connection', async (t) => {
+  const s = await setup(t, { onMessage: () => { throw new Error('boom'); } });
+  await s.live.start(['device-1']);
+  s.broker.publish(s.broker.clients[0].topics[0], { deviceId: 'device-1', pushType: 'DEVICE_STATUS', report: {} });
+  await until(() => s.lines.some((l) => l.startsWith('error: Couldn\'t apply a live update: Error: boom')));
+  assert.ok(s.live.connected);
+});
+
+test('an appliance added later is subscribed right away', async (t) => {
+  const s = await setup(t);
+  await s.live.start(['device-1']);
+  await s.live.addDevice('device-2');
+  await s.live.addDevice('device-2');
+  assert.deepEqual(s.lg.subscribed, { event: ['device-1', 'device-2'], push: ['device-1', 'device-2'] });
+});
