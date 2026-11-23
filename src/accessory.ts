@@ -221,7 +221,7 @@ export class LaundryAccessory {
     }
     if (next && prev && next.state !== prev.state) {
       const left = next.remaining ? `, ${Math.round(next.remaining / 60)} min left` : '';
-      const cycles = next.done && next.cycleCount !== undefined ? ` (LG counts ${next.cycleCount} cycles)` : '';
+      const cycles = next.done && !prev.done && next.cycleCount !== undefined ? ` (LG counts ${next.cycleCount} cycles)` : '';
       const course = next.course && (next.running || next.paused) ? ` (${stateLabel(next.course).toLowerCase()})` : '';
       const wait = next.startsIn ? `, starts in ${duration(next.startsIn)}` : '';
       this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state, this.unit.kind)}${course}${left}${wait}${cycles}.`);

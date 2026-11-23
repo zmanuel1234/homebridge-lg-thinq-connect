@@ -32,6 +32,9 @@ const CYCLE_TYPES: Record<string, LaundryKind> = {
   DEVICE_OVEN: 'oven',
 };
 
+/** Every LG device type handled as laundry or as a cycle appliance. */
+export const LAUNDRY_TYPES = [...Object.keys(TYPES), ...Object.keys(CYCLE_TYPES)];
+
 /** The operation field each kind uses, when the profile doesn't show one with START. */
 const OP_KEYS: Record<LaundryKind, string> = {
   washer: 'washerOperationMode',

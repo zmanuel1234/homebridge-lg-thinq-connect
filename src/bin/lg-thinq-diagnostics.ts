@@ -12,12 +12,26 @@ import { createInterface } from 'node:readline';
 import { Writable } from 'node:stream';
 import { ThinQClient, field } from '../api';
 
+/** Keys whose values identify the appliance or the home network, whatever their spelling or type. */
+const PRIVATE_KEY = /serial|^mac(addr(ess)?)?$|ssid|wifi|deviceid|groupid/i;
+
 /** Removes device IDs, serials, MAC addresses and network names from LG's answers. */
 export function redact(value: unknown, deviceIds: string[]): unknown {
-  let text = JSON.stringify(value);
-  for (const id of deviceIds) { text = text.split(id).join('DEVICE-ID-REMOVED'); }
-  text = text.replace(/"(deviceId|serialNumber|serial|macAddress|mac|ssid|wifiName)"\s*:\s*"[^"]*"/gi, '"$1":"REMOVED"');
-  return JSON.parse(text) as unknown;
+  const ids = deviceIds.filter((id) => id.length > 0);
+  const walk = (v: unknown): unknown => {
+    if (typeof v === 'string') {
+      let out = v;
+      for (const id of ids) { out = out.split(id).join('DEVICE-ID-REMOVED'); }
+      return out;
+    }
+    if (Array.isArray(v)) { return v.map(walk); }
+    if (v && typeof v === 'object') {
+      return Object.fromEntries(Object.entries(v).map(([k, x]) => [walk(k) as string,
+        PRIVATE_KEY.test(k) && x !== null && typeof x !== 'object' ? 'REMOVED' : walk(x)]));
+    }
+    return v;
+  };
+  return walk(value);
 }
 
 export interface Report {

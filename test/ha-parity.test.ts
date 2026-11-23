@@ -16,6 +16,7 @@ import { type ApplianceContext, mappingFor } from '../src/appliances';
 import { LaundryAccessory, type LaundryContext } from '../src/accessory';
 import { laundryStatus, laundryUnits } from '../src/laundry';
 import { SUPPORT } from '../src/support';
+import { levelFor, speedLevels } from '../src/appliances/profile';
 
 type Hap = typeof HapNodejs;
 let hap: Hap | null = null;
@@ -78,9 +79,12 @@ function defineTests(hap: Hap): void {
     part.update(json(fixture, 'status'));
     return accessory;
   };
+  // The appliance types actually compared with something Home Assistant shows, as the tests run
+  const compared = new Set<string>();
   const shown = (fixture: string, entity: string): Shown => {
     const s = snaps.get(fixture)?.get(entity);
     assert.ok(s, `Home Assistant's snapshot has ${entity} for ${fixture}`);
+    compared.add((json(fixture, 'device') as { deviceInfo: { deviceType: string } }).deviceInfo.deviceType);
     return s;
   };
   const val = (ch: Characteristic) => ch.value as number;
@@ -99,9 +103,11 @@ function defineTests(hap: Hap): void {
       near(tile.getCharacteristic(C.CoolingThresholdTemperature).props.minValue!, tempC(ha, 'min_temp'), 'lowest set temperature');
       near(tile.getCharacteristic(C.CoolingThresholdTemperature).props.maxValue!, tempC(ha, 'max_temp'), 'highest set temperature');
       if (ha.attrs.fan_mode && !DIFFERENCES[`${fixture} climate fan_mode`]) {
-        const status = json(fixture, 'status') as { airFlow?: { windStrength?: string } };
-        assert.equal(HA_FAN[status.airFlow?.windStrength ?? ''], ha.attrs.fan_mode, 'fan speed read from the same field');
-        assert.ok(val(tile.getCharacteristic(C.RotationSpeed)) > 0, 'fan speed shown');
+        // The speed the Home app shows, turned back into LG's level, is the one Home Assistant shows
+        const profile = json(fixture, 'profile') as { property: { airFlow?: Record<string, never> } };
+        const levels = speedLevels(profile.property.airFlow?.windStrength);
+        const level = levelFor(levels, val(tile.getCharacteristic(C.RotationSpeed)));
+        assert.equal(HA_FAN[level], ha.attrs.fan_mode, `fan speed: this plugin ${level}, Home Assistant ${ha.attrs.fan_mode}`);
       }
       if (ha.attrs.swing_mode) {
         assert.equal(val(tile.getCharacteristic(C.SwingMode)) === 1, ha.attrs.swing_mode === 'on', 'swing');
@@ -154,10 +160,9 @@ function defineTests(hap: Hap): void {
     assert.equal(val(fan.getCharacteristic(C.RotationSpeed)), Number(ha.attrs.percentage), 'fan speed (%)');
   });
 
-  test('checked against Home Assistant: air purifier (real sample)', () => {
+  test('air purifier sample (Home Assistant shows no purifier entities, so not "checked"): on/off from its status', () => {
     const acc = appliance('air_purifier');
     const tile = acc.getServiceById(S.AirPurifier, 'purifier')!;
-    // Home Assistant's purifier snapshot has no power entity; its sample status is on
     const status = json('air_purifier', 'status') as { operation?: { airPurifierOperationMode?: string } };
     assert.equal(val(tile.getCharacteristic(C.Active)) === 1, status.operation?.airPurifierOperationMode === 'POWER_ON', 'on/off');
   });
@@ -172,15 +177,15 @@ function defineTests(hap: Hap): void {
         { name: 'Washer', model: '', serial: 'S', allowControl: false, phaseSensors: [], tubCleanAfter: 0 }, () => Promise.resolve({}));
       const status = laundryStatus(unit, json('washer', 'status'));
       laundry.update(status);
+      // Home Assistant's power switch, and the Home app's tile: off and not running, no fault
       assert.equal(status.state !== 'POWER_OFF', ha.state === 'on', 'switched on');
       assert.equal(val(laundry.valve.getCharacteristic(C.Active)), 0, 'not running');
+      assert.equal(val(laundry.valve.getCharacteristic(C.StatusFault)), 0, 'no fault');
       laundry.stop();
     }
   });
 
   test('every "checked" appliance type has passing comparisons with Home Assistant here', () => {
-    const compared = new Set(['air_conditioner', 'air_conditioner1', 'air_conditioner2', 'dehumidifier', 'hood', 'air_purifier', 'washer']
-      .map((f) => (json(f, 'device') as { deviceInfo: { deviceType: string } }).deviceInfo.deviceType));
     const checked = Object.entries(SUPPORT).filter(([, s]) => s.level === 'checked').map(([t]) => t);
     assert.deepEqual(checked.filter((t) => !compared.has(t)), []);
   });

@@ -14,6 +14,17 @@ test('redact: device IDs anywhere, and serial, MAC and network fields', () => {
   });
 });
 
+test('redact: quotes in values, numbers, and other spellings of private fields', () => {
+  const out = redact({
+    wifi: { ssid: 'my "home" net', bssid: 'aa:bb' }, serialNumber: 12345678, deviceSerialNo: 'X9', macAddr: '00:11',
+    groupId: 'g-1', list: [{ deviceId: 'abc-123' }], 'abc-123': { note: 'keyed by abc-123' }, keep: 7,
+  }, ['abc-123']) as Record<string, unknown>;
+  assert.deepEqual(out, {
+    wifi: { ssid: 'REMOVED', bssid: 'REMOVED' }, serialNumber: 'REMOVED', deviceSerialNo: 'REMOVED', macAddr: 'REMOVED',
+    groupId: 'REMOVED', list: [{ deviceId: 'REMOVED' }], 'DEVICE-ID-REMOVED': { note: 'keyed by DEVICE-ID-REMOVED' }, keep: 7,
+  });
+});
+
 test('collect: every appliance\'s info, profile and state, with no device ID left', async (t) => {
   const lg = await new FakeLG().start();
   t.after(() => lg.stop());

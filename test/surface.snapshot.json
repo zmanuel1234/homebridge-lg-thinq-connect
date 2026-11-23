@@ -160,6 +160,46 @@
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
+  "washtower (one device) WASHER": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
+  ],
+  "washtower (one device) DRYER": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
+  ],
+  "washtower washer MAIN": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
+  ],
+  "washcombo main MAIN": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
+  ],
+  "washcombo mini MAIN": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
+  ],
+  "styler": [
+    "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
+    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
+  ],
   "dishwasher": [
     "ContactSensor/door: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
