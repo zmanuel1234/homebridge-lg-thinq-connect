@@ -166,6 +166,29 @@ export class ThinQClient {
     return this.request('GET', `devices/${encodeURIComponent(deviceId)}/profile`);
   }
 
+  /** The energy figures LG keeps for an appliance (e.g. energyUsage); none if it keeps none. */
+  async energyProperties(deviceId: string): Promise<string[]> {
+    const answer = await this.request('GET', `devices/energy/${encodeURIComponent(deviceId)}/profile`);
+    const props = field(field(answer, 'result'), 'property');
+    return Array.isArray(props) ? props.filter((p): p is string => typeof p === 'string') : [];
+  }
+
+  /**
+   * Energy used in watt-hours: for a month (YYYYMM) or day (YYYYMMDD) range, summed over LG's
+   * data points. LG updates it with a delay (often a day).
+   */
+  async energyUsage(deviceId: string, property: string, period: 'DAILY' | 'MONTHLY', start: string, end: string): Promise<number> {
+    const q = new URLSearchParams({ property, period, startDate: start, endDate: end });
+    const answer = await this.request('GET', `devices/energy/${encodeURIComponent(deviceId)}/usage?${q.toString()}`);
+    const list = field(field(answer, 'result'), 'dataList');
+    let wh = 0;
+    for (const d of Array.isArray(list) ? list : []) {
+      const v = field(d, property);
+      if (typeof v === 'number' && Number.isFinite(v)) { wh += v; }
+    }
+    return wh;
+  }
+
   /** An appliance's current state. */
   state(deviceId: string): Promise<unknown> {
     return this.request('GET', `devices/${encodeURIComponent(deviceId)}/state`);

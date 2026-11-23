@@ -4,7 +4,8 @@ import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformCo
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { type Device, ThinQClient, ThinQError, clientIdFor } from './api';
 import { TESTED_TYPES, alertFor, alertKind, isCycleAppliance, isLaundry, laundryStatus, laundryUnits, mergeState, stateLabel } from './laundry';
-import { type ApplianceContext, type Part, categoryOf, mappingFor } from './appliances';
+import { mainService, thisMonth, totalConsumption } from './energy';
+import { type ApplianceContext, type ApplianceOptions, type Part, categoryOf, mappingFor } from './appliances';
 import { type LaundryContext, LaundryAccessory } from './accessory';
 import { type LiveClient, type LiveMessage, type LiveOptions, LiveUpdates } from './live';
 
@@ -14,6 +15,9 @@ export interface Client {
   profile(deviceId: string): Promise<unknown>;
   state(deviceId: string): Promise<unknown>;
   control(deviceId: string, payload: Record<string, unknown>): Promise<unknown>;
+  /** Energy figures (optional: a client without them shows no energy). */
+  energyProperties?(deviceId: string): Promise<string[]>;
+  energyUsage?(deviceId: string, property: string, period: 'DAILY' | 'MONTHLY', start: string, end: string): Promise<number>;
 }
 
 const isLiveClient = (c: Client): c is Client & LiveClient =>
@@ -38,6 +42,29 @@ export interface Settings {
   extraControls: boolean;
   /** Appliance names (as in the ThinQ app) to leave out of the Home app. */
   ignore: string[];
+  /** Options for single appliances, by name as in the ThinQ app (lower case). */
+  appliances: Map<string, ApplianceOptions>;
+  /** Energy use (this month) for Eve, for appliances LG reports it for. */
+  energy: boolean;
+}
+
+/** The "Options per appliance" list: by ThinQ name, only the options this plugin knows. */
+function applianceOptions(v: unknown): Map<string, ApplianceOptions> {
+  const out = new Map<string, ApplianceOptions>();
+  if (!Array.isArray(v)) { return out; }
+  for (const e of v) {
+    if (!e || typeof e !== 'object') { continue; }
+    const o = e as Record<string, unknown>;
+    const name = typeof o.name === 'string' ? o.name.trim().toLowerCase() : '';
+    if (!name) { continue; }
+    const opts: ApplianceOptions = {};
+    if (typeof o.extraControls === 'boolean') { opts.extraControls = o.extraControls; }
+    if (o.acModes === 'all' || o.acModes === 'cool' || o.acModes === 'heat') { opts.acModes = o.acModes; }
+    if (o.acSwing === 'up-down' || o.acSwing === 'left-right' || o.acSwing === 'both') { opts.acSwing = o.acSwing; }
+    if (typeof o.temperatureSensor === 'boolean') { opts.temperatureSensor = o.temperatureSensor; }
+    out.set(name, opts);
+  }
+  return out;
 }
 
 const clamp = (v: unknown, min: number, max: number, fallback: number): number => {
@@ -60,6 +87,8 @@ export function readSettings(config: PlatformConfig): Settings {
     experimental: config.experimental === true,
     extraControls: config.extraControls !== false,
     ignore: strings(config.ignore).map((s) => s.toLowerCase()),
+    appliances: applianceOptions(config.appliances),
+    energy: config.energy !== false,
   };
 }
 
@@ -89,7 +118,11 @@ interface Machine {
   state?: unknown;
   timer?: NodeJS.Timeout;
   failures: number;
+  energyTimer?: NodeJS.Timeout;
 }
+
+/** How often energy use is checked (LG updates it slowly). */
+const ENERGY_EVERY = 3600;
 
 /** Waits between tries to list the appliances after a failure, in seconds. */
 const DISCOVERY_RETRY = [60, 120, 300, 900];
@@ -384,6 +417,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       }
     }
     this.machines.push(machine);
+    void this.setupEnergy(machine);
     await this.poll(machine);
   }
 
@@ -416,6 +450,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       send: (payload) => this.client!.control(device.deviceId, payload),
       refreshSoon: () => this.schedule(machine, 3),
       extraControls: this.settings.extraControls,
+      options: this.settings.appliances.get(alias.trim().toLowerCase()),
     };
     machine.parts.push(mapping.create(ctx, profile));
     if (isNew) {
@@ -426,7 +461,59 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       this.api.updatePlatformAccessories([accessory]);
     }
     this.machines.push(machine);
+    void this.setupEnergy(machine);
     await this.poll(machine);
+  }
+
+  /**
+   * Energy use for the Eve app, for appliances LG keeps it for: this month's kWh on each part's main
+   * tile. Silent when LG keeps none; failures only delay it.
+   */
+  async setupEnergy(machine: Machine): Promise<void> {
+    const client = this.client;
+    if (!this.settings.energy || this.stopped || !client?.energyProperties || !client.energyUsage) { return; }
+    const { device } = machine;
+    let props: string[];
+    try {
+      props = await client.energyProperties(device.deviceId);
+    } catch (err) {
+      this.log.debug(`[${device.deviceInfo.alias}] No energy figures from LG: ${(err as Error).message}`);
+      return;
+    }
+    // One figure for the appliance, or one per part (energyUsage_washer…) matched by its kind
+    const targets: { part: Part; property: string }[] = [];
+    for (const part of machine.parts) {
+      const key = part.alertKey?.toLowerCase();
+      const property = props.length === 1 && part === machine.parts[0] ? props[0]
+        : props.find((p) => key && p.toLowerCase().endsWith(`_${key}`));
+      if (property) { targets.push({ part, property }); }
+    }
+    if (!targets.length) { return; }
+    const Total = totalConsumption(this.api);
+    const info = this.api.hap.Service.AccessoryInformation.UUID;
+    const check = async () => {
+      for (const { part, property } of targets) {
+        const svc = mainService(part.accessory.services, info);
+        if (!svc) { continue; }
+        try {
+          const wh = await client.energyUsage!(device.deviceId, property, 'MONTHLY', thisMonth(), thisMonth());
+          if (!svc.testCharacteristic(Total.UUID)) { svc.addOptionalCharacteristic(Total); }
+          const kwh = Math.round(wh) / 1000;
+          const ch = svc.getCharacteristic(Total);
+          if (ch.value !== kwh) {
+            this.log.debug(`[${part.accessory.displayName}] Energy this month: ${kwh} kWh.`);
+            ch.updateValue(kwh);
+          }
+        } catch (err) {
+          this.log.debug(`[${part.accessory.displayName}] Couldn't get energy use: ${(err as Error).message}`);
+        }
+      }
+      if (this.stopped) { return; }
+      machine.energyTimer = setTimeout(() => { void check(); }, ENERGY_EVERY * 1000);
+      machine.energyTimer.unref?.();
+    };
+    this.log.info(`[${device.deviceInfo.alias}] Energy use this month is shown in the Eve app (LG updates it with a delay).`);
+    await check();
   }
 
   /** Check one appliance's state now, then schedule the next check. */
@@ -472,6 +559,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     this.live?.stop();
     for (const m of this.machines) {
       clearTimeout(m.timer);
+      clearTimeout(m.energyTimer);
       m.parts.forEach((p) => p.stop());
     }
   }

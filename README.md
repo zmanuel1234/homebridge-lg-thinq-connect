@@ -119,11 +119,13 @@ What LG's error codes in the log mean:
 | Country | US | The country of your LG account (two letters) |
 | Allow starting and pausing | Off | Tapping a machine's tile starts, pauses or resumes it (needs Remote Start on the machine) |
 | Experimental appliances | Off | Also add appliance types not yet confirmed on real hardware (see [Other appliances](#other-appliances)) |
-| Extra switches for experimental appliances | On | Air conditioner and air purifier mode switches; turn off for a tidier Home app |
+| Extra switches for experimental appliances | On | Air conditioner, air purifier and cooktop switches; turn off for a tidier Home app |
 | Live updates from LG | On | Changes and alerts arrive the moment they happen; scheduled checks continue as a backup |
+| Energy use in the Eve app | On | This month's energy use for appliances LG reports it for (see [Energy use](#energy-use)) |
 | Phase sensors | None | Extra sensors that are on during a chosen phase |
 | Tub clean reminder after | 0 (off) | Cycles counted by LG at which the washer's tub-clean sensor turns on |
 | Leave out these appliances | None | Names, as in the ThinQ app, to keep out of the Home app |
+| Options per appliance | None | Air conditioner modes, swing direction and room sensor, and extra switches, for one appliance (see [Options per appliance](#options-per-appliance)) |
 | Check every (idle) | 60 s | How often to ask LG while nothing runs (at least 10 min while live updates work) |
 | Check every (during a cycle) | 30 s | How often to ask while a cycle runs (at least 2 min while live updates work) |
 
@@ -160,11 +162,13 @@ anyone using this plugin. If you try one, please
 | Washer, dryer | Tile with time left; done, problem, phase and tub-clean sensors; start and pause | **Tested** |
 | WashTower, wash combo | As washer and dryer, one set per drum | Experimental (always on) |
 | Dishwasher | As a washer, plus door and "rinse aid low" sensors; the course and a delayed start in the log | Experimental |
-| Styler, oven | As a washer: time left, done, problem | Experimental |
-| Air conditioner | Heater/cooler: on/off, cool / heat / auto (as the unit offers), room and set temperature (separate heating and cooling set points in auto, on units with two-set), fan speed (Auto at the top of the slider), swing. Switches, where the unit offers them: air purify, energy saving, display light, left-right swing, jet mode, dry mode, fan mode. Air quality, humidity and filter sensors; "problem" for a full water tank | Experimental (from real sample data) |
+| Styler | As a washer: time left, done, problem | Experimental |
+| Oven (each cavity) | As a washer: time left, done, problem; and a thermostat: heat starts the oven at the set temperature (in its current cook mode, or bake), off stops it, and a new temperature while it's on is sent at once. LG doesn't report the oven's actual temperature, so the thermostat shows the set one. Needs "Allow starting and pausing" and remote control on at the oven | Experimental (from LG's documentation) |
+| Cooktop | "In use" sensor (any burner on) and one per burner, for "the stove is still on" notifications and automations; an "all burners off" button on models LG allows it for | Experimental (from LG's documentation) |
+| Air conditioner | Heater/cooler: on/off, cool / heat / auto (as the unit offers), room and set temperature (separate heating and cooling set points in auto, on units with two-set), fan speed (Auto at the top of the slider), swing. Switches, where the unit offers them: air purify, energy saving, display light, the other swing direction, jet mode, dry mode, fan mode. Air quality, humidity and filter sensors; "problem" for a full water tank. Per appliance: cooling or heating only, which way the tile's swing moves, and a room temperature sensor (see [Options per appliance](#options-per-appliance)) | Experimental (from real sample data) |
 | Refrigerator, wine cellar | Door-open sensor per door; set temperature per compartment; express modes as switches; water filter | Experimental |
 | Dehumidifier, humidifier | Humidifier tile: on/off, humidity now and target, fan speed; "problem" for a full tank | Experimental (dehumidifier from real sample data) |
-| Air purifier | Air purifier tile: on/off, auto or manual, fan speed (Auto at the top); a sleep mode switch; air quality (PM2.5, PM10), humidity and filter life when reported | Experimental (from real sample data) |
+| Air purifier, AeroTower | Air purifier tile: on/off, auto or manual, fan speed (Auto at the top); sleep mode and turbo switches; AeroTower warm mode and UV nano switches; air quality (PM2.5, PM10), temperature, humidity and filter life when reported | Experimental (purifier from real sample data) |
 | Ceiling fan, ventilator | Fan: on/off and speed | Experimental |
 | Range hood | Fan with speed steps, and the light with brightness | Experimental (from real sample data) |
 | Over-the-range microwave | Running and time left (to the second), "done" sensor, vent fan and light. LG's API has no cooking mode, power level or temperature | Experimental |
@@ -174,10 +178,30 @@ anyone using this plugin. If you try one, please
 | Anything else | What its profile shows: on/off, temperatures, humidity, LG's problem alerts | Experimental (basic) |
 
 Some air conditioners don't report air purify back; its switch then shows the last command. LG's
-official API has no quiet mode, and no Air Fast or light for air purifiers.
+official API has no quiet mode, and no light for air purifiers. It doesn't cover older (ThinQ1)
+appliances, microwave cooking, or a washer's door lock.
 
 Fridges report each compartment's **set** temperature, not the measured one, so that's what their
-tiles show. LG's API can't choose wash programs, cooking modes and the like on any appliance.
+tiles show. LG's API can't choose wash programs on any appliance.
+
+### Options per appliance
+
+Under **Advanced → Options per appliance**, add an appliance by its name exactly as in the ThinQ
+app, then choose:
+
+| Option | For | What it does |
+|---|---|---|
+| Extra switches | Any | Overrides "Extra switches for experimental appliances" for this one |
+| Modes on the tile | Air conditioner | All it has, cooling only, or heating only (for a unit used one way) |
+| The tile's swing moves | Air conditioner | Up and down (default), left and right, or both; the other direction gets a switch |
+| Room temperature sensor | Air conditioner | The room temperature as a sensor of its own, for automations |
+
+### Energy use
+
+For appliances LG keeps energy figures for, this month's use (kWh) is added to the appliance's main
+tile. Apple's Home app doesn't show energy; the **Eve** app does. LG updates the figure with a
+delay, often a day, and the plugin checks it every hour. Turn it off with **Energy use in the Eve
+app**.
 
 ### Help add or fix an appliance
 

@@ -9,12 +9,16 @@
 //  - dishwashers: "<name> door" (contact sensor) and "<name> rinse aid low" (occupancy sensor),
 //    when the machine reports them;
 //  - optionally "<name> tub clean", an occupancy sensor: detected once the washer's cycle count
-//    (as LG counts it) reaches the setting, as a reminder to run Tub Clean.
+//    (as LG counts it) reaches the setting, as a reminder to run Tub Clean;
+//  - ovens that accept a temperature: "<name> temperature", a thermostat: heat starts the oven at
+//    the set temperature, off stops it. LG doesn't report the oven's actual temperature, so the
+//    current temperature shows the one it's set to.
 // Starting, pausing and resuming from the valve is off unless the "allow control" setting is on,
 // and LG only accepts it after Remote Start is pressed on the machine.
 
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service } from 'homebridge';
-import { type LaundryStatus, type LaundryUnit, operationPayload, stateLabel } from './laundry';
+import { type LaundryStatus, type LaundryUnit, operationPayload, ovenStartPayload, stateLabel } from './laundry';
+import { limit } from './appliances/base';
 
 export interface LaundryContext {
   deviceId?: string;
@@ -41,6 +45,9 @@ export interface Deps {
 /** Sends a command body for this unit to LG. */
 export type SendFn = (payload: Record<string, unknown>) => Promise<unknown>;
 
+/** 350 °F: where an oven starts if no temperature was chosen yet. */
+const DEFAULT_OVEN_C = 177;
+
 /** If a cycle stops being seen with this little time left, it counts as finished. */
 const NEAR_END = 3 * 60;
 /** How long "done" stays detected when the finish was only inferred (the machine already powered off). */
@@ -54,6 +61,9 @@ export class LaundryAccessory {
   readonly tubCleanSensor: Service | undefined;
   readonly doorSensor: Service | undefined;
   readonly rinseAidSensor: Service | undefined;
+  readonly ovenThermostat: Service | undefined;
+  /** The temperature to start the oven at (°C), from the Home app or the oven. */
+  private ovenTarget = DEFAULT_OVEN_C;
   status: LaundryStatus | null = null;
   private inferredDoneUntil = 0;
   private inferredTimer: NodeJS.Timeout | undefined;
@@ -112,6 +122,22 @@ export class LaundryAccessory {
       this.tubCleanSensor = this.service(S.OccupancySensor, `${name} tub clean`, 'tub-clean');
     } else if (tubClean) {
       accessory.removeService(tubClean);
+    }
+
+    // Oven temperature, when the oven accepts one
+    this.ovenThermostat = this.optional(!!unit.oven, S.Thermostat, `${name} temperature`, 'oven-temperature');
+    if (this.ovenThermostat && unit.oven) {
+      const r = unit.oven.ranges;
+      const c = r.C || { min: Math.floor((r.F!.min - 32) * 5 / 9), max: Math.ceil((r.F!.max - 32) * 5 / 9), step: 0.5 };
+      this.ovenTarget = Math.min(c.max, Math.max(c.min, DEFAULT_OVEN_C));
+      const t = this.ovenThermostat;
+      limit(t.getCharacteristic(C.TargetTemperature), { minValue: c.min, maxValue: c.max, minStep: c.step });
+      limit(t.getCharacteristic(C.CurrentTemperature), { minValue: 0, maxValue: Math.max(c.max, 100) });
+      limit(t.getCharacteristic(C.TargetHeatingCoolingState), { validValues: [C.TargetHeatingCoolingState.OFF, C.TargetHeatingCoolingState.HEAT] });
+      limit(t.getCharacteristic(C.CurrentHeatingCoolingState), { validValues: [C.CurrentHeatingCoolingState.OFF, C.CurrentHeatingCoolingState.HEAT] });
+      t.getCharacteristic(C.TemperatureDisplayUnits).updateValue(r.F && !r.C ? C.TemperatureDisplayUnits.FAHRENHEIT : C.TemperatureDisplayUnits.CELSIUS);
+      t.getCharacteristic(C.TargetHeatingCoolingState).onSet((v) => this.setOvenHeat(v === C.TargetHeatingCoolingState.HEAT));
+      t.getCharacteristic(C.TargetTemperature).onSet((v) => this.setOvenTemperature(Number(v)));
     }
     this.render();
   }
@@ -234,43 +260,104 @@ export class LaundryAccessory {
       set(this.tubCleanSensor.getCharacteristic(C.OccupancyDetected),
         due ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     }
+    if (this.ovenThermostat) {
+      const t = this.ovenThermostat;
+      const set_ = s?.setTemperature;
+      if (set_) { this.ovenTarget = set_.unit === 'F' ? Math.round((set_.value - 32) * 5 / 9 * 2) / 2 : set_.value; }
+      const heating = !!(s?.running || s?.paused);
+      const maxC = t.getCharacteristic(C.TargetTemperature).props.maxValue ?? 300;
+      const minC = t.getCharacteristic(C.TargetTemperature).props.minValue ?? 0;
+      set(t.getCharacteristic(C.TargetTemperature), Math.min(maxC, Math.max(minC, this.ovenTarget)));
+      set(t.getCharacteristic(C.CurrentTemperature), heating && set_ ? Math.min(this.ovenTarget, t.getCharacteristic(C.CurrentTemperature).props.maxValue ?? 300) : 0);
+      set(t.getCharacteristic(C.CurrentHeatingCoolingState), heating ? C.CurrentHeatingCoolingState.HEAT : C.CurrentHeatingCoolingState.OFF);
+      set(t.getCharacteristic(C.TargetHeatingCoolingState), heating ? C.TargetHeatingCoolingState.HEAT : C.TargetHeatingCoolingState.OFF);
+      if (s?.setTemperature) {
+        set(t.getCharacteristic(C.TemperatureDisplayUnits),
+          s.setTemperature.unit === 'F' ? C.TemperatureDisplayUnits.FAHRENHEIT : C.TemperatureDisplayUnits.CELSIUS);
+      }
+    }
     for (const [phase, svc] of this.phaseSensors) {
       set(svc.getCharacteristic(C.OccupancyDetected),
         s?.state === phase ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     }
   }
 
-  /** The valve tapped in the Home app: start or resume (on), pause (off). */
-  private async setActive(value: CharacteristicValue): Promise<void> {
+  /** Refuses a Home app action: logged, the tile set back, and an error shown in the Home app. */
+  private refuse(why: string, level: 'info' | 'warn' = 'info'): never {
     const { HapStatusError, HAPStatus } = this.deps.api.hap;
-    const name = this.options.name;
-    const s = this.status;
-    const wantOn = value === 1 || value === true;
-    const refuse = (why: string, level: 'info' | 'warn' = 'info'): never => {
-      this.deps.log[level](`[${name}] ${why}`);
-      setTimeout(() => this.render(), 50).unref?.();
-      throw new HapStatusError(HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE);
-    };
+    this.deps.log[level](`[${this.options.name}] ${why}`);
+    setTimeout(() => this.render(), 50).unref?.();
+    throw new HapStatusError(HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE);
+  }
 
-    if (wantOn === !!s?.running) { return; }
+  /** Control must be allowed in the settings, and remote control on at the appliance. */
+  private checkControl(action: string): void {
     if (!this.options.allowControl) {
-      refuse('Ignored the tap in the Home app: control is off in the plugin settings ("Allow starting and pausing").');
+      this.refuse('Ignored the tap in the Home app: control is off in the plugin settings ("Allow starting and pausing").');
     }
-    if (!s?.remoteControl) {
-      refuse(`Can't ${wantOn ? 'start' : 'pause'}: press Remote Start on the machine first (LG only accepts commands then).`);
+    if (!this.status?.remoteControl) {
+      this.refuse(this.unit.kind === 'oven'
+        ? `Can't ${action}: turn on remote control on the oven first (LG only accepts commands then).`
+        : `Can't ${action}: press Remote Start on the machine first (LG only accepts commands then).`);
     }
-    const operation = wantOn ? 'START' : 'STOP';
-    if (!this.unit.operations.includes(operation)) {
-      refuse(`This machine doesn't accept ${operation} through LG's API.`);
+  }
+
+  /** The oven thermostat set to heat (start at the set temperature) or off (stop). */
+  private async setOvenHeat(on: boolean): Promise<void> {
+    const s = this.status;
+    if (on === !!(s?.running || s?.paused)) { return; }
+    this.checkControl(on ? 'start the oven' : 'stop the oven');
+    if (!on) { return this.sendOperation('STOP', 'Sent stop.'); }
+    if (!this.unit.operations.includes('START')) { this.refuse('This oven doesn\'t accept START through LG\'s API.'); }
+    const mode = s?.cookMode && this.unit.oven?.cookModes.includes(s.cookMode) ? s.cookMode : this.unit.oven?.cookModes[0];
+    const payload = ovenStartPayload(this.unit, this.ovenTarget, mode, s?.setTemperature?.unit === 'F');
+    const t = payload.temperature as { targetTemperature: number; unit: string };
+    await this.sendPayload(payload, `Sent start: ${mode ? `${stateLabel(mode).toLowerCase()}, ` : ''}${t.targetTemperature} °${t.unit}.`, 'START');
+  }
+
+  /** A new temperature from the Home app: sent right away while the oven is on, else used at the next start. */
+  private async setOvenTemperature(celsius: number): Promise<void> {
+    if (!Number.isFinite(celsius)) { return; }
+    const s = this.status;
+    if (!(s?.running || s?.paused)) {
+      this.ovenTarget = celsius;
+      return;
     }
+    this.checkControl('change the oven temperature');
+    const mode = s.cookMode && this.unit.oven?.cookModes.includes(s.cookMode) ? s.cookMode : undefined;
+    const payload = ovenStartPayload(this.unit, celsius, mode, s.setTemperature?.unit === 'F');
+    const t = payload.temperature as { targetTemperature: number; unit: string };
+    this.ovenTarget = celsius;
+    await this.sendPayload(payload, `Sent temperature ${t.targetTemperature} °${t.unit}.`, 'START');
+  }
+
+  private async sendOperation(operation: string, done: string): Promise<void> {
+    if (!this.unit.operations.includes(operation)) { this.refuse(`This appliance doesn't accept ${operation} through LG's API.`); }
+    await this.sendPayload(operationPayload(this.unit, operation), done, operation);
+  }
+
+  private async sendPayload(payload: Record<string, unknown>, done: string, what: string): Promise<void> {
     try {
-      await this.send(operationPayload(this.unit, operation));
-      this.deps.log.info(`[${name}] Sent ${wantOn ? (s?.paused ? 'resume' : 'start') : 'pause'}.`);
+      await this.send(payload);
+      this.deps.log.info(`[${this.options.name}] ${done}`);
     } catch (err) {
-      refuse(`LG refused ${operation}: ${(err as Error).message}`, 'warn');
+      this.refuse(`LG refused ${what}: ${(err as Error).message}`, 'warn');
     } finally {
       this.refreshSoon();
     }
+  }
+
+  /** The valve tapped in the Home app: start or resume (on), pause (off). */
+  private async setActive(value: CharacteristicValue): Promise<void> {
+    const s = this.status;
+    const wantOn = value === 1 || value === true;
+    if (wantOn === !!s?.running) { return; }
+    this.checkControl(wantOn ? 'start' : 'pause');
+    const operation = wantOn ? 'START' : 'STOP';
+    if (!this.unit.operations.includes(operation)) {
+      this.refuse(`This machine doesn't accept ${operation} through LG's API.`);
+    }
+    await this.sendPayload(operationPayload(this.unit, operation), `Sent ${wantOn ? (s?.paused ? 'resume' : 'start') : 'pause'}.`, operation);
   }
 
   stop(): void {

@@ -4,9 +4,10 @@
 // Assistant's (see test fixtures).
 //
 // Extras, for what a unit's profile offers (and the "extra controls" setting allows): switches for
-// air purify, energy saving, the display light, left-right swing (the tile swings up-down), jet
+// air purify, energy saving, the display light, the swing direction the tile doesn't move, jet
 // mode, and dry and fan-only modes; air quality, humidity and filter sensors; and in auto mode,
-// separate heating and cooling set points when the unit uses two of them ("two-set").
+// separate heating and cooling set points when the unit uses two of them ("two-set"). Per
+// appliance (settings): cooling or heating only, which way the tile swings, a room temperature sensor.
 //
 // LG modes without a heater/cooler equivalent (fan only, dry, air clean) show as on and idle.
 
@@ -45,7 +46,8 @@ export class AirConditioner extends Appliance {
   private readonly power?: { name: string; canWrite: boolean };
   private readonly modes: Mode[];
   private readonly speeds: string[];
-  private readonly swingField?: string;
+  private readonly swingFields: string[] = [];
+  private readonly roomSensor?: Service;
   private readonly ranges: Partial<Record<Mode, Range>>;
   private readonly twoSetRanges?: { heat?: Range; cool?: Range };
   on = false;
@@ -67,10 +69,18 @@ export class AirConditioner extends Appliance {
     this.res = resources(profile);
     this.power = powerField(this.res);
     const jobModes = enumValues(fieldOf(this.res, 'airConJobMode', 'currentJobMode'), 'w');
-    this.modes = MODES.filter((m) => jobModes.includes(m));
+    const opts = ctx.options || {};
+    const only = opts.acModes === 'cool' ? 'COOL' : opts.acModes === 'heat' ? 'HEAT' : undefined;
+    const offered = MODES.filter((m) => jobModes.includes(m));
+    // Cooling or heating only (a unit used one way): the tile offers just that, if the unit has it
+    this.modes = only && offered.includes(only) ? [only] : offered;
     const wind = fieldOf(this.res, 'airFlow', 'windStrength');
     this.speeds = writable(wind) ? speedLevels(wind) : [];
-    this.swingField = ['rotateUpDown', 'rotateLeftRight'].find((f) => writable(fieldOf(this.res, 'windDirection', f)));
+    const swings = ['rotateUpDown', 'rotateLeftRight'].filter((f) => writable(fieldOf(this.res, 'windDirection', f)));
+    const wanted = opts.acSwing === 'left-right' ? ['rotateLeftRight'] : opts.acSwing === 'both' ? swings : ['rotateUpDown'];
+    // The axes the tile's swing moves; up-down unless chosen otherwise, or the only one the unit has
+    this.swingFields = swings.filter((f) => wanted.includes(f));
+    if (!this.swingFields.length && swings.length) { this.swingFields = [swings[0]]; }
     const any = this.tempRange('targetTemperature');
     this.ranges = {
       COOL: this.tempRange('coolTargetTemperature') || any,
@@ -101,7 +111,7 @@ export class AirConditioner extends Appliance {
     } else if (this.tile.testCharacteristic(C.RotationSpeed)) {
       this.tile.removeCharacteristic(this.tile.getCharacteristic(C.RotationSpeed));
     }
-    if (this.swingField) {
+    if (this.swingFields.length) {
       this.tile.getCharacteristic(C.SwingMode).onSet((v) => this.setSwing(v));
     } else if (this.tile.testCharacteristic(C.SwingMode)) {
       this.tile.removeCharacteristic(this.tile.getCharacteristic(C.SwingMode));
@@ -114,7 +124,12 @@ export class AirConditioner extends Appliance {
       keep.add('problem');
     }
     this.sensors = new AirSensors(this, this.res, ctx.name, (t, n, s) => this.service(t, n, s), keep, true);
-    if (ctx.extraControls !== false) {
+    if (opts.temperatureSensor) {
+      this.roomSensor = this.service(S.TemperatureSensor, `${ctx.name} room temperature`, 'room-temperature');
+      limit(this.roomSensor.getCharacteristic(C.CurrentTemperature), { minValue: -40, maxValue: 100 });
+      keep.add('room-temperature');
+    }
+    if ((opts.extraControls ?? ctx.extraControls) !== false) {
       for (const extra of this.findExtras(jobModes)) {
         extra.service = this.service(S.Switch, `${ctx.name} ${extra.label}`, extra.subtype);
         extra.service.getCharacteristic(C.On).onSet((v) => this.setExtra(extra, v === true || v === 1));
@@ -149,10 +164,13 @@ export class AirConditioner extends Appliance {
         read: (s) => { const v = stateValue(s, 'display', 'light'); return onOff ? (v === undefined ? undefined : v === 'ON') : bool(v); },
         payload: (on) => ({ display: { light: onOff ? (on ? 'ON' : 'OFF') : on } }) });
     }
-    if (this.swingField === 'rotateUpDown' && writable(fieldOf(this.res, 'windDirection', 'rotateLeftRight'))) {
-      add({ subtype: 'swing-left-right', label: 'swing left-right',
-        read: (s) => bool(stateValue(s, 'windDirection', 'rotateLeftRight')),
-        payload: (on) => ({ windDirection: { rotateLeftRight: on } }) });
+    // The axis the tile's swing doesn't move gets a switch of its own
+    for (const [f, sub, label] of [['rotateLeftRight', 'swing-left-right', 'swing left-right'], ['rotateUpDown', 'swing-up-down', 'swing up-down']] as const) {
+      if (this.swingFields.length && !this.swingFields.includes(f) && writable(fieldOf(this.res, 'windDirection', f))) {
+        add({ subtype: sub, label,
+          read: (s) => bool(stateValue(s, 'windDirection', f)),
+          payload: (on) => ({ windDirection: { [f]: on } }) });
+      }
     }
     if (enumValues(fieldOf(this.res, 'airFlow', 'windStrength'), 'w').includes('POWER')) {
       add({ subtype: 'jet', label: 'jet mode',
@@ -231,7 +249,7 @@ export class AirConditioner extends Appliance {
         if (typeof w === 'string') { this.wind = w; }
         this.speed = levelPercent(this.speeds, this.wind) || 100;
       }
-      if (this.swingField) { this.swing = stateValue(state, 'windDirection', this.swingField) === true; }
+      if (this.swingFields.length) { this.swing = this.swingFields.some((f) => stateValue(state, 'windDirection', f) === true); }
       for (const e of this.extras) {
         const v = e.read(state);
         if (v !== undefined) { e.value = v; }
@@ -245,12 +263,15 @@ export class AirConditioner extends Appliance {
   private render(): void {
     const { Characteristic: C } = this.hap;
     set(this.tile.getCharacteristic(C.Active), this.on ? C.Active.ACTIVE : C.Active.INACTIVE);
-    set(this.tile.getCharacteristic(C.TargetHeaterCoolerState), this.hkMode(this.lastMode));
+    // A mode the tile doesn't offer (set on the remote) shows as the tile's first one
+    const shown = this.modes.includes(this.lastMode) ? this.lastMode : this.modes[0] || 'COOL';
+    set(this.tile.getCharacteristic(C.TargetHeaterCoolerState), this.hkMode(shown));
     const H = C.CurrentHeaterCoolerState;
     set(this.tile.getCharacteristic(H), !this.on ? H.INACTIVE : this.mode === 'HEAT' ? H.HEATING : this.mode === 'COOL' ? H.COOLING : H.IDLE);
     set(this.tile.getCharacteristic(C.CurrentTemperature), this.current);
+    if (this.roomSensor) { set(this.roomSensor.getCharacteristic(C.CurrentTemperature), Math.max(-40, Math.min(100, this.current))); }
     if (this.speeds.length) { set(this.tile.getCharacteristic(C.RotationSpeed), this.speed); }
-    if (this.swingField) {
+    if (this.swingFields.length) {
       set(this.tile.getCharacteristic(C.SwingMode), this.swing ? C.SwingMode.SWING_ENABLED : C.SwingMode.SWING_DISABLED);
     }
     for (const e of this.extras) { set(e.service!.getCharacteristic(C.On), e.value); }
@@ -304,7 +325,7 @@ export class AirConditioner extends Appliance {
 
   private setSwing(v: CharacteristicValue): Promise<void> {
     const on = v === this.hap.Characteristic.SwingMode.SWING_ENABLED;
-    return this.command(on ? 'Swing on' : 'Swing off', { windDirection: { [this.swingField!]: on } });
+    return this.command(on ? 'Swing on' : 'Swing off', { windDirection: Object.fromEntries(this.swingFields.map((f) => [f, on])) });
   }
 
   private setExtra(extra: Extra, on: boolean): Promise<void> {

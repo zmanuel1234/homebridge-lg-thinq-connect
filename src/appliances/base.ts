@@ -19,6 +19,20 @@ export interface ApplianceContext {
   refreshSoon: () => void;
   /** Add extra switches (air conditioner modes, air purifier sleep mode…); default true. */
   extraControls?: boolean;
+  /** This appliance's own options from the settings (matched by its ThinQ name). */
+  options?: ApplianceOptions;
+}
+
+/** Options for one appliance, from the "Options per appliance" setting. */
+export interface ApplianceOptions {
+  /** Overrides the global "extra controls" setting for this appliance. */
+  extraControls?: boolean;
+  /** Air conditioners: the modes on the tile (cooling only, heating only, or all it has). */
+  acModes?: 'all' | 'cool' | 'heat';
+  /** Air conditioners: what the tile's swing control moves. */
+  acSwing?: 'up-down' | 'left-right' | 'both';
+  /** Air conditioners and purifiers: the room temperature as a sensor of its own, for automations. */
+  temperatureSensor?: boolean;
 }
 
 /** One appliance (or one part of one) in the Home app, kept up to date from LG's state. */

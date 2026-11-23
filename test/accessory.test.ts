@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { API, Characteristic, Logging, PlatformAccessory } from 'homebridge';
 import type * as HapNodejs from '@homebridge/hap-nodejs';
 import { LaundryAccessory, type LaundryContext, type LaundryOptions } from '../src/accessory';
-import { type LaundryStatus, laundryUnits } from '../src/laundry';
+import { type LaundryStatus, laundryStatus, laundryUnits } from '../src/laundry';
 import { realDevices } from './fake-lg';
 
 type Hap = typeof HapNodejs;
@@ -37,7 +37,7 @@ function defineTests(hap: Hap): void {
   });
   const running = (over: Partial<LaundryStatus> = {}) => status({ state: 'RUNNING', running: true, remaining: 1800, total: 3600, ...over });
 
-  function setup(options: Partial<LaundryOptions> = {}, accessory?: Acc) {
+  function setup(options: Partial<LaundryOptions> = {}, accessory?: Acc, forUnit = unit) {
     const lines: string[] = [];
     const sent: Record<string, unknown>[] = [];
     let refreshes = 0;
@@ -46,7 +46,7 @@ function defineTests(hap: Hap): void {
     const log = Object.fromEntries(['info', 'warn', 'error', 'debug']
       .map((l) => [l, (m: string) => lines.push(`${l}: ${m}`)])) as unknown as Logging;
     const api = { hap } as unknown as API;
-    const laundry = new LaundryAccessory({ log, api }, acc, unit,
+    const laundry = new LaundryAccessory({ log, api }, acc, forUnit,
       { name: 'Washer', model: 'F3P2CYVAT__', serial: 'ABC123', allowControl: false, phaseSensors: [], tubCleanAfter: 0, ...options },
       (payload) => { sent.push(payload); return sendResult(); },
       () => { refreshes++; });
@@ -120,6 +120,75 @@ function defineTests(hap: Hap): void {
     laundry.update(running());
     assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     laundry.stop();
+  });
+
+  /** An oven as LG documents one: two cavities; the upper bakes only. */
+  const ovenProfile = (units: ('C' | 'F')[] = ['F', 'C']) => ({ property: ['UPPER', 'LOWER'].map((loc) => ({
+    location: { locationName: loc },
+    runState: { currentState: { type: 'enum', mode: ['r'], value: { r: ['INITIAL', 'PREHEATING', 'COOKING_IN_PROGRESS', 'COOLING', 'DONE'] } } },
+    operation: { ovenOperationMode: { type: 'enum', mode: ['w'], value: { w: ['PREHEATING', 'START', 'STOP'] } } },
+    cook: { cookMode: { type: 'enum', mode: ['w'], value: { w: loc === 'UPPER' ? ['BAKE'] : ['BAKE', 'CONVECTION_BAKE', 'CONVECTION_ROAST'] } } },
+    remoteControlEnable: { remoteControlEnabled: { type: 'boolean', mode: ['r'], value: { r: [false, true] } } },
+    temperature: units.map((u) => ({ unit: u, targetTemperature: { type: 'range', mode: ['r', 'w'],
+      value: u === 'F' ? { r: { min: 170, max: 550, step: 1 }, w: { min: 170, max: 550, step: 1 } } : { r: { min: 80, max: 285, step: 1 }, w: { min: 80, max: 285, step: 1 } } } })),
+  })) });
+
+  test('oven: a thermostat per cavity that starts it at a temperature and stops it', async () => {
+    const units = laundryUnits('DEVICE_OVEN', ovenProfile());
+    assert.deepEqual(units.map((u) => [u.location, u.oven?.cookModes]), [['UPPER', ['BAKE']], ['LOWER', ['BAKE', 'CONVECTION_BAKE', 'CONVECTION_ROAST']]]);
+    const lower = units[1];
+    const { laundry, sent, lines } = setup({ name: 'Lower oven', allowControl: true }, undefined, lower);
+    const t = laundry.ovenThermostat!;
+    assert.equal(t.getCharacteristic(C.TargetTemperature).props.maxValue, 285);
+    assert.equal(value(t.getCharacteristic(C.TargetTemperature)), 177, 'starts from 350 °F');
+    const idle = laundryStatus(lower, [{ location: { locationName: 'LOWER' }, runState: { currentState: 'INITIAL' }, remoteControlEnable: { remoteControlEnabled: true } }]);
+    laundry.update(idle);
+    // A new temperature while off is kept for the start; nothing is sent
+    await t.getCharacteristic(C.TargetTemperature).handleSetRequest(200);
+    assert.equal(sent.length, 0);
+    await t.getCharacteristic(C.TargetHeatingCoolingState).handleSetRequest(C.TargetHeatingCoolingState.HEAT);
+    assert.deepEqual(sent, [{ operation: { ovenOperationMode: 'START' }, location: { locationName: 'LOWER' },
+      temperature: { targetTemperature: 200, unit: 'C' }, cook: { cookMode: 'BAKE' } }]);
+    assert.ok(lines.includes('info: [Lower oven] Sent start: bake, 200 °C.'));
+    // Cooking at 375 °F in convection
+    const cooking = laundryStatus(lower, [{ location: { locationName: 'LOWER' }, runState: { currentState: 'COOKING_IN_PROGRESS' },
+      remoteControlEnable: { remoteControlEnabled: true }, temperature: { targetTemperature: 375, unit: 'F' }, cook: { cookMode: 'CONVECTION_BAKE' } }]);
+    assert.deepEqual([cooking.running, cooking.setTemperature, cooking.cookMode], [true, { value: 375, unit: 'F' }, 'CONVECTION_BAKE']);
+    laundry.update(cooking);
+    assert.equal(value(t.getCharacteristic(C.CurrentHeatingCoolingState)), C.CurrentHeatingCoolingState.HEAT);
+    assert.equal(value(t.getCharacteristic(C.TargetTemperature)), 191, 'in whole degrees, as the oven takes them');
+    assert.equal(value(t.getCharacteristic(C.CurrentTemperature)), 190.5, 'LG gives no actual temperature: the set one shows');
+    assert.equal(value(t.getCharacteristic(C.TemperatureDisplayUnits)), C.TemperatureDisplayUnits.FAHRENHEIT);
+    // Changing it while cooking: sent at once, in the oven's unit, keeping its mode
+    await t.getCharacteristic(C.TargetTemperature).handleSetRequest(204);
+    assert.deepEqual(sent.at(-1), { operation: { ovenOperationMode: 'START' }, location: { locationName: 'LOWER' },
+      temperature: { targetTemperature: 399, unit: 'F' }, cook: { cookMode: 'CONVECTION_BAKE' } });
+    await t.getCharacteristic(C.TargetHeatingCoolingState).handleSetRequest(C.TargetHeatingCoolingState.OFF);
+    assert.deepEqual(sent.at(-1), { operation: { ovenOperationMode: 'STOP' }, location: { locationName: 'LOWER' } });
+    // Cooling down afterwards isn't cooking; DONE is a finish
+    const cool = laundryStatus(lower, [{ location: { locationName: 'LOWER' }, runState: { currentState: 'COOLING' } }]);
+    assert.deepEqual([cool.running, cool.done], [false, false]);
+    assert.equal(laundryStatus(lower, [{ location: { locationName: 'LOWER' }, runState: { currentState: 'DONE' } }]).done, true);
+  });
+
+  test('oven: refused without control allowed or remote control on; a °F-only oven; no temperature, no thermostat', async () => {
+    const [upper] = laundryUnits('DEVICE_OVEN', ovenProfile(['F']));
+    const a = setup({ name: 'Oven' }, undefined, upper);
+    const heat = (l: LaundryAccessory) => l.ovenThermostat!.getCharacteristic(C.TargetHeatingCoolingState).handleSetRequest(C.TargetHeatingCoolingState.HEAT);
+    await assert.rejects(heat(a.laundry));
+    assert.ok(a.lines.some((l) => l.includes('control is off in the plugin settings')));
+    const b = setup({ name: 'Oven', allowControl: true }, undefined, upper);
+    b.laundry.update(status({ state: 'INITIAL' }));
+    await assert.rejects(heat(b.laundry));
+    assert.ok(b.lines.includes('info: [Oven] Can\'t start the oven: turn on remote control on the oven first (LG only accepts commands then).'));
+    assert.equal(b.sent.length, 0);
+    // °F only: limits converted for the Home app, and commands in °F
+    assert.equal(b.laundry.ovenThermostat!.getCharacteristic(C.TargetTemperature).props.minValue, 76);
+    b.laundry.update(status({ state: 'INITIAL', remoteControl: true }));
+    await heat(b.laundry);
+    assert.deepEqual(b.sent[0].temperature, { targetTemperature: 351, unit: 'F' });
+    // A washer has no oven thermostat
+    assert.equal(setup().laundry.ovenThermostat, undefined);
   });
 
   test('stopped early, before LG knew the time (0 left while detecting the load), is not a finish', () => {

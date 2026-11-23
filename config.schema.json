@@ -43,13 +43,19 @@
         "title": "Extra switches for experimental appliances",
         "type": "boolean",
         "default": true,
-        "description": "Switches for what an appliance offers beyond its main tile: air conditioner air purify, energy saving, display light, left-right swing, jet, dry and fan modes; air purifier sleep mode. Turn off for a tidier Home app."
+        "description": "Switches for what an appliance offers beyond its main tile: air conditioner air purify, energy saving, display light, the other swing direction, jet, dry and fan modes; air purifier sleep mode and turbo; AeroTower warm mode and UV nano; cooktop \"all burners off\". Turn off for a tidier Home app."
       },
       "liveUpdates": {
         "title": "Live updates from LG",
         "type": "boolean",
         "default": true,
         "description": "LG sends changes and alerts (cycle complete, drying failed) the moment they happen. Scheduled checks continue as a backup. Turn off only if live updates cause problems."
+      },
+      "energy": {
+        "title": "Energy use in the Eve app",
+        "type": "boolean",
+        "default": true,
+        "description": "This month's energy use, for appliances LG reports it for, shown in the Eve app (Apple's Home app doesn't show energy). LG updates it with a delay, often a day."
       },
       "phaseSensors": {
         "title": "Phase sensors",
@@ -145,6 +151,81 @@
           "title": "Appliance name"
         }
       },
+      "appliances": {
+        "title": "Options per appliance",
+        "type": "array",
+        "description": "For one appliance, by its name exactly as in the ThinQ app.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Appliance name",
+              "required": true
+            },
+            "extraControls": {
+              "type": "boolean",
+              "title": "Extra switches",
+              "description": "Overrides the setting above for this appliance."
+            },
+            "acModes": {
+              "type": "string",
+              "title": "Air conditioner: modes on the tile",
+              "default": "all",
+              "oneOf": [
+                {
+                  "title": "All it has (cool, heat, auto)",
+                  "enum": [
+                    "all"
+                  ]
+                },
+                {
+                  "title": "Cooling only",
+                  "enum": [
+                    "cool"
+                  ]
+                },
+                {
+                  "title": "Heating only",
+                  "enum": [
+                    "heat"
+                  ]
+                }
+              ]
+            },
+            "acSwing": {
+              "type": "string",
+              "title": "Air conditioner: the tile's swing moves",
+              "default": "up-down",
+              "oneOf": [
+                {
+                  "title": "Up and down",
+                  "enum": [
+                    "up-down"
+                  ]
+                },
+                {
+                  "title": "Left and right",
+                  "enum": [
+                    "left-right"
+                  ]
+                },
+                {
+                  "title": "Both",
+                  "enum": [
+                    "both"
+                  ]
+                }
+              ]
+            },
+            "temperatureSensor": {
+              "type": "boolean",
+              "title": "Air conditioner: room temperature sensor",
+              "description": "The room temperature as a sensor of its own, for automations."
+            }
+          }
+        }
+      },
       "pollInterval": {
         "title": "Check every (seconds, idle)",
         "type": "integer",
@@ -175,6 +256,7 @@
       }
     },
     "liveUpdates",
+    "energy",
     "phaseSensors",
     {
       "key": "tubCleanAfter",
@@ -192,6 +274,18 @@
           "buttonText": "Add appliance",
           "items": [
             "ignore[]"
+          ]
+        },
+        {
+          "key": "appliances",
+          "type": "array",
+          "buttonText": "Add appliance",
+          "items": [
+            "appliances[].name",
+            "appliances[].extraControls",
+            "appliances[].acModes",
+            "appliances[].acSwing",
+            "appliances[].temperatureSensor"
           ]
         },
         {
