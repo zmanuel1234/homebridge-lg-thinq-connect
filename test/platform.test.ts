@@ -93,6 +93,7 @@ function defineTests(hap: Hap): void {
     const platform = await hb.start();
     assert.deepEqual(hb.calls.registered.map((a) => a.displayName), ['Front Load Washer', 'Dryer']);
     assert.ok(hb.lines.includes('info: Added "Front Load Washer" (F3P2CYVAT__).'));
+    assert.equal(hb.lines.filter((l) => l === 'info: Signed in to LG (US): found Front Load Washer, Dryer.').length, 1);
     assert.deepEqual(platform.machines.map((m) => m.units[0].status?.state), ['POWER_OFF', 'POWER_OFF']);
     assert.ok(hb.lg.requests.some((r) => r.path === 'devices/device-1/state'));
     assert.ok(!hb.lines.some((l) => l.includes('experimental')), 'washer and dryer are tested types');

@@ -65,19 +65,47 @@ that. Choose those on the machine.
 ## Setup
 
 1. Go to **[connect-pat.lgthinq.com](https://connect-pat.lgthinq.com)** and sign in with the LG
-   account your appliances are on. Signing in with the QR code from the ThinQ app works too.
+   account your appliances are on (see [Signing in](#signing-in) if you're not sure which one).
 2. Choose **ADD NEW TOKEN**, name it (for example *Homebridge*), and **tick every permission**
    under *Scope of authority*.
 3. Choose **CREATE TOKEN** and copy it. Keep it private: it gives access to your appliances.
 4. Install the plugin: search for **LG ThinQ Connect** in the Homebridge UI's Plugins tab, or run
    `npm install -g homebridge-lg-thinq-connect`.
-5. In the plugin's settings, paste the token and set your **country** (the one your LG account
-   is registered in, for example US).
-6. Restart Homebridge. The log lists each appliance it found.
+5. In the plugin's settings, paste the token, set your **country** (the one your LG account
+   is registered in, for example US), and press **Check token**: it lists the appliances LG
+   shows for that token, and how well each is supported. Then save.
+6. Restart Homebridge. The log starts with `Signed in to LG (US): found Front Load Washer, Dryer.`
+   and then adds each appliance.
 
-If LG rejects the token, the log says so. Check it was copied whole, still exists on the token
-page, and has every permission ticked. You can delete a token on that page at any time and
-create a new one.
+### Signing in
+
+- **Which account?** The token must come from the LG account the ThinQ app shows your
+  appliances on. Many people have more than one (an old one, or one made for an integration).
+  The ThinQ app shows the email of the account it's signed in to.
+- **Signed up with Google, Apple or Facebook, or a password that doesn't work?** On the token
+  page choose **sign in with QR code** and scan it with the phone that has the ThinQ app. This
+  always signs in to the app's own account.
+- **Permissions:** tick every one. With some left out, LG refuses part of what the plugin asks
+  (often starting and pausing, or live updates).
+- **Country:** the country the LG account was created in. LG serves each account from one region.
+- **No appliances found?** The token is on a different LG account than the app (use the QR code),
+  or the appliances aren't registered in the ThinQ app yet.
+- The token keeps working until you delete it on the token page. To replace it, create a new one,
+  paste it, and delete the old one.
+
+What LG's error codes in the log mean:
+
+| Code | Meaning | What to do |
+|---|---|---|
+| 1103, 1218, 1302 | The token isn't valid | Copy it again whole, or create a new one |
+| 1303 | LG doesn't know this account | Create the token on the account the app uses |
+| 1304 | New LG terms to accept | Open the ThinQ app and accept them |
+| 1305, 1308 | The token lacks a permission | Create a new token with every permission ticked |
+| 1306 | Too many requests | Nothing: the plugin slows down and retries |
+| 1307, 1309 | Wrong country for this account | Set the country the account was created in |
+| 1222 | The appliance isn't connected | Check it's on and on Wi-Fi in the ThinQ app |
+| 2301 | Remote control is off | Press Remote Start on the appliance |
+| 2302, 2304 | Not possible right now (state, or switched off) | Try again when the appliance is ready |
 
 ### Settings
 

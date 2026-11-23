@@ -27,10 +27,10 @@ test('package: the diagnostics command is built and runnable', { skip }, () => {
   assert.match(readFileSync(bin, 'utf8'), /^#!\/usr\/bin\/env node/);
 });
 
-test('package: published files include the build; no runtime dependencies to install', () => {
+test('package: published files include the build; only the settings page helper to install', () => {
   assert.ok(pkg.files.includes('dist/'));
   assert.ok(pkg.files.includes('config.schema.json'));
   assert.match(pkg.main, /^dist\//);
   assert.ok(pkg.scripts.prepare.includes('build'), 'npm must build before packing and on git installs');
-  assert.equal((pkg as { dependencies?: unknown }).dependencies, undefined);
+  assert.deepEqual(Object.keys((pkg as { dependencies?: object }).dependencies || {}), ['@homebridge/plugin-ui-utils']);
 });
