@@ -45,7 +45,7 @@ test('our machines as captured (both off): idle, no time left, even though the d
   const w = laundryStatus(laundryUnits('DEVICE_WASHER', washer.profile)[0], washer.state);
   assert.deepEqual(w, {
     state: 'POWER_OFF', running: false, paused: false, done: false, error: false, errorName: '',
-    remaining: 0, total: 0, remoteControl: false, cycleCount: 15,
+    remaining: 0, total: 0, remoteControl: false, cycleCount: 15, doorOpen: undefined, rinseAidLow: undefined,
   });
   const d = laundryStatus(laundryUnits('DEVICE_DRYER', dryer.profile)[0], dryer.state);
   assert.equal(d.state, 'POWER_OFF');
@@ -181,4 +181,31 @@ test('LG alerts: finished or problem, and which machine', () => {
   assert.equal(alertFor('ERROR_DURING_WASHING'), 'washer');
   assert.equal(alertFor('DRYING_FAILED'), 'dryer');
   assert.equal(alertFor('SOMETHING_NEW'), undefined);
+});
+
+test('dishwasher: a cycle appliance with its own command field, door and rinse aid', () => {
+  const profile = { property: {
+    runState: { currentState: { type: 'enum', mode: ['r'], value: { r: ['POWER_OFF', 'RUNNING', 'RINSING', 'DRYING', 'END', 'PAUSE'] } } },
+    operation: { dishWasherOperationMode: { type: 'enum', mode: ['w'], value: { w: ['START', 'STOP', 'POWER_OFF'] } } },
+    doorStatus: { doorState: { type: 'enum', mode: ['r'], value: { r: ['OPEN', 'CLOSE'] } } },
+    dishWashingStatus: { rinseRefill: { type: 'boolean', mode: ['r'] } },
+    timer: { remainHour: { type: 'number', mode: ['r'] }, remainMinute: { type: 'number', mode: ['r'] } },
+  } };
+  const [unit] = laundryUnits('DEVICE_DISH_WASHER', profile);
+  assert.equal(unit.kind, 'dishwasher');
+  assert.equal(unit.opKey, 'dishWasherOperationMode');
+  assert.ok(unit.hasDoor && unit.hasRinseAid);
+  const s = laundryStatus(unit, { runState: { currentState: 'DRYING' }, doorStatus: { doorState: 'CLOSE' },
+    dishWashingStatus: { rinseRefill: true }, timer: { remainHour: 0, remainMinute: 20 } });
+  assert.equal(s.running, true);
+  assert.equal(s.remaining, 1200);
+  assert.equal(s.doorOpen, false);
+  assert.equal(s.rinseAidLow, true);
+  assert.deepEqual(operationPayload(unit, 'START'), { operation: { dishWasherOperationMode: 'START' } });
+  assert.equal(stateLabel('RUNNING', 'dishwasher'), 'Washing');
+  assert.equal(stateLabel('RUNNING', 'styler'), 'Refreshing');
+  assert.equal(stateLabel('RUNNING', 'oven'), 'Cooking');
+  // A Styler whose profile names its command field differently still finds the one with START
+  const [styler] = laundryUnits('DEVICE_STYLER', { property: { operation: { anyName: { type: 'enum', mode: ['w'], value: { w: ['START', 'STOP'] } } } } });
+  assert.equal(styler.opKey, 'anyName');
 });

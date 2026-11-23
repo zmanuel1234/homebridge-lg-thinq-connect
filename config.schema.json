@@ -2,7 +2,7 @@
   "pluginAlias": "LGThinQConnect",
   "pluginType": "platform",
   "singular": true,
-  "headerDisplay": "LG ThinQ appliances in Apple Home through LG's official ThinQ Connect API. Create a personal access token at [connect-pat.lgthinq.com](https://connect-pat.lgthinq.com) with every device permission ticked, and paste it below. This version supports washers and dryers.",
+  "headerDisplay": "LG ThinQ appliances in Apple Home through LG's official ThinQ Connect API. Create a personal access token at [connect-pat.lgthinq.com](https://connect-pat.lgthinq.com) with every device permission ticked, and paste it below. Washers and dryers are supported; other LG appliances can be tried with \"Experimental appliances\".",
   "footerDisplay": "Problems or a new appliance to add? [Open an issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues).",
   "schema": {
     "type": "object",
@@ -30,6 +30,12 @@
         "type": "boolean",
         "default": false,
         "description": "Tapping the machine's tile starts, pauses or resumes it. LG only accepts this after Remote Start is pressed on the machine. Off: the tile only shows the cycle."
+      },
+      "experimental": {
+        "title": "Experimental appliances",
+        "type": "boolean",
+        "default": false,
+        "description": "Also add LG appliances not yet confirmed on real hardware: air conditioners, fridges, dishwashers, dehumidifiers, air purifiers and more (see the README). If you try one, please report how it works on GitHub."
       },
       "liveUpdates": {
         "title": "Live updates from LG",
@@ -98,6 +104,7 @@
     "token",
     "country",
     "allowControl",
+    "experimental",
     "liveUpdates",
     "phaseSensors",
     {

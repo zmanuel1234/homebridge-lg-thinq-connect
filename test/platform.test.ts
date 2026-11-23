@@ -13,6 +13,7 @@ import { connect } from 'node:net';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 type Hap = typeof HapNodejs;
 let hap: Hap | null = null;
@@ -26,12 +27,12 @@ try {
 
 test('settings: defaults, limits and clean-up', () => {
   const s = readSettings({ platform: 'LGThinQConnect' } as PlatformConfig);
-  assert.deepEqual(s, { token: '', country: 'US', pollInterval: 60, runningPollInterval: 30, allowControl: false, liveUpdates: true, phaseSensors: [], tubCleanAfter: 0, ignore: [] });
+  assert.deepEqual(s, { token: '', country: 'US', pollInterval: 60, runningPollInterval: 30, allowControl: false, liveUpdates: true, phaseSensors: [], tubCleanAfter: 0, experimental: false, ignore: [] });
   const t = readSettings({
     platform: 'LGThinQConnect', token: ' abc ', country: 'gb', pollInterval: 5, runningPollInterval: '9999',
-    allowControl: 'yes', liveUpdates: false, phaseSensors: ['SPINNING', '', 3], tubCleanAfter: 500, ignore: [' Dryer '],
+    allowControl: 'yes', liveUpdates: false, phaseSensors: ['SPINNING', '', 3], tubCleanAfter: 500, experimental: 'yes', ignore: [' Dryer '],
   } as unknown as PlatformConfig);
-  assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, liveUpdates: false, phaseSensors: ['SPINNING'], tubCleanAfter: 200, ignore: ['dryer'] });
+  assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, liveUpdates: false, phaseSensors: ['SPINNING'], tubCleanAfter: 200, experimental: false, ignore: ['dryer'] });
 });
 
 if (!hap) {
@@ -129,12 +130,21 @@ function defineTests(hap: Hap): void {
     assert.ok(hb.lines.some((l) => l.startsWith('error: Couldn\'t list your LG appliances: HTTP 503') && l.includes('Trying again in 1 min')));
   });
 
-  test('an unsupported appliance is named in the log, with how to help add it', async (t) => {
+  test('other appliance types: left out unless "Experimental appliances" is on, with how to try them', async (t) => {
     const hb = await homebridge(t);
     hb.lg.devices.push({ deviceId: 'fridge', deviceInfo: { deviceType: 'DEVICE_REFRIGERATOR', alias: 'Fridge', modelName: 'X' }, profile: {}, state: {} });
     await hb.start();
     assert.equal(hb.calls.registered.length, 2);
-    assert.ok(hb.lines.some((l) => l.startsWith('info: "Fridge" (DEVICE_REFRIGERATOR) isn\'t supported yet') && l.includes('lg-thinq-diagnostics')));
+    assert.ok(hb.lines.some((l) => l.startsWith('info: "Fridge" (DEVICE_REFRIGERATOR) isn\'t confirmed on a real appliance yet')
+      && l.includes('"Experimental appliances"')));
+  });
+
+  test('experimental on: a type with nothing to show is named in the log, with how to help add it', async (t) => {
+    const hb = await homebridge(t);
+    hb.lg.devices.push({ deviceId: 'brew', deviceInfo: { deviceType: 'DEVICE_HOME_BREW', alias: 'Brewer', modelName: 'X' }, profile: {}, state: {} });
+    await hb.start([], { experimental: true });
+    assert.equal(hb.calls.registered.length, 2);
+    assert.ok(hb.lines.some((l) => l.startsWith('info: "Brewer" (DEVICE_HOME_BREW) isn\'t supported yet') && l.includes('lg-thinq-diagnostics')));
   });
 
   test('an untested laundry type is added and marked experimental; a two-drum one gets one accessory per drum', async (t) => {
@@ -253,5 +263,39 @@ function defineTests(hap: Hap): void {
     const platform = await hb.start();
     assert.equal(platform.live, undefined);
     assert.ok(!hb.lg.requests.some((r) => r.path === 'route'));
+  });
+
+  test('experimental on: a real air conditioner\'s data through LG, controlled from the Home app', async (t) => {
+    const hb = await homebridge(t);
+    const dir = join(__dirname, 'fixtures', 'ha', 'air_conditioner');
+    const read = (f: string): unknown => JSON.parse(readFileSync(join(dir, f), 'utf8')) as unknown;
+    const info = (read('device.json') as { deviceInfo: Record<string, unknown> }).deviceInfo;
+    hb.lg.devices.push({ deviceId: 'ac-1', deviceInfo: info, profile: read('profile.json'), state: read('status.json') });
+    const platform = await hb.start([], { experimental: true });
+    assert.deepEqual(hb.calls.registered.map((a) => a.displayName), ['Front Load Washer', 'Dryer', 'Test air conditioner']);
+    assert.ok(hb.lines.some((l) => l.startsWith('warn: [Test air conditioner] Added as an experimental air conditioner')));
+    const ac = hb.calls.registered[2];
+    const tile = ac.getServiceById(S.HeaterCooler, 'climate')!;
+    assert.equal(tile.getCharacteristic(C.CurrentTemperature).value, 25);
+    await tile.getCharacteristic(C.Active).handleSetRequest(0);
+    const sent = hb.lg.requests.find((r) => r.method === 'POST' && r.path === 'devices/ac-1/control');
+    assert.deepEqual(sent?.body, { operation: { airConOperationMode: 'POWER_OFF' } });
+    // Live updates reach it too
+    platform.onLive({ deviceId: 'ac-1', pushType: 'DEVICE_STATUS', report: { temperature: { currentTemperature: 23, unit: 'C' } } });
+    assert.equal(tile.getCharacteristic(C.CurrentTemperature).value, 23);
+  });
+
+  test('experimental on: a dishwasher is added as a cycle appliance', async (t) => {
+    const hb = await homebridge(t);
+    hb.lg.devices.push({ deviceId: 'dw', deviceInfo: { deviceType: 'DEVICE_DISH_WASHER', alias: 'Dishwasher', modelName: 'DW' },
+      profile: { property: { runState: { currentState: { type: 'enum', mode: ['r'], value: { r: ['RUNNING', 'END'] } } } } },
+      state: { runState: { currentState: 'RUNNING' }, timer: { remainHour: 1, remainMinute: 5 } } });
+    const off = await hb.start();
+    assert.equal(off.machines.length, 2, 'not without the setting');
+    const on = await hb.start([], { experimental: true });
+    const dish = on.machines[2].units[0];
+    assert.equal(dish.unit.kind, 'dishwasher');
+    assert.equal(dish.valve.getCharacteristic(C.RemainingDuration).value, 65 * 60);
+    assert.ok(hb.lines.some((l) => l.includes('DEVICE_DISH_WASHER support is experimental')));
   });
 }

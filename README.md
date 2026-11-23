@@ -13,9 +13,10 @@ Shows LG ThinQ appliances in Apple Home through **LG's official ThinQ Connect AP
 with a personal access token that LG issues, not your LG password, so the plugin doesn't break
 when LG changes its app's login.
 
-This version supports **washers and dryers**: the time left, a notification when a cycle
-finishes or stops on an error, and sensors for automations. Other LG appliances are planned
-(see [More appliances](#more-appliances)).
+**Washers and dryers** are supported: the time left, a notification when a cycle finishes or
+stops on an error, and sensors for automations. **Other LG appliances** (air conditioners, fridges,
+dishwashers, dehumidifiers, air purifiers and more) can be tried with the *Experimental
+appliances* setting; see [Other appliances](#other-appliances).
 
 ## What you get
 
@@ -85,6 +86,7 @@ create a new one.
 | Personal access token | | Your token from connect-pat.lgthinq.com |
 | Country | US | The country of your LG account (two letters) |
 | Allow starting and pausing | Off | Tapping a machine's tile starts, pauses or resumes it (needs Remote Start on the machine) |
+| Experimental appliances | Off | Also add appliance types not yet confirmed on real hardware (see [Other appliances](#other-appliances)) |
 | Live updates from LG | On | Changes and alerts arrive the moment they happen; scheduled checks continue as a backup |
 | Phase sensors | None | Extra sensors that are on during a chosen phase |
 | Tub clean reminder after | 0 (off) | Cycles counted by LG at which the washer's tub-clean sensor turns on |
@@ -111,10 +113,37 @@ nothing is removed from the Home app.
 The plugin has no dependencies to install: it talks to LG's API and message server directly,
 with the requests and headers LG documents and uses in its own toolkit.
 
-## More appliances
+## Other appliances
 
-Fridges, air conditioners, dishwashers, dehumidifiers, air purifiers, ovens and more are on
-LG's API and planned. To help add yours, run the diagnostics command on your Homebridge machine:
+With **Experimental appliances** on, the plugin also adds the LG appliance types below. They're
+built from LG's documentation, Home Assistant's LG integration and its sample data from real
+appliances, and two other plugins on the same API (credits below), but not yet confirmed by
+anyone using this plugin. If you try one, please
+[report how it works](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose).
+
+| Appliance | In the Home app | Status |
+|---|---|---|
+| Washer, dryer | Tile with time left; done, problem, phase and tub-clean sensors; start and pause | **Tested** |
+| WashTower, wash combo | As washer and dryer, one set per drum | Experimental (always on) |
+| Dishwasher | As a washer, plus door and "rinse aid low" sensors | Experimental |
+| Styler, oven | As a washer: time left, done, problem | Experimental |
+| Air conditioner | Heater/cooler: on/off, cool / heat / auto (as the unit offers), room and set temperature, fan speed, swing; "problem" for a full water tank | Experimental (from real sample data) |
+| Refrigerator, wine cellar | Door-open sensor per door; set temperature per compartment; express modes as switches; water filter | Experimental |
+| Dehumidifier, humidifier | Humidifier tile: on/off, humidity now and target, fan speed; "problem" for a full tank | Experimental (dehumidifier from real sample data) |
+| Air purifier | Air purifier tile: on/off, fan speed; air quality (PM2.5, PM10) and filter life when reported | Experimental (from real sample data) |
+| Ceiling fan, ventilator | Fan: on/off and speed | Experimental |
+| Range hood, over-the-range microwave | Fan with speed steps, and the light with brightness | Experimental (hood from real sample data) |
+| Water heater | Thermostat: on/off, tank and set temperature | Experimental |
+| Heat pump (system boiler) | Thermostat for room heating or cooling, and one for hot water | Experimental |
+| Robot vacuum | Switch, on while cleaning (on starts or resumes, off sends it home); battery | Experimental |
+| Anything else | What its profile shows: on/off, temperatures, humidity, LG's problem alerts | Experimental (basic) |
+
+Fridges report each compartment's **set** temperature, not the measured one, so that's what their
+tiles show. LG's API can't choose wash programs, cooking modes and the like on any appliance.
+
+### Help add or fix an appliance
+
+Run the diagnostics command on your Homebridge machine:
 
 ```bash
 lg-thinq-diagnostics --country US
@@ -122,8 +151,8 @@ lg-thinq-diagnostics --country US
 
 It asks for your token without showing it, and saves `lg-diagnostics.json`: what LG reports
 about each appliance, with device IDs and serial numbers removed. Look it over, then attach it to
-a [new appliance issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose).
-If Homebridge's npm isn't on your path, run
+a [new appliance issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose),
+with what works and what doesn't. If Homebridge's npm isn't on your path, run
 `node "$(npm root -g)/homebridge-lg-thinq-connect/dist/bin/lg-thinq-diagnostics.js"` instead.
 
 ## Coming from homebridge-lg-thinq
@@ -134,11 +163,18 @@ notifications and automations again on them, then remove the old plugin.
 
 ## Credits
 
-LG's [ThinQ Connect](https://thinq.developer.lge.com/en/cloud/docs/thinq-connect/) documentation
-and its Node toolkit [thinqconnect](https://github.com/thinq-connect/jsthinqconnect) (Apache-2.0)
-describe the API. The long work in
-[homebridge-lg-thinq](https://github.com/nVuln/homebridge-lg-thinq) showed which Home app tiles
-suit each appliance.
+- LG's [ThinQ Connect](https://thinq.developer.lge.com/en/cloud/docs/thinq-connect/) documentation
+  and its Node toolkit [thinqconnect](https://github.com/thinq-connect/jsthinqconnect) (Apache-2.0)
+  describe the API and each appliance type's properties.
+- Home Assistant's [LG ThinQ integration](https://github.com/home-assistant/core/tree/dev/homeassistant/components/lg_thinq)
+  (Apache-2.0) showed how each appliance type behaves; its sample data from real appliances is
+  used in this plugin's tests (`test/fixtures/ha`, with its licence).
+- [homebridge-lg-thinqconnect-ac](https://www.npmjs.com/package/homebridge-lg-thinqconnect-ac) (MIT)
+  for the air conditioner mapping, including sending commands one at a time, and
+  [homebridge-lg-thinq-system-boiler](https://www.npmjs.com/package/homebridge-lg-thinq-system-boiler)
+  (MIT) for the heat pump mapping.
+- The long work in [homebridge-lg-thinq](https://github.com/nVuln/homebridge-lg-thinq) showed which
+  Home app tiles suit each appliance.
 
 ## License
 

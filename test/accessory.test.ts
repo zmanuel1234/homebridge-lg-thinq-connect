@@ -243,6 +243,26 @@ function defineTests(hap: Hap): void {
     assert.equal(off.acc.getServiceById(S.OccupancySensor, 'tub-clean'), undefined);
   });
 
+  test('dishwasher: door and rinse-aid sensors when the machine reports them', () => {
+    const dish = laundryUnits('DEVICE_DISH_WASHER', { property: {
+      runState: { currentState: { type: 'enum', mode: ['r'], value: { r: ['RUNNING', 'END'] } } },
+      doorStatus: { doorState: { type: 'enum', mode: ['r'], value: { r: ['OPEN', 'CLOSE'] } } },
+      dishWashingStatus: { rinseRefill: { type: 'boolean', mode: ['r'] } },
+    } })[0];
+    const acc = Object.assign(new hap.Accessory('Dishwasher', hap.uuid.generate(String(Math.random()))), { context: {} }) as unknown as Acc;
+    const log = { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} } as unknown as Logging;
+    const laundry = new LaundryAccessory({ log, api: { hap } as unknown as API }, acc, dish,
+      { name: 'Dishwasher', model: '', serial: 'S', allowControl: false, phaseSensors: [], tubCleanAfter: 30 }, () => Promise.resolve());
+    laundry.update(status({ state: 'END', done: true, doorOpen: true, rinseAidLow: true }));
+    assert.equal(value(acc.getServiceById(S.ContactSensor, 'door')!.getCharacteristic(C.ConfiguredName)), 'Dishwasher door');
+    assert.equal(value(acc.getServiceById(S.ContactSensor, 'door')!.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_NOT_DETECTED);
+    assert.equal(value(acc.getServiceById(S.OccupancySensor, 'rinse-aid')!.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(acc.getServiceById(S.OccupancySensor, 'tub-clean'), undefined, 'the tub-clean reminder is for washers');
+    assert.equal(value(acc.getService(S.AccessoryInformation)!.getCharacteristic(C.Model)), 'Dishwasher');
+    // Our washer reports neither: no such sensors
+    assert.equal(setup().acc.getServiceById(S.ContactSensor, 'door'), undefined);
+  });
+
   test('tapping the tile with control off: refused, the tile snaps back, the log says why', async () => {
     const { laundry, lines, sent } = setup();
     laundry.update(running({ remoteControl: true }));

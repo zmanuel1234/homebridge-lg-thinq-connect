@@ -6,10 +6,13 @@
 //    `location.locationName` (MAIN, MINI); the state is a list in the same shape;
 //  - a WashTower as one device: `{ washer: ..., dryer: ... }`, and commands wrapped the same way.
 // Each drum or machine becomes one "unit" here, and one accessory in the Home app.
+//
+// Other appliances that run cycles the same way (dishwashers, Stylers, ovens: runState, timer,
+// an operation with START and STOP) use the same code, as experimental types.
 
 import { field } from './api';
 
-export type LaundryKind = 'washer' | 'dryer';
+export type LaundryKind = 'washer' | 'dryer' | 'dishwasher' | 'styler' | 'oven';
 
 /** LG device types handled as laundry, and what each one is. 'tower' = WashTower as one device. */
 const TYPES: Record<string, LaundryKind | 'tower'> = {
@@ -22,11 +25,32 @@ const TYPES: Record<string, LaundryKind | 'tower'> = {
   DEVICE_WASHTOWER: 'tower',
 };
 
+/** Other appliances that run cycles like laundry machines (experimental). */
+const CYCLE_TYPES: Record<string, LaundryKind> = {
+  DEVICE_DISH_WASHER: 'dishwasher',
+  DEVICE_STYLER: 'styler',
+  DEVICE_OVEN: 'oven',
+};
+
+/** The operation field each kind uses, when the profile doesn't show one with START. */
+const OP_KEYS: Record<LaundryKind, string> = {
+  washer: 'washerOperationMode',
+  dryer: 'dryerOperationMode',
+  dishwasher: 'dishWasherOperationMode',
+  styler: 'stylerOperationMode',
+  oven: 'ovenOperationMode',
+};
+
 /** Device types tested on real machines; the rest are marked experimental in the log. */
 export const TESTED_TYPES = new Set(['DEVICE_WASHER', 'DEVICE_DRYER']);
 
 export function isLaundry(deviceType: string): boolean {
   return deviceType in TYPES;
+}
+
+/** A dishwasher, Styler or oven: run like laundry, experimental. */
+export function isCycleAppliance(deviceType: string): boolean {
+  return deviceType in CYCLE_TYPES;
 }
 
 export interface LaundryUnit {
@@ -35,8 +59,13 @@ export interface LaundryUnit {
   location: string;
   /** The states this machine can report, from its profile. */
   states: string[];
-  /** The operation commands it accepts (START, STOP, POWER_OFF). */
+  /** The operation commands it accepts (START, STOP, POWER_OFF), and the field they go in. */
   operations: string[];
+  opKey: string;
+  /** It reports its door (doorStatus.doorState: dishwashers). */
+  hasDoor: boolean;
+  /** It reports when rinse aid needs refilling (dishWashingStatus.rinseRefill). */
+  hasRinseAid: boolean;
   /** The machine reports a cycle count (cycle.cycleCount), used for the tub-clean reminder. */
   countsCycles: boolean;
   /** Where this unit's properties sit in a WashTower's state and commands. */
@@ -69,12 +98,18 @@ function enumValues(prop: unknown, mode: 'r' | 'w'): string[] {
 }
 
 function unitFrom(kind: LaundryKind, props: Props, location: string, usesLocation: boolean, towerKey?: 'washer' | 'dryer'): LaundryUnit {
-  const opKey = kind === 'washer' ? 'washerOperationMode' : 'dryerOperationMode';
+  // The field with START among its commands; the kind's usual one if none shows it
+  const ops = asObject(props.operation) || {};
+  const withStart = Object.keys(ops).find((k) => enumValues(ops[k], 'w').includes('START'));
+  const opKey = withStart || OP_KEYS[kind];
   return {
     kind,
     location,
     states: enumValues(field(field(props, 'runState'), 'currentState'), 'r'),
     operations: enumValues(field(field(props, 'operation'), opKey), 'w'),
+    opKey,
+    hasDoor: field(field(props, 'doorStatus'), 'doorState') !== undefined,
+    hasRinseAid: field(field(props, 'dishWashingStatus'), 'rinseRefill') !== undefined,
     countsCycles: field(field(props, 'cycle'), 'cycleCount') !== undefined,
     towerKey,
     usesLocation,
@@ -83,7 +118,7 @@ function unitFrom(kind: LaundryKind, props: Props, location: string, usesLocatio
 
 /** The units (drums or machines) a laundry device's profile describes. */
 export function laundryUnits(deviceType: string, profile: unknown): LaundryUnit[] {
-  const type = TYPES[deviceType];
+  const type = TYPES[deviceType] || CYCLE_TYPES[deviceType];
   if (!type) { return []; }
   if (type === 'tower') {
     return (['washer', 'dryer'] as const).flatMap((key) => {
@@ -121,6 +156,10 @@ export interface LaundryStatus {
   remoteControl: boolean;
   /** Times the washer has run, when it reports it. */
   cycleCount?: number;
+  /** The door is open (dishwashers), when reported. */
+  doorOpen?: boolean;
+  /** Rinse aid needs refilling (dishwashers), when reported. */
+  rinseAidLow?: boolean;
 }
 
 // States that are not a cycle under way. Anything not listed here or in PAUSED counts as running,
@@ -150,6 +189,8 @@ export function laundryStatus(unit: LaundryUnit, state: unknown): LaundryStatus 
   const inCycle = running || paused;
   const errorWord = field(field(s, 'error'), 'errorCode') ?? field(s, 'errorCode');
   const count = field(field(s, 'cycle'), 'cycleCount');
+  const door = field(field(s, 'doorStatus'), 'doorState');
+  const rinse = field(field(s, 'dishWashingStatus'), 'rinseRefill');
   return {
     state: current,
     running,
@@ -161,6 +202,8 @@ export function laundryStatus(unit: LaundryUnit, state: unknown): LaundryStatus 
     total: inCycle ? num(field(timer, 'totalHour')) * 3600 + num(field(timer, 'totalMinute')) * 60 : 0,
     remoteControl: field(field(s, 'remoteControlEnable'), 'remoteControlEnabled') === true,
     cycleCount: typeof count === 'number' ? count : undefined,
+    doorOpen: door === undefined ? undefined : door === 'OPEN',
+    rinseAidLow: typeof rinse === 'boolean' ? rinse : undefined,
   };
 }
 
@@ -196,7 +239,7 @@ export function mergeState(base: unknown, patch: unknown): unknown {
 
 /** What an LG alert means: a finished cycle, a problem, or neither (just logged). */
 export function alertKind(pushCode: string): 'finished' | 'problem' | 'other' {
-  if (/ERROR|FAIL/.test(pushCode)) { return 'problem'; }
+  if (/ERROR|FAIL|FULL|EMPTY|PROBLEM/.test(pushCode)) { return 'problem'; }
   if (/COMPLETE|FINISH|DONE/.test(pushCode)) { return 'finished'; }
   return 'other';
 }
@@ -210,8 +253,7 @@ export function alertFor(pushCode: string): LaundryKind | undefined {
 
 /** The command body for an operation (START, STOP, POWER_OFF) on a unit. */
 export function operationPayload(unit: LaundryUnit, operation: string): Record<string, unknown> {
-  const opKey = unit.kind === 'washer' ? 'washerOperationMode' : 'dryerOperationMode';
-  const body: Record<string, unknown> = { operation: { [opKey]: operation } };
+  const body: Record<string, unknown> = { operation: { [unit.opKey]: operation } };
   if (unit.usesLocation && unit.location) { body.location = { locationName: unit.location }; }
   return unit.towerKey ? { [unit.towerKey]: body } : body;
 }
@@ -233,7 +275,9 @@ const LABELS: Record<string, string> = {
 
 /** "Spinning" from SPINNING, "Paused" from PAUSE, "Washing" or "Drying" from RUNNING: for the log and sensor names. */
 export function stateLabel(state: string, kind: LaundryKind = 'washer'): string {
-  if (state === 'RUNNING') { return kind === 'washer' ? 'Washing' : 'Drying'; }
+  if (state === 'RUNNING') {
+    return ({ washer: 'Washing', dryer: 'Drying', dishwasher: 'Washing', styler: 'Refreshing', oven: 'Cooking' } as const)[kind];
+  }
   if (LABELS[state]) { return LABELS[state]; }
   const text = state.toLowerCase().split('_').filter(Boolean).join(' ');
   return text ? text[0].toUpperCase() + text.slice(1) : state;
