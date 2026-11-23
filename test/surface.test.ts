@@ -11,7 +11,8 @@ import type { API, Logging, PlatformAccessory } from 'homebridge';
 import type * as HapNodejs from '@homebridge/hap-nodejs';
 import { type ApplianceContext, MAPPED_TYPES, mappingFor } from '../src/appliances';
 import { LaundryAccessory, type LaundryContext } from '../src/accessory';
-import { laundryUnits } from '../src/laundry';
+import { LAUNDRY_TYPES, laundryUnits } from '../src/laundry';
+import { PLUGIN_NAME } from '../src/settings';
 import { readSettings } from '../src/platform';
 import { realDevices } from './fake-lg';
 import schema from '../config.schema.json';
@@ -122,6 +123,17 @@ const APPLIANCES: { name: string; type: string; profile: unknown; options?: Appl
 const LAUNDRY: { name: string; type: string; profile: unknown; tubClean?: number }[] = [
   ...realDevices().map((d) => ({ name: `ours ${String(d.deviceInfo.deviceType)}`, type: String(d.deviceInfo.deviceType), profile: d.profile, tubClean: 30 })),
   { name: 'ha washtower_dryer', type: 'DEVICE_WASHTOWER_DRYER', profile: ha('washtower_dryer') },
+  // Other laundry types, built from our washer's and dryer's profiles (same LG fields)
+  ...(() => {
+    const [washer, dryer] = realDevices();
+    return [
+      { name: 'washtower (one device)', type: 'DEVICE_WASHTOWER', profile: { washer: washer.profile, dryer: dryer.profile } },
+      { name: 'washtower washer', type: 'DEVICE_WASHTOWER_WASHER', profile: washer.profile },
+      { name: 'washcombo main', type: 'DEVICE_WASHCOMBO_MAIN', profile: washer.profile },
+      { name: 'washcombo mini', type: 'DEVICE_WASHCOMBO_MINI', profile: washer.profile },
+      { name: 'styler', type: 'DEVICE_STYLER', profile: dryer.profile },
+    ];
+  })(),
   { name: 'dishwasher', type: 'DEVICE_DISH_WASHER', profile: { property: {
     runState: { currentState: en(['POWER_OFF', 'RUNNING', 'END'], ['r']) }, operation: { dishWasherOperationMode: en(['START', 'STOP'], ['w']) },
     doorStatus: { doorState: en(['OPEN', 'CLOSE'], ['r']) }, dishWashingStatus: { rinseRefill: bool(['r']) },
@@ -170,9 +182,10 @@ function defineTests(hap: Hap): void {
       }
     }
     surface.settings = settingKeys();
-    if (process.env.UPDATE_SURFACE === '1' || !existsSync(SNAPSHOT)) {
+    if (process.env.UPDATE_SURFACE === '1') {
       writeFileSync(SNAPSHOT, `${JSON.stringify(surface, null, 2)}\n`);
     }
+    assert.ok(existsSync(SNAPSHOT), `${SNAPSHOT} is missing: restore it from git (or record it with UPDATE_SURFACE=1 npm test)`);
     const saved = JSON.parse(readFileSync(SNAPSHOT, 'utf8')) as Record<string, string[]>;
     // Removed or changed entries fail; new appliances or entries only fail until the snapshot is updated
     for (const [name, entries] of Object.entries(saved)) {
@@ -204,8 +217,17 @@ function settingKeys(): string[] {
 
 if (hap) { defineTests(hap); } else { test('HomeKit surface', { skip: 'HAP library not loadable' }, () => {}); }
 
+// The accessory IDs: the Home app keys scenes and automations to these, so they never change in 1.x
+test('HomeKit surface: accessory IDs are made the same way', () => {
+  const src = readFileSync(join(__dirname, '..', 'src', 'platform.ts'), 'utf8');
+  assert.ok(src.includes('uuid.generate(`${PLUGIN_NAME}:${device.deviceId}:${unit.location}`)'), 'laundry accessory IDs');
+  assert.ok(src.includes('uuid.generate(`${PLUGIN_NAME}:${device.deviceId}:`)'), 'other appliances\' accessory IDs');
+  assert.equal(PLUGIN_NAME, 'homebridge-lg-thinq-connect');
+});
+
 // Every type the plugin maps appears above
 test('HomeKit surface covers every mapped appliance type', () => {
   const covered = new Set([...APPLIANCES.map((a) => a.type), ...LAUNDRY.map((l) => l.type)]);
   assert.deepEqual(MAPPED_TYPES.filter((t) => !covered.has(t)), []);
+  assert.deepEqual(LAUNDRY_TYPES.filter((t) => !covered.has(t)), [], 'every laundry and cycle type');
 });

@@ -38,6 +38,11 @@ Each washer or dryer shows up as:
   count reaches the number you set (LG suggests a Tub Clean about every 30 washes). Turn on
   notifications for it as a reminder. The count is LG's own; it's expected to start again after a
   Tub Clean.
+- **"Washer remote start"** (occupancy sensor, with *Allow starting and pausing* on, for
+  machines that report it; dishwashers and Stylers too): detected while Remote Start is on at the machine, so an automation
+  or a notification can tell you the machine is ready to be started from the Home app.
+
+When a cycle finishes, the log also notes LG's cycle count for machines that keep one.
 
 The names follow your machines' names in the ThinQ app.
 
@@ -165,9 +170,11 @@ appliance, and what has to be true first:
 | Cooktop | Switch every burner off | Models LG allows it for. It can never switch a burner on |
 | Air conditioner, purifier, humidifier, dehumidifier, fan, hood | On/off, modes, temperature, fan speed, the extra switches | **Experimental appliances** on (as LG's own app allows) |
 | Fridge, wine cellar, water heater, heat pump | Set temperatures, express and eco modes, water heater modes, the wine cellar light | **Experimental appliances** on |
+| Over-the-range microwave | Vent fan speed and light (never cooking) | **Experimental appliances** on, where LG allows it |
 | Robot vacuum | Start, resume, send home | **Experimental appliances** on |
+| Other appliances with a basic tile (kimchi fridge, plant cultivator…) | On/off, where LG allows it | **Experimental appliances** on |
 
-Microwaves and stick vacuums are read-only, and so is anything LG marks read-only, such as a
+Stick vacuums are read-only, and so is anything LG marks read-only, such as a
 fridge's Sabbath mode. LG also refuses any command an appliance can't take in its current state;
 the Home app then shows an error and the log says why.
 
@@ -199,9 +206,9 @@ Each type has one of three levels:
 | Air conditioner | Heater/cooler: on/off, cool / heat / auto (as the unit offers), room and set temperature (separate heating and cooling set points in auto, on units with two-set), fan speed (Auto at the top of the slider), swing. Switches, where the unit offers them: air purify, energy saving, display light, the other swing direction, jet mode, dry mode, fan mode, and newer units' airflow styles (forest wind, air guide, high ceiling, swirl…). Air quality, humidity and filter sensors; "problem" for a full water tank, or an error where the unit reports one. Picking a mode while it's off switches it on in that mode. Per appliance: cooling or heating only, which way the tile's swing moves, and a room temperature sensor (see [Options per appliance](#options-per-appliance)) | **Checked** (Home Assistant's three samples) |
 | Refrigerator, wine cellar | Door-open sensor per door; set temperature per compartment; express modes, eco and power saving as switches (as status sensors where LG doesn't allow changing them, such as Sabbath mode); up to three water filters and the air filter; wine cellar light and optimal humidity | Experimental |
 | Dehumidifier, humidifier | Humidifier tile: on/off, humidity now and target, fan speed; "problem" for a full tank. Humidifiers: auto, sleep, hygiene dry, warm mist, mood lamp and display light switches; temperature and air quality | Dehumidifier **checked**, humidifier experimental |
-| Air purifier, AeroTower | Air purifier tile: on/off, auto or manual, fan speed (Auto at the top); sleep mode and turbo switches; AeroTower warm mode, UV nano and display light switches; air quality (PM2.5, PM10), temperature, humidity and filter life when reported | Purifier **checked**, AeroTower experimental |
+| Air purifier, AeroTower | Air purifier tile: on/off, auto or manual, fan speed (Auto at the top); sleep mode and turbo switches; AeroTower warm mode, UV nano and display light switches; air quality (PM2.5, PM10), temperature, humidity and filter life when reported | Experimental (Home Assistant's purifier sample has nothing to compare with yet) |
 | Ceiling fan, ventilator | Fan: on/off and speed. Ventilators: CO₂ (with the Home app's alarm above 1,000 ppm), PM2.5/PM10 and temperature | Experimental |
-| Range hood | Fan with speed steps, and the light with brightness | **Checked** (Home Assistant's sample) |
+| Range hood | Fan with speed steps, and the light with brightness | **Checked** (the fan, against Home Assistant's sample; the light is experimental) |
 | Over-the-range microwave | Running and time left (to the second), "done" sensor, vent fan and light. LG's API has no cooking mode, power level or temperature | Experimental |
 | Water heater | Thermostat: on/off, tank and set temperature; its modes (heat pump, turbo, vacation…) as switches | Experimental |
 | Heat pump (system boiler) | Thermostat for room heating or cooling, and one for hot water | Experimental |
@@ -212,6 +219,8 @@ Each type has one of three levels:
 Some air conditioners don't report air purify back; its switch then shows the last command. LG's
 official API has no quiet mode, and no light for air purifiers. It doesn't cover older (ThinQ1)
 appliances, microwave cooking, or a washer's door lock.
+
+### LG quirks
 
 Things LG's API does that the plugin works around or can't fix (from Home Assistant's and LG's own
 issue reports): below an hour, live updates leave the hours out of the time left (the plugin reads
@@ -272,7 +281,7 @@ run into most.
 
 | What you see | What to do |
 |---|---|
-| "LG refused: … 1103 / 1218 / 1302" | The token isn't valid: create a new one, with every permission ticked (see [Signing in](#signing-in)) |
+| "LG error 1103", "1218" or "1302" (often with HTTP 401) | The token isn't valid: create a new one, with every permission ticked (see [Signing in](#signing-in)) |
 | No appliances found, or not all of them | The token is on a different LG account than the ThinQ app's: sign in to the token page with the QR code. Check the country |
 | "LG error 1307 / 1309" | The country doesn't match the LG account: set the one the account was created in |
 | "LG error 1304" | LG has new terms: open the ThinQ app and accept them |
@@ -286,8 +295,8 @@ run into most.
 **Debug logging.** For a closer look, turn on debug logging for this plugin only: run it as a
 child bridge (in the Homebridge UI, the plugin's **Bridge Settings**), then turn on debug mode
 for that bridge, either there or by adding `"_bridge": { "debugModeEnabled": true }` to the
-plugin's config (with the child bridge's other `_bridge` settings). The log then shows each
-request to LG and each live update.
+plugin's config (with the child bridge's other `_bridge` settings). The log then also shows
+each live update from LG, appliances that still couldn't be set up, and energy checks.
 
 **Reporting a problem.** Open the plugin's settings and press **Copy diagnostics**: it collects
 what LG says about each appliance, with device IDs, serial numbers and the token removed. Look
@@ -306,6 +315,21 @@ Your scenes and automations are built on the tiles and sensors this plugin adds,
 
 The plugin's tests hold every appliance's tiles and settings to a recorded list
 (`test/surface.snapshot.json`), so a change can't slip through by accident.
+
+**Homebridge and Node.js.** Works with Homebridge 1.6 or later and Homebridge 2.0, on Node.js 22,
+24 or 26. Every change is tested on Homebridge 2 and Node.js 22, 24 and 26; before each release
+the tests are also run on Homebridge 1.8 (`npm run test:homebridge1`).
+
+## Privacy
+
+- Your token is kept only in your Homebridge settings. The plugin sends it only to LG's ThinQ
+  Connect servers, the same ones LG's own app uses.
+- The plugin talks to nobody but LG: no analytics, no tracking, no update checks of its own.
+- For live updates the plugin creates a private key on your Homebridge, and LG signs a
+  certificate for it. Both are kept in Homebridge's storage folder, readable only by the
+  Homebridge user; the private key never leaves it.
+- **Copy diagnostics** removes the token, device IDs and serial numbers, and only copies to your
+  clipboard: nothing is sent anywhere until you paste it yourself.
 
 ## Coming from homebridge-lg-thinq
 
@@ -333,6 +357,42 @@ This plugin can run next to [homebridge-lg-thinq](https://github.com/nVuln/homeb
 
 Older appliances that only work with LG's previous system (ThinQ1) aren't reachable through LG's
 official API: keep the old plugin for those, and leave them out of this one.
+
+## Compared with other HomeKit plugins for LG
+
+Checked November 2026. Plugins that use **LG's official ThinQ Connect API** (a token from LG)
+keep working when LG changes its app; the others sign in the way LG's app does, with your LG
+password, and depend on that staying the same.
+
+| Plugin | LG API | Appliances |
+|---|---|---|
+| **This plugin** | Official | 26 appliance types mapped (others get a basic tile when LG reports something usable): washer and dryer tested on real machines, air conditioner, dehumidifier and range hood checked against Home Assistant's data, the rest experimental. Energy use, live updates, settings screen with a token check and Copy diagnostics |
+| [homebridge-lg-thinq](https://github.com/nVuln/homebridge-lg-thinq) and its forks (homebridge-lg-thinq-2, @rnikoopour, @bvksound and others) | LG app login | Many types, including older ThinQ1 appliances this API can't reach, and a few details the official API doesn't report (such as the washer's door lock) |
+| [@0modfather0/homebridge-lg-thinq](https://www.npmjs.com/package/@0modfather0/homebridge-lg-thinq) | Official | Washers, dryers and a few others, read-only |
+| [homebridge-lg-thinqconnect-ac](https://www.npmjs.com/package/homebridge-lg-thinqconnect-ac) | Official | Air conditioners |
+| [homebridge-lg-thinq-system-boiler](https://www.npmjs.com/package/homebridge-lg-thinq-system-boiler) | Official | Heat pumps and hot water |
+
+## Home Assistant parity
+
+Home Assistant's [LG ThinQ integration](https://www.home-assistant.io/integrations/lg_thinq/) is
+the most used project on LG's official API, so this plugin keeps track of it:
+
+- **Same data.** The tests run Home Assistant's own sample data from real appliances through this
+  plugin and compare what the Home app gets with what Home Assistant shows for the same sample:
+  power, mode, temperatures and their limits, fan speed, swing, humidity (`test/ha-parity.test.ts`).
+  An appliance type is marked *checked* once that passes. Values Home Assistant doesn't show
+  (such as a range hood's light) aren't part of the comparison.
+- **Same known quirks.** LG problems reported by Home Assistant users are handled here too (see
+  [LG quirks](#lg-quirks)), such as the time left jumping when it drops below an hour and the
+  "finished" alert LG sends while a washer is still weighing the load.
+- **Intentional differences.** For air conditioners with both a fan speed and a detailed fan speed,
+  the plugin uses the plain one, so *Auto* stays available (Home Assistant shows the detailed
+  one). Some values have no Home app tile, such as the program name, filter dates or a fridge's
+  door alarm history; these are in the log instead.
+- **Not covered yet.** The kimchi refrigerator shows nothing beyond its basic tile.
+
+Each week an automated check, run by the maintainer, looks at new Home Assistant changes and LG
+toolkit releases, and opens a "Parity check" issue here when something needs a look.
 
 ## Credits
 

@@ -44,7 +44,8 @@
     "verify": "npm run lint && npm run build && npm test",
     "test:matrix": "npm run build && npm test",
     "release:check": "npm run verify",
-    "surface:update": "UPDATE_SURFACE=1 node --import tsx --test test/surface.test.ts"
+    "surface:update": "UPDATE_SURFACE=1 node --import tsx --test test/surface.test.ts",
+    "test:homebridge1": "node -e \"require('fs').rmSync('.hb1',{recursive:true,force:true})\" && git worktree add --detach .hb1 >/dev/null && cd .hb1 && npm ci --silent && npm i --no-save --silent homebridge@1.8 && node -p \"'Homebridge ' + require('homebridge/package.json').version\" && node -e \"require('fs').symlinkSync('../hap-nodejs','node_modules/@homebridge/hap-nodejs')\" && npm run check && npm test; s=$?; cd .. && git worktree remove --force .hb1; exit $s"
   },
   "keywords": [
     "homebridge-plugin",

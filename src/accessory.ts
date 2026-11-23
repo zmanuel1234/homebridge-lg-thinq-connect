@@ -10,6 +10,8 @@
 //    when the machine reports them;
 //  - optionally "<name> tub clean", an occupancy sensor: detected once the washer's cycle count
 //    (as LG counts it) reaches the setting, as a reminder to run Tub Clean;
+//  - "<name> remote start", an occupancy sensor: on while Remote Start is on at the machine, for a
+//    notification or an automation that starts it (machines that report it, when control is allowed);
 //  - ovens that accept a temperature: "<name> temperature", a thermostat: heat starts the oven at
 //    the set temperature, off stops it. LG doesn't report the oven's actual temperature, so the
 //    current temperature shows the one it's set to.
@@ -73,6 +75,7 @@ export class LaundryAccessory {
   readonly doorSensor: Service | undefined;
   readonly rinseAidSensor: Service | undefined;
   readonly ovenThermostat: Service | undefined;
+  readonly remoteStartSensor: Service | undefined;
   /** The temperature to start the oven at (°C), from the Home app or the oven. */
   private ovenTarget = DEFAULT_OVEN_C;
   /** Until when the Home app's temperature wins over the oven's report. */
@@ -142,6 +145,10 @@ export class LaundryAccessory {
     } else if (tubClean) {
       accessory.removeService(tubClean);
     }
+
+    // Remote Start on at the machine: only useful when the Home app may start it
+    this.remoteStartSensor = this.optional(unit.reportsRemoteStart && options.allowControl && unit.kind !== 'oven',
+      S.OccupancySensor, `${name} remote start`, 'remote-start');
 
     // Oven temperature, when the oven accepts one
     this.ovenThermostat = this.optional(!!unit.oven, S.Thermostat, `${name} temperature`, 'oven-temperature');
@@ -214,9 +221,10 @@ export class LaundryAccessory {
     }
     if (next && prev && next.state !== prev.state) {
       const left = next.remaining ? `, ${Math.round(next.remaining / 60)} min left` : '';
+      const cycles = next.done && !prev.done && next.cycleCount !== undefined ? ` (LG counts ${next.cycleCount} cycles)` : '';
       const course = next.course && (next.running || next.paused) ? ` (${stateLabel(next.course).toLowerCase()})` : '';
       const wait = next.startsIn ? `, starts in ${duration(next.startsIn)}` : '';
-      this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state, this.unit.kind)}${course}${left}${wait}.`);
+      this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state, this.unit.kind)}${course}${left}${wait}${cycles}.`);
       if (next.error) {
         this.deps.log.warn(`[${this.options.name}] The machine reports an error${next.errorName ? `: ${next.errorName}` : ''}.`);
       }
@@ -303,6 +311,10 @@ export class LaundryAccessory {
       const due = s?.cycleCount !== undefined && s.cycleCount >= this.options.tubCleanAfter;
       set(this.tubCleanSensor.getCharacteristic(C.OccupancyDetected),
         due ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    }
+    if (this.remoteStartSensor) {
+      set(this.remoteStartSensor.getCharacteristic(C.OccupancyDetected),
+        s?.remoteControl ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     }
     if (this.ovenThermostat) {
       const t = this.ovenThermostat;

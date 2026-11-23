@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- Washers, dryers, dishwashers and Stylers: a **remote start** sensor, on while Remote Start is on
+  at the machine (with "Allow starting and pausing" on). The log notes LG's cycle count when a cycle finishes.
+- README: comparison with the other LG plugins, Home Assistant parity, privacy, and Homebridge and
+  Node.js compatibility. `docs/verified-checklist.md` tracks the Homebridge Verified requirements.
+- `npm run test:homebridge1` runs the tests on Homebridge 1.8.
 - **Copy diagnostics** on the settings page: what LG says about each appliance, with device IDs,
   serial numbers and the token removed, ready to paste into an issue (no terminal needed).
 - README: what the plugin can change on your appliances and what each needs; troubleshooting
@@ -11,7 +16,7 @@
 - **Support levels** (README, the log, the settings page's Check token): **tested** on a real
   appliance, **checked** against Home Assistant's LG integration on real-appliance data, or
   **experimental**. The tests compare what the Home app gets with what Home Assistant shows for its
-  samples, value by value (air conditioners, dehumidifier, range hood, air purifier, washer), read
+  samples (air conditioners, dehumidifier, range hood, washer), read
   straight from Home Assistant's own snapshot files; the one intentional difference (air
   conditioner fan speed on units with two speed fields) is listed with its reason.
 - A compatibility promise for 1.0 (README, "Updates and compatibility"): 1.x never renames or

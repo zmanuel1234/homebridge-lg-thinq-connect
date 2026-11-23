@@ -64,7 +64,15 @@
       result.style.display = 'block';
     }
 
+    const diagBox = document.getElementById('lg-diag-box');
+    // Each button shows only its own answer
+    function clearAnswers() {
+      result.style.display = 'none';
+      diagBox.style.display = 'none';
+    }
+
     button.addEventListener('click', async () => {
+      clearAnswers();
       button.disabled = true;
       homebridge.showSpinner();
       try {
@@ -81,15 +89,15 @@
     // What LG says about each appliance, for an issue (IDs, serials and the token removed)
     const diagButton = document.getElementById('lg-diag');
     diagButton.addEventListener('click', async () => {
+      clearAnswers();
       diagButton.disabled = true;
       homebridge.showSpinner();
       try {
         const answer = await homebridge.request('/diagnostics', { token: config.token, country: config.country });
         if (!answer.ok) { show(false, answer.message); return; }
-        const box = document.getElementById('lg-diag-box');
         const text = document.getElementById('lg-diag-text');
         text.value = answer.report;
-        box.style.display = 'block';
+        diagBox.style.display = 'block';
         let copied = false;
         try { await navigator.clipboard.writeText(answer.report); copied = true; } catch (e) { /* not allowed here: select it instead */ }
         if (!copied) { text.focus(); text.select(); }

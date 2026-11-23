@@ -32,6 +32,9 @@ const CYCLE_TYPES: Record<string, LaundryKind> = {
   DEVICE_OVEN: 'oven',
 };
 
+/** Every LG device type handled as laundry or as a cycle appliance. */
+export const LAUNDRY_TYPES = [...Object.keys(TYPES), ...Object.keys(CYCLE_TYPES)];
+
 /** The operation field each kind uses, when the profile doesn't show one with START. */
 const OP_KEYS: Record<LaundryKind, string> = {
   washer: 'washerOperationMode',
@@ -66,6 +69,8 @@ export interface LaundryUnit {
   hasRinseAid: boolean;
   /** The machine reports a cycle count (cycle.cycleCount), used for the tub-clean reminder. */
   countsCycles: boolean;
+  /** The machine reports whether Remote Start is on (remoteControlEnable.remoteControlEnabled). */
+  reportsRemoteStart: boolean;
   /** Where this unit's properties sit in a WashTower's state and commands. */
   towerKey?: 'washer' | 'dryer';
   /** Whether the state and commands carry location.locationName. */
@@ -140,6 +145,7 @@ function unitFrom(kind: LaundryKind, props: Props, location: string, usesLocatio
     hasDoor: field(field(props, 'doorStatus'), 'doorState') !== undefined,
     hasRinseAid: field(field(props, 'dishWashingStatus'), 'rinseRefill') !== undefined,
     countsCycles: field(field(props, 'cycle'), 'cycleCount') !== undefined,
+    reportsRemoteStart: field(field(props, 'remoteControlEnable'), 'remoteControlEnabled') !== undefined,
     towerKey,
     usesLocation,
     ...ovenField(kind, props),
