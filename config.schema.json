@@ -41,10 +41,10 @@
           "oneOf": [
             { "title": "Detecting load", "enum": ["DETECTING"] },
             { "title": "Prewash", "enum": ["PREWASH"] },
-            { "title": "Washing", "enum": ["RUNNING"] },
+            { "title": "Main phase (washing, or drying on a dryer)", "enum": ["RUNNING"] },
             { "title": "Rinsing", "enum": ["RINSING"] },
             { "title": "Spinning", "enum": ["SPINNING"] },
-            { "title": "Drying", "enum": ["DRYING"] },
+            { "title": "Drying (washer-dryer combos)", "enum": ["DRYING"] },
             { "title": "Cooling (dryer)", "enum": ["COOLING"] },
             { "title": "Wrinkle care (dryer)", "enum": ["WRINKLE_CARE"] },
             { "title": "Rinse hold", "enum": ["RINSE_HOLD"] },

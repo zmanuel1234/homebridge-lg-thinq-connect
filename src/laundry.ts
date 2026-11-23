@@ -169,9 +169,25 @@ export function operationPayload(unit: LaundryUnit, operation: string): Record<s
   return unit.towerKey ? { [unit.towerKey]: body } : body;
 }
 
-/** "Spinning" from SPINNING, for log lines and sensor names. */
-export function stateLabel(state: string): string {
-  const words = state.toLowerCase().split('_').filter(Boolean);
-  const text = words.join(' ');
+// Words for LG's states, where its own name reads oddly. RUNNING is the main phase: washing or drying.
+const LABELS: Record<string, string> = {
+  POWER_OFF: 'Off',
+  INITIAL: 'Ready',
+  PAUSE: 'Paused',
+  DETECTING: 'Detecting load',
+  END: 'Finished',
+  RESERVED: 'Delayed start waiting',
+  FROZEN_PREVENT_INITIAL: 'Freeze protection',
+  FROZEN_PREVENT_RUNNING: 'Freeze protection running',
+  FROZEN_PREVENT_PAUSE: 'Freeze protection paused',
+  ADD_DRAIN: 'Draining',
+  DETERGENT_AMOUNT: 'Measuring detergent',
+};
+
+/** "Spinning" from SPINNING, "Paused" from PAUSE, "Washing" or "Drying" from RUNNING: for the log and sensor names. */
+export function stateLabel(state: string, kind: LaundryKind = 'washer'): string {
+  if (state === 'RUNNING') { return kind === 'washer' ? 'Washing' : 'Drying'; }
+  if (LABELS[state]) { return LABELS[state]; }
+  const text = state.toLowerCase().split('_').filter(Boolean).join(' ');
   return text ? text[0].toUpperCase() + text.slice(1) : state;
 }

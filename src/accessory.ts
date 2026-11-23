@@ -80,7 +80,7 @@ export class LaundryAccessory {
     // Phase sensors the machine can report; ones no longer wanted are removed
     const phases = options.phaseSensors.filter((p) => unit.states.includes(p));
     for (const phase of phases) {
-      this.phaseSensors.set(phase, this.service(S.OccupancySensor, `${name} ${stateLabel(phase).toLowerCase()}`, `phase-${phase}`));
+      this.phaseSensors.set(phase, this.service(S.OccupancySensor, `${name} ${stateLabel(phase, unit.kind).toLowerCase()}`, `phase-${phase}`));
     }
     for (const svc of [...accessory.services]) {
       if (svc.subtype?.startsWith('phase-') && !this.phaseSensors.has(svc.subtype.slice(6))) {
@@ -118,7 +118,7 @@ export class LaundryAccessory {
     }
     if (next && prev && next.state !== prev.state) {
       const left = next.remaining ? `, ${Math.round(next.remaining / 60)} min left` : '';
-      this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state)}${left}.`);
+      this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state, this.unit.kind)}${left}.`);
       if (next.error) {
         this.deps.log.warn(`[${this.options.name}] The machine reports an error${next.errorName ? `: ${next.errorName}` : ''}.`);
       }

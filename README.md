@@ -18,7 +18,8 @@ finishes or stops on an error, and sensors for automations. Other LG appliances 
 Each washer or dryer shows up as:
 
 - **The machine** (a valve tile): on while it runs, with the **minutes left** on the tile. While
-  paused, it's off and keeps the time left.
+  paused, it's off and keeps the time left. For the first minute or so of a wash the machine is
+  still sensing the load and hasn't worked out the time, so none is shown yet.
 - **"Washer done"** (occupancy sensor): detected when the cycle finishes, until the machine
   starts again or is switched off. **Turn on notifications for it** in the Home app to be told
   when the laundry is ready.

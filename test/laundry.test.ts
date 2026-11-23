@@ -135,4 +135,10 @@ test('state labels', () => {
   assert.equal(stateLabel('WRINKLE_CARE'), 'Wrinkle care');
   assert.equal(stateLabel('MAIN'), 'Main');
   assert.equal(stateLabel(''), '');
+  assert.equal(stateLabel('PAUSE'), 'Paused');
+  assert.equal(stateLabel('INITIAL'), 'Ready');
+  assert.equal(stateLabel('DETECTING'), 'Detecting load');
+  assert.equal(stateLabel('END'), 'Finished');
+  assert.equal(stateLabel('RUNNING'), 'Washing');
+  assert.equal(stateLabel('RUNNING', 'dryer'), 'Drying');
 });

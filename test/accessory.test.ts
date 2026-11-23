@@ -106,7 +106,7 @@ function defineTests(hap: Hap): void {
     laundry.update(status({ state: 'END', done: true }));
     assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
     assert.equal(value(laundry.valve.getCharacteristic(C.Active)), C.Active.INACTIVE);
-    assert.ok(lines.includes('info: [Washer] End.'));
+    assert.ok(lines.includes('info: [Washer] Finished.'));
     // Powering off or starting again clears it
     laundry.update(status());
     assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
