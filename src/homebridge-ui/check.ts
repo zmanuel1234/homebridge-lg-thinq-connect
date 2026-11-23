@@ -1,13 +1,15 @@
 import { ThinQClient, ThinQError, type ClientOptions } from '../api';
-import { TESTED_TYPES, isCycleAppliance, isLaundry } from '../laundry';
+import { isCycleAppliance, isLaundry } from '../laundry';
 import { MAPPED_TYPES } from '../appliances';
+import { supportLevel } from '../support';
 
 /**
- * supported: tested on real appliances. laundry: other laundry, added without the experimental
- * setting. experimental: needs "Experimental appliances". basic: experimental, and added only if
- * LG reports something useful.
+ * tested: confirmed on real appliances. checked: matches Home Assistant on real sample data
+ * (needs "Experimental appliances"). laundry: other laundry, added without that setting.
+ * experimental: needs "Experimental appliances". basic: experimental, and added only if LG
+ * reports something useful.
  */
-export type Support = 'supported' | 'laundry' | 'experimental' | 'basic';
+export type Support = 'tested' | 'checked' | 'laundry' | 'experimental' | 'basic';
 
 export interface CheckResult {
   ok: boolean;
@@ -18,7 +20,9 @@ export interface CheckResult {
 
 /** How well this plugin supports an LG appliance type. */
 export function supportOf(deviceType: string): Support {
-  if (TESTED_TYPES.has(deviceType)) { return 'supported'; }
+  const level = supportLevel(deviceType);
+  if (level === 'tested') { return 'tested'; }
+  if (level === 'checked') { return 'checked'; }
   if (isLaundry(deviceType)) { return 'laundry'; }
   if (isCycleAppliance(deviceType) || MAPPED_TYPES.includes(deviceType)
     || deviceType === 'DEVICE_MICROWAVE_OVEN') { return 'experimental'; }

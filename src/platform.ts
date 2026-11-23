@@ -3,8 +3,9 @@ import { join } from 'node:path';
 import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { type Device, ThinQClient, ThinQError, clientIdFor } from './api';
-import { TESTED_TYPES, alertFor, alertKind, isCycleAppliance, isLaundry, laundryStatus, laundryUnits, mergeState, stateLabel } from './laundry';
+import { alertFor, alertKind, isCycleAppliance, isLaundry, laundryStatus, laundryUnits, mergeState, stateLabel } from './laundry';
 import { mainService, thisMonth, totalConsumption } from './energy';
+import { supportLevel } from './support';
 import { type ApplianceContext, type ApplianceOptions, type Part, categoryOf, mappingFor } from './appliances';
 import { type LaundryContext, LaundryAccessory } from './accessory';
 import { type LiveClient, type LiveMessage, type LiveOptions, LiveUpdates } from './live';
@@ -395,7 +396,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     const profile = await this.client!.profile(device.deviceId);
     const units = laundryUnits(deviceType, profile);
     if (!units.length) { throw new Error('LG\'s profile for it has nothing this plugin understands.'); }
-    if (!TESTED_TYPES.has(deviceType)) {
+    if (supportLevel(deviceType) === 'experimental') {
       this.log.warn(`[${alias}] ${deviceType} support is experimental. Please report how it works: `
         + 'https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues');
     }
@@ -444,8 +445,13 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
         + 'https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues');
       return;
     }
-    this.log.warn(`[${alias}] Added as an experimental ${mapping.label} (${deviceType}). Please report how it works: `
-      + 'https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues');
+    if (supportLevel(deviceType) === 'checked') {
+      this.log.info(`[${alias}] Added as ${/^[aeiou]/.test(mapping.label) ? 'an' : 'a'} ${mapping.label} (${deviceType}), checked against Home Assistant's data from a real one. `
+        + 'Please report how it works: https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues');
+    } else {
+      this.log.warn(`[${alias}] Added as an experimental ${mapping.label} (${deviceType}). Please report how it works: `
+        + 'https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues');
+    }
     const uuid = this.api.hap.uuid.generate(`${PLUGIN_NAME}:${device.deviceId}:`);
     active.add(uuid);
     let accessory = this.cached.get(uuid);

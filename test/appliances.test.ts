@@ -4,7 +4,7 @@
 // property names.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { API, Characteristic, Logging, PlatformAccessory } from 'homebridge';
 import type * as HapNodejs from '@homebridge/hap-nodejs';
@@ -913,7 +913,7 @@ function defineTests(hap: Hap): void {
     console.warn = catchWarning;
     console.log = catchWarning;
     try {
-      for (const name of readdirSync(join(__dirname, 'fixtures', 'ha')).filter((n) => !n.includes('.'))) {
+      for (const name of readdirSync(join(__dirname, 'fixtures', 'ha')).filter((n) => existsSync(join(__dirname, 'fixtures', 'ha', n, 'device.json')))) {
         const info = fixture(name, 'device') as { deviceInfo?: { deviceType: string }; deviceType?: string };
         const type = info.deviceInfo?.deviceType || info.deviceType || '';
         const profile = fixture(name, 'profile');

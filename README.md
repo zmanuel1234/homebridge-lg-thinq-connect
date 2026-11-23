@@ -156,9 +156,18 @@ toolkit.
 
 With **Experimental appliances** on, the plugin also adds the LG appliance types below. They're
 built from LG's documentation, Home Assistant's LG integration and its sample data from real
-appliances, and two other plugins on the same API (credits below), but not yet confirmed by
-anyone using this plugin. If you try one, please
+appliances, and two other plugins on the same API (credits below). If you try one, please
 [report how it works](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose).
+
+Each type has one of three levels:
+
+- **Tested**: confirmed on a real appliance by someone using this plugin.
+- **Checked**: matches Home Assistant's LG integration on data captured from a real appliance.
+  The plugin's tests feed it the same LG answers Home Assistant's tests use and compare what the
+  Home app gets with what Home Assistant shows, value by value (`test/ha-parity.test.ts`), so it
+  stays in step as either side changes. Controls are built the same way, but not yet confirmed on
+  a real one.
+- **Experimental**: built from LG's documentation and its own toolkits; not yet confirmed.
 
 | Appliance | In the Home app | Status |
 |---|---|---|
@@ -168,12 +177,12 @@ anyone using this plugin. If you try one, please
 | Styler | As a washer: time left, done, problem | Experimental |
 | Oven (each cavity) | As a washer: time left, done, problem; and a thermostat: heat (or the main tile) starts the oven at the set temperature (350 °F or 175 °C until you choose one; in its current cook mode, or bake), off stops it, and a new temperature while it's cooking is sent at once. A paused or self-cleaning oven is never restarted from the Home app. LG doesn't report the oven's actual temperature, so the thermostat shows the set one. Needs "Allow starting and pausing" and remote control on at the oven | Experimental (from LG's documentation) |
 | Cooktop | "In use" sensor (any burner on) and one per burner, for "the stove is still on" notifications and automations; an "all burners off" button on models LG allows it for; each burner's level and time left in the log | Experimental (from LG's documentation) |
-| Air conditioner | Heater/cooler: on/off, cool / heat / auto (as the unit offers), room and set temperature (separate heating and cooling set points in auto, on units with two-set), fan speed (Auto at the top of the slider), swing. Switches, where the unit offers them: air purify, energy saving, display light, the other swing direction, jet mode, dry mode, fan mode, and newer units' airflow styles (forest wind, air guide, high ceiling, swirl…). Air quality, humidity and filter sensors; "problem" for a full water tank, or an error where the unit reports one. Picking a mode while it's off switches it on in that mode. Per appliance: cooling or heating only, which way the tile's swing moves, and a room temperature sensor (see [Options per appliance](#options-per-appliance)) | Experimental (from real sample data) |
+| Air conditioner | Heater/cooler: on/off, cool / heat / auto (as the unit offers), room and set temperature (separate heating and cooling set points in auto, on units with two-set), fan speed (Auto at the top of the slider), swing. Switches, where the unit offers them: air purify, energy saving, display light, the other swing direction, jet mode, dry mode, fan mode, and newer units' airflow styles (forest wind, air guide, high ceiling, swirl…). Air quality, humidity and filter sensors; "problem" for a full water tank, or an error where the unit reports one. Picking a mode while it's off switches it on in that mode. Per appliance: cooling or heating only, which way the tile's swing moves, and a room temperature sensor (see [Options per appliance](#options-per-appliance)) | **Checked** (Home Assistant's three samples) |
 | Refrigerator, wine cellar | Door-open sensor per door; set temperature per compartment; express modes, eco and power saving as switches (as status sensors where LG doesn't allow changing them, such as Sabbath mode); up to three water filters and the air filter; wine cellar light and optimal humidity | Experimental |
-| Dehumidifier, humidifier | Humidifier tile: on/off, humidity now and target, fan speed; "problem" for a full tank. Humidifiers: auto, sleep, hygiene dry, warm mist, mood lamp and display light switches; temperature and air quality | Experimental (dehumidifier from real sample data) |
-| Air purifier, AeroTower | Air purifier tile: on/off, auto or manual, fan speed (Auto at the top); sleep mode and turbo switches; AeroTower warm mode, UV nano and display light switches; air quality (PM2.5, PM10), temperature, humidity and filter life when reported | Experimental (purifier from real sample data) |
+| Dehumidifier, humidifier | Humidifier tile: on/off, humidity now and target, fan speed; "problem" for a full tank. Humidifiers: auto, sleep, hygiene dry, warm mist, mood lamp and display light switches; temperature and air quality | Dehumidifier **checked**, humidifier experimental |
+| Air purifier, AeroTower | Air purifier tile: on/off, auto or manual, fan speed (Auto at the top); sleep mode and turbo switches; AeroTower warm mode, UV nano and display light switches; air quality (PM2.5, PM10), temperature, humidity and filter life when reported | Purifier **checked**, AeroTower experimental |
 | Ceiling fan, ventilator | Fan: on/off and speed. Ventilators: CO₂ (with the Home app's alarm above 1,000 ppm), PM2.5/PM10 and temperature | Experimental |
-| Range hood | Fan with speed steps, and the light with brightness | Experimental (from real sample data) |
+| Range hood | Fan with speed steps, and the light with brightness | **Checked** (Home Assistant's sample) |
 | Over-the-range microwave | Running and time left (to the second), "done" sensor, vent fan and light. LG's API has no cooking mode, power level or temperature | Experimental |
 | Water heater | Thermostat: on/off, tank and set temperature; its modes (heat pump, turbo, vacation…) as switches | Experimental |
 | Heat pump (system boiler) | Thermostat for room heating or cooling, and one for hot water | Experimental |
