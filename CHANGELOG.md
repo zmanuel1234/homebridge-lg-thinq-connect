@@ -1,23 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.2.0-beta.6 - 2026-11-23
 
-### Changed
-- Sign-in steps (README, settings page): choose your country at the top of the token page first,
-  since it decides which LG sign-in you get; use the same country in the plugin's settings.
-
-## 0.2.0-beta.5 - 2026-11-23
-
-### Added
-- **Check token** in the plugin's settings: step-by-step sign-in help, and a button that tries the
-  token with LG and lists the appliances it can see and how well each is supported, before you
-  save or restart.
-- The log now starts with who LG signed in and what it found, for example
-  `Signed in to LG (US): found Front Load Washer, Dryer.`
-- LG's error codes now come with what to do (new terms to accept, wrong country, a missing
-  permission, an offline appliance, Remote Start), and a README section on signing in.
-
-### Fixed (from an independent code review)
+### Fixed (from an independent code review; these were listed by mistake in 0.2.0-beta.5's release notes)
 - An odd or empty appliance list from LG no longer removes accessories from the Home app: an
   unreadable list is retried, and an empty one must repeat three times before anything is removed.
 - An appliance whose setup fails at startup (LG not answering) now shows a fault and is set up
@@ -36,6 +21,21 @@
 - Live updates stay off, with a warning, if Homebridge gives no storage folder (they never write
   elsewhere).
 - Removed a test certificate file that had been committed by mistake.
+
+### Changed
+- Sign-in steps (README, settings page): choose your country at the top of the token page first,
+  since it decides which LG sign-in you get; use the same country in the plugin's settings.
+
+## 0.2.0-beta.5 - 2026-11-23
+
+### Added
+- **Check token** in the plugin's settings: step-by-step sign-in help, and a button that tries the
+  token with LG and lists the appliances it can see and how well each is supported, before you
+  save or restart.
+- The log now starts with who LG signed in and what it found, for example
+  `Signed in to LG (US): found Front Load Washer, Dryer.`
+- LG's error codes now come with what to do (new terms to accept, wrong country, a missing
+  permission, an offline appliance, Remote Start), and a README section on signing in.
 
 ## 0.2.0-beta.4 - 2026-11-23
 
