@@ -72,7 +72,9 @@ export class WaterHeater extends Thermostats {
       for (const mode of modes.filter((m) => m !== this.defaultMode)) {
         const sub = `mode-${mode}`;
         const svc = this.service(S.Switch, `${ctx.name} ${mode.toLowerCase().split('_').join(' ')}`, sub);
-        svc.getCharacteristic(C.On).onSet((v) => this.setMode(v === true || v === 1 ? mode : this.defaultMode!));
+        // Off only undoes this mode: switching off a mode that isn't on changes nothing
+        svc.getCharacteristic(C.On).onSet((v) => (v === true || v === 1 ? this.setMode(mode)
+          : this.mode === mode ? this.setMode(this.defaultMode!) : Promise.resolve()));
         this.modeSwitches.set(mode, svc);
         keep.add(sub);
       }

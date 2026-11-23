@@ -234,6 +234,11 @@ test('below an hour, LG leaves remainHour out of live updates: minutes alone mea
   // 1:02 left, then an update with only the minutes (59): 0:59, not 1:59
   const merged = mergeState(base, [{ timer: { remainMinute: 59 }, location: { locationName: 'MAIN' } }]);
   assert.equal(laundryStatus(unit, merged).remaining, 59 * 60);
+  // Minutes alone that didn't wrap round: the hour hasn't changed (1:30 → 1:29, not 0:29)
+  const long = washerState('RINSING', [1, 30], [2, 0]);
+  assert.equal(laundryStatus(unit, mergeState(long, [{ timer: { remainMinute: 29 }, location: { locationName: 'MAIN' } }])).remaining, 89 * 60);
+  // 2:01 → 1:58 wraps round: one hour less
+  assert.equal(laundryStatus(unit, mergeState(washerState('RINSING', [2, 1], [3, 0]), [{ timer: { remainMinute: 58 }, location: { locationName: 'MAIN' } }])).remaining, 118 * 60);
   // An update with both is taken as is; one without a timer leaves it alone
   assert.equal(laundryStatus(unit, mergeState(base, [{ timer: { remainHour: 1, remainMinute: 1 }, location: { locationName: 'MAIN' } }])).remaining, 3660);
   assert.equal(laundryStatus(unit, mergeState(base, [{ runState: { currentState: 'SPINNING' }, location: { locationName: 'MAIN' } }])).remaining, 3720);

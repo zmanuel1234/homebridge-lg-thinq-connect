@@ -183,8 +183,11 @@ export class Fridge extends Appliance {
   }
 
   /** Wine cellar light: LG lists it as changeable but refuses while lightStatusControlEnabled is false. */
-  private setLight(level: number): Promise<void> {
-    if (level === this.values.get('light')) { return Promise.resolve(); }
+  private setLight(wanted: number): Promise<void> {
+    // Within LG's range and steps (a light whose range starts above 0 can only be dimmed, not switched off)
+    const r = this.lightRange!;
+    const level = Math.min(r.max, Math.max(r.min, Math.round(wanted / r.step) * r.step));
+    if (level === this.values.get('light')) { setTimeout(() => this.update(undefined), 50).unref?.(); return Promise.resolve(); }
     if (this.values.get('lightControl') === false) {
       this.ctx.log.info(`[${this.ctx.name}] LG doesn't allow changing the light right now (light control is off on the wine cellar).`);
       setTimeout(() => this.update(undefined), 50).unref?.();

@@ -177,6 +177,18 @@ function defineTests(hap: Hap): void {
     assert.ok(!washer.getService(S.Valve)!.characteristics.some(isEnergy));
   });
 
+  test('energy: a failed daily check is tried again within the hour', async (t) => {
+    const hb = await homebridge(t);
+    hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 1000 };
+    hb.lg.failPath = /^devices\/energy\/device-1\/usage/;
+    const platform = await hb.start();
+    await new Promise((r) => setTimeout(r, 50));
+    const washer = platform.machines.find((m) => m.device.deviceId === 'device-1')!;
+    const timer = washer.energyTimer as unknown as { _idleTimeout: number } | undefined;
+    assert.equal(timer?._idleTimeout, 3600_000);
+    platform.stop();
+  });
+
   test('energy: LG not answering is tried again later; a model without figures isn\'t', async (t) => {
     const hb = await homebridge(t);
     hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 1000 };

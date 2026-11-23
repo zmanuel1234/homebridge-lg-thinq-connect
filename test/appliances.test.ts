@@ -830,6 +830,64 @@ function defineTests(hap: Hap): void {
     assert.doesNotThrow(() => kimchi.part.update({ temperature: [{ locationName: 'TOP', targetTemperature: 'KIMCHI' }], operation: { kimchiOperationMode: 'POWER_ON' } }));
   });
 
+  test('air conditioner: a scene switching it off while setting a mode leaves it off; one write\'s failure is shared', async () => {
+    const profile = { property: {
+      operation: { airConOperationMode: en(['POWER_ON', 'POWER_OFF']) }, airConJobMode: { currentJobMode: en(['COOL', 'HEAT']) },
+      temperature: { targetTemperature: range(16, 30) } } };
+    const T = C.TargetHeaterCoolerState;
+    const tileOf = (a: PlatformAccessory) => a.getServiceById(S.HeaterCooler, 'climate')!;
+    // Unit on; "off, heating" in one action, in either order: only POWER_OFF
+    for (const order of ['active-first', 'mode-first']) {
+      const a = make('DEVICE_AIR_CONDITIONER', profile, 'AC');
+      a.part.update({ operation: { airConOperationMode: 'POWER_ON' }, airConJobMode: { currentJobMode: 'COOL' } });
+      const writes = [() => write(tileOf(a.accessory).getCharacteristic(C.Active), 0), () => write(tileOf(a.accessory).getCharacteristic(T), T.HEAT)];
+      if (order === 'mode-first') { writes.reverse(); }
+      await Promise.all(writes.map((w) => w()));
+      await new Promise((r) => setTimeout(r, 250));
+      assert.ok(!a.sent.some((p) => JSON.stringify(p).includes('POWER_ON')), order);
+      assert.ok(a.sent.some((p) => JSON.stringify(p).includes('POWER_OFF')), order);
+    }
+    // Unit off; "off, heating": nothing at all
+    const b = make('DEVICE_AIR_CONDITIONER', profile, 'AC');
+    b.part.update({ operation: { airConOperationMode: 'POWER_OFF' }, airConJobMode: { currentJobMode: 'COOL' } });
+    await Promise.all([write(tileOf(b.accessory).getCharacteristic(C.Active), 0), write(tileOf(b.accessory).getCharacteristic(T), T.HEAT)]);
+    await new Promise((r) => setTimeout(r, 250));
+    assert.deepEqual(b.sent, []);
+    // Unit off; only a mode picked: on, then the mode, once
+    const c = make('DEVICE_AIR_CONDITIONER', profile, 'AC');
+    c.part.update({ operation: { airConOperationMode: 'POWER_OFF' }, airConJobMode: { currentJobMode: 'COOL' } });
+    await write(tileOf(c.accessory).getCharacteristic(T), T.HEAT);
+    assert.deepEqual(c.sent, [{ operation: { airConOperationMode: 'POWER_ON' } }, { airConJobMode: { currentJobMode: 'HEAT' } }]);
+    // Unit off; on first, then the mode: on, mode once
+    const d = make('DEVICE_AIR_CONDITIONER', profile, 'AC');
+    d.part.update({ operation: { airConOperationMode: 'POWER_OFF' }, airConJobMode: { currentJobMode: 'COOL' } });
+    await Promise.all([write(tileOf(d.accessory).getCharacteristic(C.Active), 1), write(tileOf(d.accessory).getCharacteristic(T), T.HEAT)]);
+    assert.deepEqual(d.sent, [{ operation: { airConOperationMode: 'POWER_ON' } }, { airConJobMode: { currentJobMode: 'HEAT' } }]);
+    // LG refusing the power-on: both writes of the action report it, and the tile shows off again
+    const e = make('DEVICE_AIR_CONDITIONER', profile, 'AC');
+    e.part.update({ operation: { airConOperationMode: 'POWER_OFF' }, airConJobMode: { currentJobMode: 'COOL' } });
+    e.failNext(new Error('LG says no'));
+    const results = await Promise.all([write(tileOf(e.accessory).getCharacteristic(T), T.HEAT), write(tileOf(e.accessory).getCharacteristic(C.Active), 1)]);
+    assert.ok(results[1] !== undefined, 'the on write reports the failure');
+    e.part.update(undefined);
+    assert.equal(val(tileOf(e.accessory).getCharacteristic(C.Active)), C.Active.INACTIVE);
+  });
+
+  test('water heater: switching off a mode that isn\'t on changes nothing; wine light kept within LG\'s range', async () => {
+    const { part, accessory, sent } = make('DEVICE_WATER_HEATER', { property: {
+      operation: { waterHeaterOperationMode: en(['POWER_ON', 'POWER_OFF']) },
+      waterHeaterJobMode: { currentJobMode: en(['AUTO', 'HEAT_PUMP', 'TURBO']) },
+      temperatureInUnits: [{ unit: 'C', targetTemperature: range(30, 60) }] } }, 'Water');
+    part.update({ operation: { waterHeaterOperationMode: 'POWER_ON' }, waterHeaterJobMode: { currentJobMode: 'HEAT_PUMP' } });
+    await write(accessory.getServiceById(S.Switch, 'mode-TURBO')!.getCharacteristic(C.On), false);
+    assert.deepEqual(sent, []);
+    const wine = make('DEVICE_WINE_CELLAR', { property: { operation: { lightStatus: range(1, 10, 1) } } }, 'Wine');
+    wine.part.update({ operation: { lightStatus: 5 } });
+    await write(wine.accessory.getServiceById(S.Lightbulb, 'light')!.getCharacteristic(C.On), false);
+    await write(wine.accessory.getServiceById(S.Lightbulb, 'light')!.getCharacteristic(C.Brightness), 100);
+    assert.deepEqual(wine.sent, [{ operation: { lightStatus: 1 } }, { operation: { lightStatus: 10 } }], 'off means the lowest level LG allows');
+  });
+
   test('basic fallback: an LG alert opens the problem sensor, and it closes again on its own', () => {
     const { part, accessory } = make('DEVICE_PLANT_CULTIVATOR', { property: { operation: { operationMode: en(['POWER_ON', 'POWER_OFF']) } } });
     const problem = () => accessory.getServiceById(S.ContactSensor, 'problem')!.getCharacteristic(C.ContactSensorState).value;

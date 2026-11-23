@@ -30,6 +30,11 @@ type Mode = typeof MODES[number];
 
 const bool = (v: unknown): boolean | undefined => (typeof v === 'boolean' ? v : undefined);
 
+/** How long a mode picked while off waits for the same Home app action's on/off (ms). */
+const PENDING_ON_MS = 150;
+/** A mode written this soon after an off isn't a request to switch on (ms). */
+const RECENT_OFF_MS = 2000;
+
 /** Airflow styles some units offer (windDirection.*), with names for the Home app. */
 const AIRFLOW_STYLES: [string, string][] = [
   ['airGuideWind', 'air guide'], ['autoFitWind', 'auto-fit airflow'], ['concentrationWind', 'focused airflow'],
@@ -320,32 +325,82 @@ export class AirConditioner extends Appliance {
   private setPower(v: CharacteristicValue): Promise<void> {
     if (!this.power?.canWrite) { return this.refuse('This air conditioner can\'t be switched on or off through LG\'s API.'); }
     const on = v === 1 || v === true;
-    if (on === this.on) { return Promise.resolve(); }
+    this.powerWrite = { on, at: Date.now() };
+    // A mode picked while off waits briefly for this: off wins, on sends power then that mode once
+    const picked = this.cancelPendingOn();
+    if (on === this.on) { return this.switching ?? Promise.resolve(); }
+    if (!on) { return this.switchPower(false); }
     // Cooling or heating only: a unit left in another mode on its remote is switched to the tile's
-    const mode = on && this.restricted && !(this.modes as string[]).includes(this.mode) ? this.modes[0] : undefined;
-    return this.switchPower(on, mode);
+    const restrictedMode = this.restricted && !(this.modes as string[]).includes(this.mode) ? this.modes[0] : undefined;
+    return this.switchPower(true, picked ?? restrictedMode);
   }
+
+  /** A mode picked on the tile while off, waiting to see whether the same action also switches it off. */
+  private pendingOn?: { mode: Mode; timer: NodeJS.Timeout; done: (p: Promise<void>) => void };
+
+  /** Cancels a waiting power-on; returns its mode (the caller now decides). */
+  private cancelPendingOn(): Mode | undefined {
+    const p = this.pendingOn;
+    if (!p) { return undefined; }
+    clearTimeout(p.timer);
+    this.pendingOn = undefined;
+    // The mode write itself succeeds: what happens next is the power write's
+    p.done(Promise.resolve());
+    return p.mode;
+  }
+
+  /** The last on/off written from the Home app: an off just written keeps a mode from switching it back on. */
+  private powerWrite?: { on: boolean; at: number };
+
+  /** The power change under way, so a second write in the same action shares its result. */
+  private switching?: Promise<void>;
 
   /**
    * Power, then (if given) a mode: two commands, one after the other, as LG takes one kind of
-   * change per command and refuses a mode while the unit is off. Counted as on/off at once, so a
-   * mode chosen in the same Home app action doesn't switch it on twice.
+   * change per command and refuses a mode while the unit is off.
    */
   private switchPower(on: boolean, mode?: Mode): Promise<void> {
     this.on = on;
-    const power = this.command(on ? 'Switched on' : 'Switched off', { operation: { [this.power!.name]: on ? 'POWER_ON' : 'POWER_OFF' } })
-      .catch((err: unknown) => { this.on = !on; throw err; });
-    if (!mode) { return power; }
-    return power.then(() => this.command(`Mode ${mode.toLowerCase()}`, { airConJobMode: { currentJobMode: mode } }))
-      .then(() => { this.mode = mode; this.lastMode = mode; this.applyRange(); });
+    let run = this.command(on ? 'Switched on' : 'Switched off', { operation: { [this.power!.name]: on ? 'POWER_ON' : 'POWER_OFF' } })
+      .catch((err: unknown) => {
+        // Back to what it was, unless LG reported a newer state meanwhile
+        if (this.on === on) { this.on = !on; }
+        throw err;
+      });
+    if (mode) {
+      run = run.then(() => this.command(`Mode ${mode.toLowerCase()}`, { airConJobMode: { currentJobMode: mode } }))
+        .then(() => { this.mode = mode; this.lastMode = mode; this.applyRange(); });
+    }
+    const switching = run.finally(() => { if (this.switching === switching) { this.switching = undefined; } });
+    this.switching = switching;
+    return switching;
   }
 
   private setMode(v: CharacteristicValue): Promise<void> {
     const T = this.hap.Characteristic.TargetHeaterCoolerState;
     const mode: Mode = v === T.HEAT ? 'HEAT' : v === T.AUTO ? 'AUTO' : 'COOL';
     if (!this.modes.includes(mode)) { return this.refuse(`This air conditioner has no ${mode.toLowerCase()} mode.`); }
-    // A mode picked on an air conditioner that's off switches it on in that mode (LG refuses a mode change while off)
-    if (!this.on && this.power?.canWrite) { return this.switchPower(true, mode); }
+    const justOff = this.powerWrite && !this.powerWrite.on && Date.now() - this.powerWrite.at < RECENT_OFF_MS;
+    if (justOff) {
+      // Switched off in the same action (a scene restoring "off, cooling"): keep the mode for next time
+      this.lastMode = mode;
+      this.applyRange();
+      return Promise.resolve();
+    }
+    if (!this.on && this.power?.canWrite && !this.switching) {
+      // A mode picked on an air conditioner that's off switches it on in that mode (LG refuses a
+      // mode change while off), unless the same Home app action switches it off or on itself
+      this.cancelPendingOn();
+      return new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          this.pendingOn = undefined;
+          this.switchPower(true, mode).then(resolve, reject);
+        }, PENDING_ON_MS);
+        this.pendingOn = { mode, timer, done: (p) => { p.then(resolve, reject); } };
+      });
+    }
+    // Switching on right now (same action): the mode follows the power command
+    if (this.switching) { return this.switching.then(() => this.setMode(v)); }
     if (mode === this.mode) { return Promise.resolve(); }
     return this.command(`Mode ${mode.toLowerCase()}`, { airConJobMode: { currentJobMode: mode } })
       .then(() => { this.lastMode = mode; this.mode = mode; this.applyRange(); });
