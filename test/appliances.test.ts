@@ -10,7 +10,7 @@ import type { API, Characteristic, Logging, PlatformAccessory } from 'homebridge
 import type * as HapNodejs from '@homebridge/hap-nodejs';
 import { type ApplianceContext, categoryOf, mappingFor } from '../src/appliances';
 import type { LaundryContext } from '../src/accessory';
-import { filterPercent } from '../src/appliances/air';
+import { filterPercent } from '../src/appliances/sensors';
 import { levelFor, levelPercent, speedLevels, temperatureC } from '../src/appliances/profile';
 
 type Hap = typeof HapNodejs;
@@ -75,7 +75,7 @@ if (!hap) {
 function defineTests(hap: Hap): void {
   const { Service: S, Characteristic: C } = hap;
 
-  function make(deviceType: string, profile: unknown, alias = 'Thing') {
+  function make(deviceType: string, profile: unknown, alias = 'Thing', extraControls = true) {
     const lines: string[] = [];
     const sent: Record<string, unknown>[] = [];
     let refreshes = 0;
@@ -87,6 +87,7 @@ function defineTests(hap: Hap): void {
       device: { deviceId: 'd1', deviceInfo: { deviceType, alias, modelName: 'M1' } },
       send: (p) => { sent.push(p); return fail ? Promise.reject(fail) : Promise.resolve({}); },
       refreshSoon: () => { refreshes++; },
+      extraControls,
     };
     const part = mappingFor(deviceType, profile)!.create(ctx, profile);
     return { part, accessory, lines, sent, refreshes: () => refreshes, failNext: (e: Error) => { fail = e; } };
@@ -172,6 +173,85 @@ function defineTests(hap: Hap): void {
     assert.equal(val(problem.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_DETECTED);
   });
 
+  test('air conditioner extras from real data: air purify, energy saving, left-right swing, dry mode; air quality, humidity, filter', async () => {
+    const { part, accessory, sent } = make('DEVICE_AIR_CONDITIONER', fixture('air_conditioner', 'profile'), 'AC');
+    part.update(fixture('air_conditioner', 'status'));
+    const sw = (sub: string) => accessory.getServiceById(S.Switch, sub);
+    assert.deepEqual(accessory.services.filter((x) => x.UUID === S.Switch.UUID).map((x) => x.subtype).sort(),
+      ['air-purify', 'energy-saving', 'mode-AIR_DRY', 'swing-left-right']);
+    assert.equal(val(sw('energy-saving')!.getCharacteristic(C.ConfiguredName)), 'AC energy saving');
+    assert.equal(val(sw('energy-saving')!.getCharacteristic(C.On)), false);
+    const aq = accessory.getServiceById(S.AirQualitySensor, 'air-quality')!;
+    assert.equal(val(aq.getCharacteristic(C.AirQuality)), C.AirQuality.EXCELLENT + 1, 'GOOD');
+    assert.equal(val(aq.getCharacteristic(C.PM2_5Density)), 24);
+    assert.equal(val(accessory.getServiceById(S.HumiditySensor, 'humidity')!.getCharacteristic(C.CurrentRelativeHumidity)), 40);
+    assert.equal(val(accessory.getServiceById(S.FilterMaintenance, 'filter')!.getCharacteristic(C.FilterLifeLevel)), 67, '180 of 540 hours used');
+    await write(sw('air-purify')!.getCharacteristic(C.On), true);
+    await write(sw('energy-saving')!.getCharacteristic(C.On), true);
+    await write(sw('swing-left-right')!.getCharacteristic(C.On), true);
+    await write(sw('mode-AIR_DRY')!.getCharacteristic(C.On), true);
+    await write(sw('mode-AIR_DRY')!.getCharacteristic(C.On), false);
+    assert.deepEqual(sent, [
+      { operation: { airCleanOperationMode: 'START' } },
+      { powerSave: { powerSaveEnabled: true } },
+      { windDirection: { rotateLeftRight: true } },
+      { airConJobMode: { currentJobMode: 'AIR_DRY' } },
+      { airConJobMode: { currentJobMode: 'COOL' } },
+    ]);
+    // The unit doesn't report air purify back: the switch keeps the last command
+    part.update(fixture('air_conditioner', 'status'));
+    assert.equal(val(sw('air-purify')!.getCharacteristic(C.On)), true);
+    assert.equal(val(sw('energy-saving')!.getCharacteristic(C.On)), false, 'reported back: follows the unit');
+  });
+
+  test('air conditioner extras: display light, jet mode, fan mode; none with the setting off', async () => {
+    const profile = { property: {
+      operation: { airConOperationMode: en(['POWER_ON', 'POWER_OFF']) },
+      airConJobMode: { currentJobMode: en(['COOL', 'FAN']) },
+      airFlow: { windStrength: en(['LOW', 'HIGH', 'POWER', 'AUTO']) },
+      display: { light: en(['ON', 'OFF']) },
+      temperature: { targetTemperature: range(18, 30), currentTemperature: { type: 'number', mode: ['r'] } },
+    } };
+    const { part, accessory, sent } = make('DEVICE_AIR_CONDITIONER', profile, 'AC');
+    part.update({ operation: { airConOperationMode: 'POWER_ON' }, airConJobMode: { currentJobMode: 'FAN' },
+      airFlow: { windStrength: 'POWER' }, display: { light: 'ON' }, temperature: { currentTemperature: 24, targetTemperature: 22, unit: 'C' } });
+    const sw = (sub: string) => accessory.getServiceById(S.Switch, sub)!;
+    assert.equal(val(sw('jet').getCharacteristic(C.On)), true);
+    assert.equal(val(sw('display-light').getCharacteristic(C.On)), true);
+    assert.equal(val(sw('mode-FAN').getCharacteristic(C.On)), true);
+    const tile = accessory.getServiceById(S.HeaterCooler, 'climate')!;
+    assert.equal(val(tile.getCharacteristic(C.RotationSpeed)), 100, 'jet is not a slider speed');
+    await write(sw('jet').getCharacteristic(C.On), false);
+    await write(sw('display-light').getCharacteristic(C.On), false);
+    assert.deepEqual(sent, [{ airFlow: { windStrength: 'AUTO' } }, { display: { light: 'OFF' } }]);
+    const off = make('DEVICE_AIR_CONDITIONER', profile, 'AC', false);
+    assert.equal(off.accessory.services.filter((x) => x.UUID === S.Switch.UUID).length, 0);
+  });
+
+  test('air conditioner two-set: in auto with two set points on, heating and cooling are separate', async () => {
+    const { part, accessory, sent } = make('DEVICE_AIR_CONDITIONER', { property: {
+      operation: { airConOperationMode: en(['POWER_ON', 'POWER_OFF']) },
+      airConJobMode: { currentJobMode: en(['COOL', 'HEAT', 'AUTO']) },
+      temperature: { targetTemperature: range(16, 30), currentTemperature: { type: 'number', mode: ['r'] } },
+      twoSetTemperature: { twoSetEnabled: { type: 'boolean', mode: ['r', 'w'] } },
+      twoSetTemperatureInUnits: [{ unit: 'C', heatTargetTemperature: range(16, 26), coolTargetTemperature: range(20, 30) }],
+    } }, 'AC');
+    part.update({ operation: { airConOperationMode: 'POWER_ON' }, airConJobMode: { currentJobMode: 'AUTO' },
+      temperature: { currentTemperature: 22, targetTemperature: 22, unit: 'C' },
+      twoSetTemperature: { twoSetEnabled: true }, twoSetTemperatureInUnits: [{ unit: 'C', heatTargetTemperature: 19, coolTargetTemperature: 25 }] });
+    const tile = accessory.getServiceById(S.HeaterCooler, 'climate')!;
+    assert.equal(val(tile.getCharacteristic(C.HeatingThresholdTemperature)), 19);
+    assert.equal(val(tile.getCharacteristic(C.CoolingThresholdTemperature)), 25);
+    assert.equal(tile.getCharacteristic(C.CoolingThresholdTemperature).props.minValue, 20);
+    await write(tile.getCharacteristic(C.CoolingThresholdTemperature), 26);
+    assert.deepEqual(sent, [{ twoSetTemperatureInUnits: { coolTargetTemperature: 26, unit: 'C' } }]);
+    // Cool mode: back to the one set temperature
+    part.update({ airConJobMode: { currentJobMode: 'COOL' }, operation: { airConOperationMode: 'POWER_ON' } });
+    assert.equal(val(tile.getCharacteristic(C.CoolingThresholdTemperature)), 22);
+    await write(tile.getCharacteristic(C.CoolingThresholdTemperature), 23);
+    assert.deepEqual(sent.at(-1), { temperature: { targetTemperature: 23 } });
+  });
+
   // ---- Air purifier, dehumidifier, hood (Home Assistant's sample units) ----
 
   test('air purifier: on/off from real data; air quality and filter when the profile has them', async () => {
@@ -198,6 +278,22 @@ function defineTests(hap: Hap): void {
     const filter = full.accessory.getServiceById(S.FilterMaintenance, 'filter')!;
     assert.equal(val(filter.getCharacteristic(C.FilterChangeIndication)), C.FilterChangeIndication.CHANGE_FILTER);
     assert.equal(val(full.accessory.getServiceById(S.AirPurifier, 'purifier')!.getCharacteristic(C.RotationSpeed)), 25);
+  });
+
+  test('air purifier: auto or manual from its modes, and a sleep mode switch', async () => {
+    const { part, accessory, sent } = make('DEVICE_AIR_PURIFIER', { property: {
+      operation: { airPurifierOperationMode: en(['POWER_ON', 'POWER_OFF']) },
+      airPurifierJobMode: { currentJobMode: en(['CLEAN', 'AUTO', 'SLEEP']) },
+    } }, 'Purifier');
+    part.update({ operation: { airPurifierOperationMode: 'POWER_ON' }, airPurifierJobMode: { currentJobMode: 'AUTO' } });
+    const tile = accessory.getServiceById(S.AirPurifier, 'purifier')!;
+    const T = C.TargetAirPurifierState;
+    assert.equal(val(tile.getCharacteristic(T)), T.AUTO);
+    await write(tile.getCharacteristic(T), T.MANUAL);
+    const sleep = accessory.getServiceById(S.Switch, 'sleep')!;
+    await write(sleep.getCharacteristic(C.On), true);
+    await write(sleep.getCharacteristic(C.On), false);
+    assert.deepEqual(sent.map((p) => (p.airPurifierJobMode as Record<string, string>).currentJobMode), ['CLEAN', 'SLEEP', 'CLEAN']);
   });
 
   test('dehumidifier: humidity now and target from real data, its two fan speeds, the full-tank alert', async () => {

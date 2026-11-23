@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0-beta.3 - 2026-11-23
+
+### Added
+- **Air conditioner extras** (experimental appliances), for what a unit offers through LG's official
+  API: switches for air purify, energy saving, the display light, left-right swing, jet mode, dry
+  mode and fan mode; air quality (PM2.5, PM10), humidity and filter sensors; and separate heating
+  and cooling set points in auto mode on units with two set points.
+- **Air purifier**: auto or manual mode on the tile, a sleep mode switch, and a humidity sensor.
+- New setting **Extra switches for experimental appliances** (on by default) to leave the switches
+  out.
+
 ## 0.2.0-beta.2 - 2026-11-23
 
 ### Added

@@ -27,12 +27,12 @@ try {
 
 test('settings: defaults, limits and clean-up', () => {
   const s = readSettings({ platform: 'LGThinQConnect' } as PlatformConfig);
-  assert.deepEqual(s, { token: '', country: 'US', pollInterval: 60, runningPollInterval: 30, allowControl: false, liveUpdates: true, phaseSensors: [], tubCleanAfter: 0, experimental: false, ignore: [] });
+  assert.deepEqual(s, { token: '', country: 'US', pollInterval: 60, runningPollInterval: 30, allowControl: false, liveUpdates: true, phaseSensors: [], tubCleanAfter: 0, experimental: false, extraControls: true, ignore: [] });
   const t = readSettings({
     platform: 'LGThinQConnect', token: ' abc ', country: 'gb', pollInterval: 5, runningPollInterval: '9999',
-    allowControl: 'yes', liveUpdates: false, phaseSensors: ['SPINNING', '', 3], tubCleanAfter: 500, experimental: 'yes', ignore: [' Dryer '],
+    allowControl: 'yes', liveUpdates: false, phaseSensors: ['SPINNING', '', 3], tubCleanAfter: 500, experimental: 'yes', extraControls: false, ignore: [' Dryer '],
   } as unknown as PlatformConfig);
-  assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, liveUpdates: false, phaseSensors: ['SPINNING'], tubCleanAfter: 200, experimental: false, ignore: ['dryer'] });
+  assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, liveUpdates: false, phaseSensors: ['SPINNING'], tubCleanAfter: 200, experimental: false, extraControls: false, ignore: ['dryer'] });
 });
 
 if (!hap) {
