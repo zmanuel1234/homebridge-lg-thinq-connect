@@ -31,7 +31,7 @@ export interface ApplianceOptions {
   acModes?: 'all' | 'cool' | 'heat';
   /** Air conditioners: what the tile's swing control moves. */
   acSwing?: 'up-down' | 'left-right' | 'both';
-  /** Air conditioners and purifiers: the room temperature as a sensor of its own, for automations. */
+  /** Air conditioners: the room temperature as a sensor of its own, for automations (purifiers that measure it always get one). */
   temperatureSensor?: boolean;
 }
 

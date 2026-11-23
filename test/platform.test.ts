@@ -161,12 +161,36 @@ function defineTests(hap: Hap): void {
     platform.stop();
   });
 
-  test('energy: off in the settings asks LG for nothing', async (t) => {
+  test('energy: turned off in the settings, LG isn\'t asked and an earlier figure is taken off the tile', async (t) => {
     const hb = await homebridge(t);
-    hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 1 };
-    await hb.start([], { energy: false });
+    hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 1000 };
+    const first = await hb.start();
+    const isEnergy = (c: { UUID: string }) => c.UUID === 'E863F10C-079E-48FF-8F27-9C2605A29F52';
+    const washer = hb.calls.registered.find((a) => a.displayName === 'Front Load Washer')!;
+    await until(() => washer.getService(S.Valve)!.characteristics.some(isEnergy));
+    first.stop();
+    const cached = hb.calls.registered.splice(0);
+    const queries = hb.lg.energyQueries.length;
+    await hb.start(cached, { energy: false });
     await new Promise((r) => setTimeout(r, 50));
-    assert.deepEqual(hb.lg.energyQueries, []);
+    assert.equal(hb.lg.energyQueries.length, queries);
+    assert.ok(!washer.getService(S.Valve)!.characteristics.some(isEnergy));
+  });
+
+  test('energy: LG not answering is tried again later; a model without figures isn\'t', async (t) => {
+    const hb = await homebridge(t);
+    hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 1000 };
+    hb.lg.failPath = /^devices\/energy\/device-1\/profile/;
+    const platform = await hb.start();
+    await new Promise((r) => setTimeout(r, 50));
+    const washer = platform.machines.find((m) => m.device.deviceId === 'device-1')!;
+    const dryer = platform.machines.find((m) => m.device.deviceId !== 'device-1')!;
+    assert.ok(washer.energyTimer, 'a retry is scheduled');
+    assert.equal(dryer.energyTimer, undefined, 'LG says the dryer has none: no retry');
+    hb.lg.failPath = null;
+    await platform.setupEnergy(washer);
+    assert.equal(hb.lg.energyQueries.length, 1);
+    platform.stop();
   });
 
   test('LG answering an empty list: nothing removed until it says so three times in a row', async (t) => {

@@ -85,6 +85,11 @@ export interface OvenControl {
   cookModes: string[];
 }
 
+function ovenField(kind: LaundryKind, props: Props): { oven?: OvenControl } {
+  const oven = kind === 'oven' ? ovenControl(props) : undefined;
+  return oven ? { oven } : {};
+}
+
 /** An oven's set-temperature control, from a cavity's profile; undefined if it has none. */
 function ovenControl(props: Props): OvenControl | undefined {
   const ranges: OvenControl['ranges'] = {};
@@ -139,7 +144,7 @@ function unitFrom(kind: LaundryKind, props: Props, location: string, usesLocatio
     countsCycles: field(field(props, 'cycle'), 'cycleCount') !== undefined,
     towerKey,
     usesLocation,
-    ...(kind === 'oven' && ovenControl(props) ? { oven: ovenControl(props) } : {}),
+    ...ovenField(kind, props),
   };
 }
 
@@ -189,6 +194,8 @@ export interface LaundryStatus {
   setTemperature?: { value: number; unit: 'C' | 'F' };
   /** Ovens: the cook mode, when reported. */
   cookMode?: string;
+  /** Ovens: the unit it shows temperatures in, when reported. */
+  temperatureUnit?: 'C' | 'F';
   /** Rinse aid needs refilling (dishwashers), when reported. */
   rinseAidLow?: boolean;
   /** The course or program, when reported (dishwashers: dishWashingCourse). */
@@ -260,11 +267,17 @@ export function laundryStatus(unit: LaundryUnit, state: unknown): LaundryStatus 
 }
 
 /** Ovens only: the set temperature and cook mode. */
-function ovenStatus(unit: LaundryUnit, s: unknown): Pick<LaundryStatus, 'setTemperature' | 'cookMode'> {
+function ovenStatus(unit: LaundryUnit, s: unknown): Pick<LaundryStatus, 'setTemperature' | 'cookMode' | 'temperatureUnit'> {
   if (unit.kind !== 'oven') { return {}; }
-  const out: Pick<LaundryStatus, 'setTemperature' | 'cookMode'> = {};
+  const out: Pick<LaundryStatus, 'setTemperature' | 'cookMode' | 'temperatureUnit'> = {};
   const t = ovenTemperature(field(s, 'temperature'));
   if (t) { out.setTemperature = t; }
+  // The unit the oven shows, also when it isn't set to anything (0)
+  for (const entry of propertySets(field(s, 'temperature'))) {
+    const u = field(entry, 'unit') ?? field(entry, 'temperatureUnit');
+    if ((u === 'C' || u === 'F') && !out.temperatureUnit) { out.temperatureUnit = u; }
+  }
+  if (t) { out.temperatureUnit = t.unit; }
   const mode = field(field(s, 'cook'), 'cookMode');
   if (typeof mode === 'string' && mode) { out.cookMode = mode; }
   return out;

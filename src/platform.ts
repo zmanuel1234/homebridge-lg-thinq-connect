@@ -471,13 +471,32 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
    */
   async setupEnergy(machine: Machine): Promise<void> {
     const client = this.client;
-    if (!this.settings.energy || this.stopped || !client?.energyProperties || !client.energyUsage) { return; }
+    if (this.stopped || !client?.energyProperties || !client.energyUsage) { return; }
+    const Total = totalConsumption(this.api);
+    const info = this.api.hap.Service.AccessoryInformation.UUID;
+    /** Takes the energy figure off tiles that shouldn't show one (setting off, or LG keeps none). */
+    const clear = (parts: Part[]) => {
+      for (const part of parts) {
+        const svc = mainService(part.accessory.services, info);
+        const ch = svc?.characteristics.find((c) => c.UUID === Total.UUID);
+        if (svc && ch) { svc.removeCharacteristic(ch); }
+      }
+    };
+    if (!this.settings.energy) { clear(machine.parts); return; }
     const { device } = machine;
+    const retryLater = () => {
+      if (this.stopped) { return; }
+      machine.energyTimer = setTimeout(() => { void this.setupEnergy(machine); }, ENERGY_EVERY * 1000);
+      machine.energyTimer.unref?.();
+    };
     let props: string[];
     try {
       props = await client.energyProperties(device.deviceId);
     } catch (err) {
+      // LG keeps no figures for this model: nothing to show. Anything else: try again later
+      const unsupported = err instanceof ThinQError && ['1205', '1219', '1221'].includes(err.code);
       this.log.debug(`[${device.deviceInfo.alias}] No energy figures from LG: ${(err as Error).message}`);
+      if (unsupported) { clear(machine.parts); } else { retryLater(); }
       return;
     }
     // One figure for the appliance, or one per part (energyUsage_washer…) matched by its kind
@@ -488,18 +507,16 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
         : props.find((p) => key && p.toLowerCase().endsWith(`_${key}`));
       if (property) { targets.push({ part, property }); }
     }
+    clear(machine.parts.filter((p) => !targets.some((t) => t.part === p)));
     if (!targets.length) { return; }
-    const Total = totalConsumption(this.api);
-    const info = this.api.hap.Service.AccessoryInformation.UUID;
     const check = async () => {
       for (const { part, property } of targets) {
         const svc = mainService(part.accessory.services, info);
         if (!svc) { continue; }
         try {
           const wh = await client.energyUsage!(device.deviceId, property, 'MONTHLY', thisMonth(), thisMonth());
-          if (!svc.testCharacteristic(Total.UUID)) { svc.addOptionalCharacteristic(Total); }
           const kwh = Math.round(wh) / 1000;
-          const ch = svc.getCharacteristic(Total);
+          const ch = svc.characteristics.find((c) => c.UUID === Total.UUID) || svc.addCharacteristic(Total);
           if (ch.value !== kwh) {
             this.log.debug(`[${part.accessory.displayName}] Energy this month: ${kwh} kWh.`);
             ch.updateValue(kwh);
