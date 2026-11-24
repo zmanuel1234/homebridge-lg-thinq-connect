@@ -18,6 +18,7 @@
 // Starting, pausing and resuming from the valve is off unless the "allow control" setting is on,
 // and LG only accepts it after Remote Start is pressed on the machine.
 
+import { displayName, keepOrUpdate } from './names';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service } from 'homebridge';
 import { type LaundryStatus, type LaundryUnit, operationPayload, ovenStartPayload, stateLabel } from './laundry';
 import { limit } from './appliances/base';
@@ -179,14 +180,16 @@ export class LaundryAccessory {
   }
 
   /** Get or add a service, and keep its name in step with the settings. */
-  private service(type: typeof Service.Valve, name: string, subtype: string): Service {
+  private service(type: typeof Service.Valve, raw: string, subtype: string): Service {
     const { Characteristic: C } = this.deps.api.hap;
+    const name = displayName(this.options.name, raw);
     const svc = this.accessory.getServiceById(type, subtype) || this.accessory.addService(type, name, subtype);
     svc.setCharacteristic(C.Name, name);
     if (!svc.testCharacteristic(C.ConfiguredName)) { svc.addOptionalCharacteristic(C.ConfiguredName); }
     // Set once: a name changed in the Home app wins after that
     const configured = svc.getCharacteristic(C.ConfiguredName);
-    if (!configured.value) { configured.updateValue(name); }
+    const shown = keepOrUpdate(configured.value, name);
+    if (shown) { configured.updateValue(shown); }
     return svc;
   }
 

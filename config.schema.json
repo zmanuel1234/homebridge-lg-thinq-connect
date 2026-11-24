@@ -160,8 +160,7 @@
           "properties": {
             "name": {
               "type": "string",
-              "title": "Appliance name",
-              "required": true
+              "title": "Appliance name"
             },
             "extraControls": {
               "type": "boolean",
@@ -171,7 +170,6 @@
             "acModes": {
               "type": "string",
               "title": "Air conditioner: modes on the tile",
-              "default": "all",
               "oneOf": [
                 {
                   "title": "All it has (cool, heat, auto)",
@@ -196,7 +194,6 @@
             "acSwing": {
               "type": "string",
               "title": "Air conditioner: the tile's swing moves",
-              "default": "up-down",
               "oneOf": [
                 {
                   "title": "Up and down",

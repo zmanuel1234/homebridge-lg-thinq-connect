@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.4 - 2026-11-24
+
+### Changed
+- **Tile and sensor names in title case**: "Washer Done", "Washer Remote Start", "AC Energy
+  Saving". The appliance's own name stays as in the ThinQ app. Names you changed in the Home app
+  are kept; the earlier lower-case defaults update on their own.
+- The energy section in Eve is named "<name> Energy" (it showed Eve's internal type name).
+
+### Fixed
+- The Homebridge settings screen no longer warns "config validation failed" because of an empty
+  **Options per appliance** entry: entries without an appliance name are now allowed (the plugin
+  ignores them, as before).
+
 ## 1.0.3 - 2026-11-24
 
 ### Changed
