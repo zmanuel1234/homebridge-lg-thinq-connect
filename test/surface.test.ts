@@ -157,6 +157,15 @@ function defineTests(hap: Hap): void {
     .filter((s) => s.UUID !== S.AccessoryInformation.UUID)
     .map((s) => `${serviceNames.get(s.UUID) || s.UUID}/${s.subtype || ''}: ${s.characteristics.map((c) => c.displayName).sort().join(', ')}`)
     .sort();
+  // Every tile's name: the appliance's name, then what the tile is in title case
+  const lowerCaseNames: string[] = [];
+  const checkNames = (acc: PlatformAccessory, base: string) => {
+    for (const s of acc.services.filter((x) => x.UUID !== S.AccessoryInformation.UUID)) {
+      const shown = String(s.getCharacteristic(hap.Characteristic.ConfiguredName).value || s.getCharacteristic(hap.Characteristic.Name).value || '');
+      const rest = shown === base ? '' : shown.startsWith(`${base} `) ? shown.slice(base.length + 1) : `(not after "${base}") ${shown}`;
+      if (rest.split(' ').some((w) => /^[a-z]/.test(w)) || rest.startsWith('(')) { lowerCaseNames.push(`${acc.displayName}: ${shown}`); }
+    }
+  };
 
   test('HomeKit surface: no tile, sensor, identifier or characteristic changes by accident (see the comment at the top)', () => {
     const surface: Record<string, string[]> = {};
@@ -170,6 +179,7 @@ function defineTests(hap: Hap): void {
       assert.ok(mapping, `${a.name}: mapped`);
       mapping.create(ctx, a.profile).stop();
       surface[a.name] = describe(accessory);
+      checkNames(accessory, 'Appliance');
     }
     for (const l of LAUNDRY) {
       for (const unit of laundryUnits(l.type, l.profile)) {
@@ -178,9 +188,11 @@ function defineTests(hap: Hap): void {
           { name: 'Machine', model: 'M', serial: 'S', allowControl: true, phaseSensors: ['SPINNING'], tubCleanAfter: l.tubClean ?? 0 },
           () => Promise.resolve({}));
         laundry.stop();
+        checkNames(accessory, 'Machine');
         surface[`${l.name}${unit.location ? ` ${unit.location}` : ''}`] = describe(accessory);
       }
     }
+    assert.deepEqual(lowerCaseNames, [], 'every tile name in title case after the appliance\'s name');
     surface.settings = settingKeys();
     if (process.env.UPDATE_SURFACE === '1') {
       writeFileSync(SNAPSHOT, `${JSON.stringify(surface, null, 2)}\n`);
