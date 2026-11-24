@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.2 - 2026-11-24
+
+### Fixed
+- **Energy use in the Eve app, for real this time.** Eve didn't show 1.0.1's energy section either:
+  it only shows energy on outlets. Appliances LG keeps energy figures for now get a read-only
+  **"<name> energy"** outlet in the Home app (on and *in use* while the appliance runs; tapping it
+  changes nothing), with this month's use as **Total Consumption** in Eve. Where 1.0.0 and 1.0.1
+  put the figure is cleared on its own. Turn it off with **Energy use in the Eve app**.
+
 ## 1.0.1 - 2026-11-24
 
 ### Fixed
