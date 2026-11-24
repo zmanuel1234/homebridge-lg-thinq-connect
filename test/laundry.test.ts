@@ -41,6 +41,15 @@ test('our dryer: one unit, no location', () => {
   assert.ok(unit.states.includes('WRINKLE_CARE'));
 });
 
+test('error name: as LG sent it on a real washer (a plain "error" next to runState), and the other shapes', () => {
+  const u = laundryUnits('DEVICE_WASHER', washer.profile)[0];
+  const at = (extra: Record<string, unknown>) => laundryStatus(u, [{ runState: { currentState: 'ERROR' }, location: { locationName: 'MAIN' }, ...extra }]);
+  assert.equal(at({ error: 'DOOR_OPEN_ERROR' }).errorName, 'DOOR_OPEN_ERROR');
+  assert.equal(at({ error: { errorCode: 'OUT_OF_BALANCE_ERROR' } }).errorName, 'OUT_OF_BALANCE_ERROR');
+  assert.equal(at({ errorCode: 'WATER_DRAIN_ERROR' }).errorName, 'WATER_DRAIN_ERROR');
+  assert.equal(at({}).errorName, '');
+});
+
 test('our machines as captured (both off): idle, no time left, even though the dryer says 1 min', () => {
   const w = laundryStatus(laundryUnits('DEVICE_WASHER', washer.profile)[0], washer.state);
   assert.deepEqual(w, {

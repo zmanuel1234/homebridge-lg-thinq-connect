@@ -38,6 +38,8 @@ export interface Settings {
   phaseSensors: string[];
   /** Cycles counted by LG at which the tub-clean reminder turns on; 0 = off. */
   tubCleanAfter: number;
+  /** Minutes "done" stays on after a machine switches itself off straight from finished. */
+  doneHoldMinutes: number;
   /** Add appliance types not yet confirmed on real hardware (everything but washers and dryers). */
   experimental: boolean;
   /** Extra switches for experimental appliances (air conditioner modes, purifier sleep mode…). */
@@ -87,6 +89,7 @@ export function readSettings(config: PlatformConfig): Settings {
     liveUpdates: config.liveUpdates !== false,
     phaseSensors: strings(config.phaseSensors),
     tubCleanAfter: clamp(config.tubCleanAfter, 0, 200, 0),
+    doneHoldMinutes: clamp(config.doneHoldMinutes, 0, 1440, 120),
     experimental: config.experimental === true,
     extraControls: config.extraControls !== false,
     ignore: strings(config.ignore).map((s) => s.toLowerCase()),
@@ -420,6 +423,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       const laundry = new LaundryAccessory(this, accessory, unit,
         { name, model: modelName, serial, allowControl: this.settings.allowControl,
           phaseSensors: this.settings.phaseSensors, tubCleanAfter: this.settings.tubCleanAfter,
+          doneHoldMinutes: this.settings.doneHoldMinutes,
           remoteStartSensor: this.settings.appliances.get(alias.trim().toLowerCase())?.hideRemoteStart !== true },
         (payload) => this.client!.control(device.deviceId, payload),
         () => this.schedule(machine, 3));

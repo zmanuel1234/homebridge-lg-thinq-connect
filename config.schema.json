@@ -142,6 +142,14 @@
         "maximum": 200,
         "description": "Adds a \"tub clean\" sensor to washers that count their cycles. It turns on when LG's count reaches this number (LG suggests a Tub Clean about every 30 washes); turn on notifications for it. 0 = no reminder."
       },
+      "doneHoldMinutes": {
+        "title": "Keep \"Done\" on after the machine switches itself off (minutes)",
+        "type": "integer",
+        "default": 120,
+        "minimum": 0,
+        "maximum": 1440,
+        "description": "Many washers switch themselves off a minute after finishing, which would turn \"Done\" off with them. \"Done\" then stays on until the machine is next switched on or started, for at most this long, so you can see the laundry is waiting. Switching a dryer off from wrinkle care ends it at once. 0 = off together with the machine."
+      },
       "ignore": {
         "title": "Leave out these appliances",
         "type": "array",
@@ -262,6 +270,10 @@
     "phaseSensors",
     {
       "key": "tubCleanAfter",
+      "type": "number"
+    },
+    {
+      "key": "doneHoldMinutes",
       "type": "number"
     },
     {

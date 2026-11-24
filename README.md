@@ -26,9 +26,12 @@ Each washer or dryer shows up as:
 - **The machine** (a valve tile): on while it runs, with the **minutes left** on the tile. While
   paused, it's off and keeps the time left. For the first minute or so of a wash the machine is
   still sensing the load and hasn't worked out the time, so none is shown yet.
-- **"Washer Done"** (occupancy sensor): detected when the cycle finishes, until the machine
-  starts again or is switched off. **Turn on notifications for it** in the Home app to be told
-  when the laundry is ready.
+- **"Washer Done"** (occupancy sensor): detected when the cycle finishes. **Turn on
+  notifications for it** in the Home app (choose "Occupancy Detected") to be told when the laundry
+  is ready. Many washers switch themselves off a minute after finishing; "Done" then stays on, so
+  you can see the laundry is waiting, until the machine is next switched on or started, for 2 hours
+  at most (setting: *Keep "Done" on after the machine switches itself off*), also across a
+  Homebridge restart. A dryer keeps it on through wrinkle care; switching it off there ends it.
 - **"Washer Problem"** (contact sensor): open while the machine reports an error (door, drain,
   water supply, unbalanced load and so on), or after LG's "drying failed" or "error during
   washing" alert, until the next cycle starts or the machine is switched off. The machine's tile
@@ -40,10 +43,13 @@ Each washer or dryer shows up as:
   notifications for it as a reminder. The count is LG's own; it's expected to start again after a
   Tub Clean.
 - **"Washer Remote Start"** (occupancy sensor, with *Allow starting and pausing* on, for
-  machines that report it; dishwashers and Stylers too): detected while Remote Start is on at the machine, so an automation
-  or a notification can tell you the machine is ready to be started from the Home app.
+  machines that report it; dishwashers and Stylers too): detected while Remote Start is on and the
+  machine is waiting to be started, so an automation or a notification can tell you it's ready
+  to be started from the Home app. It isn't detected during a cycle, while paused, or after it
+  finished, even though LG keeps Remote Start on then (and a dryer turns it on by itself during
+  wrinkle care, where a start would begin a new cycle), nor during a delayed start.
 
-When a cycle finishes, the log also notes LG's cycle count for machines that keep one.
+The log also notes LG's cycle count when it goes up, for machines that keep one.
 
 The names follow your machines' names in the ThinQ app.
 
@@ -136,6 +142,7 @@ What LG's error codes in the log mean:
 | Energy use in the Eve app | On | This month's energy use for appliances LG reports it for, shown in the Eve app (see [Energy use](#energy-use)) |
 | Phase sensors | None | Extra sensors that are on during a chosen phase |
 | Tub clean reminder after | 0 (off) | Cycles counted by LG at which the washer's tub-clean sensor turns on |
+| Keep "Done" on after the machine switches itself off | 120 min | How long at most "Done" stays on after a machine switches itself off straight from finished (until it's next switched on or started); 0 = off together with the machine |
 | Leave out these appliances | None | Names, as in the ThinQ app, to keep out of the Home app |
 | Options per appliance | None | Air conditioner modes, swing direction and room sensor, and extra switches, for one appliance (see [Options per appliance](#options-per-appliance)) |
 | Check every (idle) | 60 s | How often to ask LG while nothing runs (at least 10 min while live updates work) |

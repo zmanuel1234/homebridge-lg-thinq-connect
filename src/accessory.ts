@@ -10,8 +10,9 @@
 //    when the machine reports them;
 //  - optionally "<name> tub clean", an occupancy sensor: detected once the washer's cycle count
 //    (as LG counts it) reaches the setting, as a reminder to run Tub Clean;
-//  - "<name> remote start", an occupancy sensor: on while Remote Start is on at the machine, for a
-//    notification or an automation that starts it (machines that report it, when control is allowed);
+//  - "<name> remote start", an occupancy sensor: on while Remote Start is on and the machine waits to
+//    be started, for a notification or an automation that starts it (machines that report it, when
+//    control is allowed);
 //  - ovens that accept a temperature: "<name> temperature", a thermostat: heat starts the oven at
 //    the set temperature, off stops it. LG doesn't report the oven's actual temperature, so the
 //    current temperature shows the one it's set to.
@@ -27,12 +28,20 @@ import { limit } from './appliances/base';
 export interface LaundryContext {
   deviceId?: string;
   location?: string;
+  /** "Done" held until then (ms since 1970), across Homebridge restarts. */
+  doneUntil?: number;
 }
 
+/** Minutes "done" stays on by default after the machine switches itself off from finished. */
+const DEFAULT_DONE_HOLD_MIN = 120;
 /** How long the tile shows a start or pause sent from the Home app before LG reports it. */
 const PENDING_MS = 30_000;
-/** How long after a start the program time is compared with the one chosen before it. */
-const START_CHECK_MS = 3 * 60_000;
+/**
+ * How long after a start the program time is compared with the one chosen before it. LG reports a
+ * program switch within about a second (Speed Wash 15 min → Normal 65 min, 1 s after the start);
+ * the washer's own adjustment for the load comes later (65 → 53 min after 43 s), so it's left out.
+ */
+const START_CHECK_MS = 15_000;
 /** A change in program time this large (seconds) after a start means another program. */
 const PROGRAM_CHANGE = 10 * 60;
 
@@ -46,6 +55,8 @@ export interface LaundryOptions {
   phaseSensors: string[];
   /** Cycles counted by LG at which the tub-clean reminder turns on; 0 = no reminder. */
   tubCleanAfter: number;
+  /** Minutes "done" stays on after the machine switches itself off straight from finished (default 120). */
+  doneHoldMinutes?: number;
   /** The Remote Start sensor (when the machine reports it and control is allowed); default on. */
   remoteStartSensor?: boolean;
 }
@@ -76,6 +87,8 @@ const EARLY_ALERT_LEFT = 10 * 60;
 const NEAR_END = 3 * 60;
 /** How long "done" stays detected when the finish was only inferred (the machine already powered off). */
 const INFERRED_DONE_MS = 60_000;
+/** A cycle count of 0 after a real one is only believed when it lasts this long (seen: 16 → 0 → 16 at power-on). */
+const ZERO_COUNT_MS = 30_000;
 
 export class LaundryAccessory {
   readonly valve: Service;
@@ -88,6 +101,8 @@ export class LaundryAccessory {
   readonly ovenThermostat: Service | undefined;
   /** After a start from the Home app: the program time chosen before it, checked for a few minutes. */
   private startCheck: { programTime: number; until: number } | undefined;
+  /** When LG started reporting a cycle count of 0 after a real one (0: it isn't). */
+  private zeroCountSince = 0;
   /**
    * A start (on) or pause (off) sent from the Home app that LG hasn't reported yet: the tile shows
    * it meanwhile, and taps asking for the same aren't sent again (seen: a dryer took 7 s to report
@@ -187,6 +202,9 @@ export class LaundryAccessory {
       t.getCharacteristic(C.TargetHeatingCoolingState).onSet((v) => this.setOvenHeat(v === C.TargetHeatingCoolingState.HEAT));
       t.getCharacteristic(C.TargetTemperature).onSet((v) => this.setOvenTemperature(Number(v)));
     }
+    // A "done" held before a Homebridge restart
+    const held = accessory.context.doneUntil;
+    if (typeof held === 'number' && held > Date.now()) { this.setDoneUntil(held); } else { accessory.context.doneUntil = undefined; }
     this.render();
   }
 
@@ -213,8 +231,9 @@ export class LaundryAccessory {
   }
 
   /** New status from LG; null when LG can't be reached. */
-  update(next: LaundryStatus | null): void {
+  update(incoming: LaundryStatus | null): void {
     const prev = this.status;
+    const next = this.steadyCount(incoming, prev);
     this.checkProgramAfterStart(next);
     if (this.heldFinish && next) {
       this.heldFinish = false;
@@ -223,36 +242,49 @@ export class LaundryAccessory {
       } else if (!next.running && !next.paused) {
         this.deps.log.info(`[${this.options.name}] LG says the cycle is finished.`);
         this.finishedAlert = next.state !== 'POWER_OFF';
-        if (!this.finishedAlert) { this.briefDone(); }
+        if (!this.finishedAlert) { this.holdDone(true); }
       }
     }
     if (next && prev && (prev.running || prev.paused) && !next.running && !next.paused && !next.done && !next.error
       && prev.total > 0 && prev.state !== 'DETECTING' && prev.remaining <= NEAR_END) {
       // Missed the END state between two looks (the machine went straight to off): still a finish.
       // Only when a time was known: early on (DETECTING) LG reports 0 left, and stopping then isn't a finish.
-      this.briefDone();
+      // Held like a finish when the machine went off; a minute when it's still on (it may just have been stopped).
+      if (next.state === 'POWER_OFF') { this.holdDone(true); } else { this.briefDone(); }
     }
     if (next && (next.running || next.paused)) {
       // A new cycle (or a resumed one): earlier finishes and alerts no longer apply
-      this.inferredDoneUntil = 0;
+      this.clearHold();
       this.finishedAlert = false;
       this.problemAlert = '';
     } else if (next && next.state === 'POWER_OFF') {
       // Switched off: alerts end (an inferred finish still shows briefly)
+      if (prev?.state === 'END' || (this.finishedAlert && prev?.state !== 'WRINKLE_CARE')) {
+        // Straight from finished (many washers switch themselves off a minute later): the laundry is
+        // still waiting, so "done" stays on until the machine is next used. From wrinkle care
+        // someone switched it off at the machine, so it ends.
+        this.holdDone();
+      }
       this.finishedAlert = false;
       this.problemAlert = '';
+    } else if (next && !next.done && !next.error && prev?.state === 'POWER_OFF') {
+      // Switched on again: the next load
+      this.clearHold();
     }
     if (next && prev && next.state !== prev.state) {
       const left = next.remaining ? `, ${Math.round(next.remaining / 60)} min left` : '';
-      const cycles = next.done && !prev.done && next.cycleCount !== undefined ? ` (LG counts ${next.cycleCount} cycles)` : '';
       const course = next.course && (next.running || next.paused) ? ` (${stateLabel(next.course).toLowerCase()})` : '';
       const wait = next.startsIn ? `, starts in ${duration(next.startsIn)}` : '';
-      this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state, this.unit.kind)}${course}${left}${wait}${cycles}.`);
+      this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state, this.unit.kind)}${course}${left}${wait}.`);
       if (next.error) {
         this.deps.log.warn(`[${this.options.name}] The machine reports an error${next.errorName ? `: ${next.errorName}` : ''}.`);
       }
     }
     const count = next?.cycleCount;
+    // LG sends the new count in an update of its own, right after the end
+    if (count !== undefined && prev?.cycleCount !== undefined && count > prev.cycleCount && prev.cycleCount > 0) {
+      this.deps.log.info(`[${this.options.name}] LG now counts ${count} cycles.`);
+    }
     if (this.tubCleanSensor && count !== undefined && count >= this.options.tubCleanAfter
       && (prev?.cycleCount === undefined || prev.cycleCount < this.options.tubCleanAfter)) {
       this.deps.log.info(`[${this.options.name}] Time for a Tub Clean: LG counts ${count} cycles (reminder set at ${this.options.tubCleanAfter}).`);
@@ -287,16 +319,73 @@ export class LaundryAccessory {
     return this.pending ? this.pending.on : !!s?.running;
   }
 
-  /** "Done" for a minute: the machine is already off, so nothing else would end it. */
+  /** "Done" for a minute, when a finish is only inferred and nothing else would end it. */
   private briefDone(): void {
-    this.inferredDoneUntil = Date.now() + INFERRED_DONE_MS;
+    this.keepDone(INFERRED_DONE_MS);
+  }
+
+  /**
+   * "Done" kept after the machine switched itself off from finished, until it's next used.
+   * `atLeastBrief`: an inferred finish, shown for a minute even with the setting at 0.
+   */
+  private holdDone(atLeastBrief = false): void {
+    const ms = atLeastBrief ? Math.max(INFERRED_DONE_MS, this.holdMs) : this.holdMs;
+    if (ms > 0) { this.keepDone(ms); }
+  }
+
+  /** Ovens finish cooking, not a load to take out: their "done" ends with them. */
+  private get holdMs(): number {
+    return this.unit.kind === 'oven' ? 0 : (this.options.doneHoldMinutes ?? DEFAULT_DONE_HOLD_MIN) * 60_000;
+  }
+
+  private keepDone(ms: number): void {
+    this.setDoneUntil(Date.now() + ms);
+  }
+
+  /** The machine is used again: a held "done" ends (shown with the next render). */
+  private clearHold(): void {
+    if (!this.inferredDoneUntil && this.accessory.context.doneUntil === undefined) { return; }
+    this.inferredDoneUntil = 0;
+    this.accessory.context.doneUntil = undefined;
     clearTimeout(this.inferredTimer);
-    this.inferredTimer = setTimeout(() => { this.inferredDoneUntil = 0; this.render(); }, INFERRED_DONE_MS);
-    this.inferredTimer.unref?.();
+  }
+
+  /** "Done" until then (0: not held); kept with the accessory, so a Homebridge restart keeps it. */
+  private setDoneUntil(until: number): void {
+    this.inferredDoneUntil = until;
+    this.accessory.context.doneUntil = until || undefined;
+    clearTimeout(this.inferredTimer);
+    if (until > Date.now()) {
+      this.inferredTimer = setTimeout(() => this.setDoneUntil(0), until - Date.now());
+      this.inferredTimer.unref?.();
+    }
+    this.render();
+  }
+
+  /**
+   * LG briefly reports a cycle count of 0 when a washer is switched on, then the real one (seen:
+   * 16 → 0 → 16). Believing it would switch the tub-clean sensor off and on (with a notification)
+   * at every power-on, so a 0 after a real count only counts once it has lasted a while.
+   */
+  private steadyCount(next: LaundryStatus | null, prev: LaundryStatus | null): LaundryStatus | null {
+    if (!next || next.cycleCount !== 0 || !prev?.cycleCount) { this.zeroCountSince = 0; return next; }
+    if (!this.zeroCountSince) { this.zeroCountSince = Date.now(); }
+    if (Date.now() - this.zeroCountSince >= ZERO_COUNT_MS) { return next; }
+    return { ...next, cycleCount: prev.cycleCount };
   }
 
   get done(): boolean {
     return !!this.status?.done || this.finishedAlert || this.inferredDoneUntil > Date.now();
+  }
+
+  /**
+   * Remote Start is on and the machine waits to be started. LG's flag alone also stays on during a
+   * cycle and comes on by itself in a dryer's wrinkle care, where "start" would begin a new cycle.
+   */
+  get waitingForStart(): boolean {
+    const s = this.status;
+    // Ready and idle only: not a delayed start (RESERVED), freeze protection or anything unknown
+    return !!s?.remoteControl && s.state === 'INITIAL';
   }
 
   get problem(): boolean {
@@ -321,8 +410,8 @@ export class LaundryAccessory {
       }
       this.deps.log.info(`[${name}] LG says the cycle is finished.`);
       if (s && (s.state === 'POWER_OFF')) {
-        // Already off: a brief "done", as when a finish is inferred
-        this.briefDone();
+        // Already off: held like a finish the machine switched itself off after
+        this.holdDone(true);
       } else {
         this.finishedAlert = true;
       }
@@ -364,7 +453,7 @@ export class LaundryAccessory {
     }
     if (this.remoteStartSensor) {
       set(this.remoteStartSensor.getCharacteristic(C.OccupancyDetected),
-        s?.remoteControl ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+        this.waitingForStart ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     }
     if (this.ovenThermostat) {
       const t = this.ovenThermostat;
