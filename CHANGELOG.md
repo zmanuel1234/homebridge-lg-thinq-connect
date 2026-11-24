@@ -9,12 +9,13 @@ From the first full cycles on a real washer and dryer.
   after finishing, which turned "Done" off too (and sent an "unoccupied" notification), so it
   couldn't show that the laundry was waiting. "Done" now stays on until the machine is next
   switched on or started, for 2 hours at most: new setting *Keep "Done" on after the machine
-  switches itself off* (0 = as before). A dryer switched off from wrinkle care still ends it at
-  once.
+  switches itself off* (0 = as before), kept across a Homebridge restart. A dryer switched off from
+  wrinkle care still ends it at once; ovens aren't held.
 - **"Remote Start" means "waiting to be started".** LG keeps Remote Start on during a cycle, and a
   dryer turns it on by itself in wrinkle care, so the sensor showed Detected on a finished load (an
   automation starting the dryer then would begin a new cycle). It's now Detected only while the
-  machine waits to be started; pausing and resuming from the Home app work as before.
+  machine is switched on and idle, waiting to be started (not during a cycle, a pause, a delayed
+  start or after finishing); pausing and resuming from the Home app work as before.
 - The program-switch warning after a washer start from the Home app only looks at the first 15
   seconds (was 3 minutes). LG reports a program switch within about a second; the washer's own
   adjustment for the load comes later (seen: 65 → 53 min after 43 seconds) and could have set off a

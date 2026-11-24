@@ -10,8 +10,9 @@
 //    when the machine reports them;
 //  - optionally "<name> tub clean", an occupancy sensor: detected once the washer's cycle count
 //    (as LG counts it) reaches the setting, as a reminder to run Tub Clean;
-//  - "<name> remote start", an occupancy sensor: on while Remote Start is on at the machine, for a
-//    notification or an automation that starts it (machines that report it, when control is allowed);
+//  - "<name> remote start", an occupancy sensor: on while Remote Start is on and the machine waits to
+//    be started, for a notification or an automation that starts it (machines that report it, when
+//    control is allowed);
 //  - ovens that accept a temperature: "<name> temperature", a thermostat: heat starts the oven at
 //    the set temperature, off stops it. LG doesn't report the oven's actual temperature, so the
 //    current temperature shows the one it's set to.
@@ -27,6 +28,8 @@ import { limit } from './appliances/base';
 export interface LaundryContext {
   deviceId?: string;
   location?: string;
+  /** "Done" held until then (ms since 1970), across Homebridge restarts. */
+  doneUntil?: number;
 }
 
 /** Minutes "done" stays on by default after the machine switches itself off from finished. */
@@ -199,6 +202,9 @@ export class LaundryAccessory {
       t.getCharacteristic(C.TargetHeatingCoolingState).onSet((v) => this.setOvenHeat(v === C.TargetHeatingCoolingState.HEAT));
       t.getCharacteristic(C.TargetTemperature).onSet((v) => this.setOvenTemperature(Number(v)));
     }
+    // A "done" held before a Homebridge restart
+    const held = accessory.context.doneUntil;
+    if (typeof held === 'number' && held > Date.now()) { this.setDoneUntil(held); } else { accessory.context.doneUntil = undefined; }
     this.render();
   }
 
@@ -236,18 +242,19 @@ export class LaundryAccessory {
       } else if (!next.running && !next.paused) {
         this.deps.log.info(`[${this.options.name}] LG says the cycle is finished.`);
         this.finishedAlert = next.state !== 'POWER_OFF';
-        if (!this.finishedAlert) { this.briefDone(); }
+        if (!this.finishedAlert) { this.holdDone(true); }
       }
     }
     if (next && prev && (prev.running || prev.paused) && !next.running && !next.paused && !next.done && !next.error
       && prev.total > 0 && prev.state !== 'DETECTING' && prev.remaining <= NEAR_END) {
       // Missed the END state between two looks (the machine went straight to off): still a finish.
       // Only when a time was known: early on (DETECTING) LG reports 0 left, and stopping then isn't a finish.
-      this.briefDone();
+      // Held like a finish when the machine went off; a minute when it's still on (it may just have been stopped).
+      if (next.state === 'POWER_OFF') { this.holdDone(true); } else { this.briefDone(); }
     }
     if (next && (next.running || next.paused)) {
       // A new cycle (or a resumed one): earlier finishes and alerts no longer apply
-      this.inferredDoneUntil = 0;
+      this.clearHold();
       this.finishedAlert = false;
       this.problemAlert = '';
     } else if (next && next.state === 'POWER_OFF') {
@@ -262,7 +269,7 @@ export class LaundryAccessory {
       this.problemAlert = '';
     } else if (next && !next.done && !next.error && prev?.state === 'POWER_OFF') {
       // Switched on again: the next load
-      this.inferredDoneUntil = 0;
+      this.clearHold();
     }
     if (next && prev && next.state !== prev.state) {
       const left = next.remaining ? `, ${Math.round(next.remaining / 60)} min left` : '';
@@ -312,14 +319,18 @@ export class LaundryAccessory {
     return this.pending ? this.pending.on : !!s?.running;
   }
 
-  /** "Done" for a minute: the machine is already off, so nothing else would end it. */
+  /** "Done" for a minute, when a finish is only inferred and nothing else would end it. */
   private briefDone(): void {
-    this.keepDone(Math.max(INFERRED_DONE_MS, this.holdMs));
+    this.keepDone(INFERRED_DONE_MS);
   }
 
-  /** "Done" kept after the machine switched itself off from finished, until it's next used. */
-  private holdDone(): void {
-    if (this.holdMs > 0) { this.keepDone(this.holdMs); }
+  /**
+   * "Done" kept after the machine switched itself off from finished, until it's next used.
+   * `atLeastBrief`: an inferred finish, shown for a minute even with the setting at 0.
+   */
+  private holdDone(atLeastBrief = false): void {
+    const ms = atLeastBrief ? Math.max(INFERRED_DONE_MS, this.holdMs) : this.holdMs;
+    if (ms > 0) { this.keepDone(ms); }
   }
 
   /** Ovens finish cooking, not a load to take out: their "done" ends with them. */
@@ -328,10 +339,27 @@ export class LaundryAccessory {
   }
 
   private keepDone(ms: number): void {
-    this.inferredDoneUntil = Date.now() + ms;
+    this.setDoneUntil(Date.now() + ms);
+  }
+
+  /** The machine is used again: a held "done" ends (shown with the next render). */
+  private clearHold(): void {
+    if (!this.inferredDoneUntil && this.accessory.context.doneUntil === undefined) { return; }
+    this.inferredDoneUntil = 0;
+    this.accessory.context.doneUntil = undefined;
     clearTimeout(this.inferredTimer);
-    this.inferredTimer = setTimeout(() => { this.inferredDoneUntil = 0; this.render(); }, ms);
-    this.inferredTimer.unref?.();
+  }
+
+  /** "Done" until then (0: not held); kept with the accessory, so a Homebridge restart keeps it. */
+  private setDoneUntil(until: number): void {
+    this.inferredDoneUntil = until;
+    this.accessory.context.doneUntil = until || undefined;
+    clearTimeout(this.inferredTimer);
+    if (until > Date.now()) {
+      this.inferredTimer = setTimeout(() => this.setDoneUntil(0), until - Date.now());
+      this.inferredTimer.unref?.();
+    }
+    this.render();
   }
 
   /**
@@ -356,7 +384,8 @@ export class LaundryAccessory {
    */
   get waitingForStart(): boolean {
     const s = this.status;
-    return !!s?.remoteControl && !s.running && !s.paused && !s.done && !s.error && s.state !== 'POWER_OFF';
+    // Ready and idle only: not a delayed start (RESERVED), freeze protection or anything unknown
+    return !!s?.remoteControl && s.state === 'INITIAL';
   }
 
   get problem(): boolean {
@@ -381,8 +410,8 @@ export class LaundryAccessory {
       }
       this.deps.log.info(`[${name}] LG says the cycle is finished.`);
       if (s && (s.state === 'POWER_OFF')) {
-        // Already off: a brief "done", as when a finish is inferred
-        this.briefDone();
+        // Already off: held like a finish the machine switched itself off after
+        this.holdDone(true);
       } else {
         this.finishedAlert = true;
       }

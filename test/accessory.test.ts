@@ -145,6 +145,52 @@ function defineTests(hap: Hap): void {
     assert.equal(done(now.laundry), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED, '0: off together with the machine');
   });
 
+  test('done held across a Homebridge restart, and its time limit with it', () => {
+    const first = setup();
+    first.laundry.update(running());
+    first.laundry.update(status({ state: 'END', done: true }));
+    first.laundry.update(status());
+    first.laundry.stop();
+    assert.ok((first.acc.context as LaundryContext).doneUntil! > Date.now(), 'kept with the accessory');
+    // Homebridge restarts: same accessory, no state from LG yet, then LG says off
+    const again = setup({}, first.acc);
+    assert.equal(value(again.laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    again.laundry.update(status());
+    assert.equal(value(again.laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    again.laundry.update(status({ state: 'INITIAL' }));
+    assert.equal(value(again.laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal((again.acc.context as LaundryContext).doneUntil, undefined, 'forgotten once used');
+    // A hold that ran out while Homebridge was down isn't brought back
+    (again.acc.context as LaundryContext).doneUntil = Date.now() - 1000;
+    const late = setup({}, again.acc);
+    assert.equal(value(late.laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    late.laundry.stop();
+  });
+
+  test('a finish only inferred while the machine is still on shows for a minute, not the 2-hour hold', () => {
+    mock.timers.enable({ apis: ['Date', 'setTimeout'], now: Date.now() });
+    try {
+      const { laundry } = setup();
+      laundry.update(running({ remaining: 60 }));
+      // Stopped in its last minute, the machine still on: done briefly, as before
+      laundry.update(status({ state: 'INITIAL' }));
+      assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+      mock.timers.tick(61_000);
+      assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    } finally {
+      mock.timers.reset();
+    }
+  });
+
+  test('ovens: done ends with them (cooking finished, not a load waiting)', () => {
+    const oven = laundryUnits('DEVICE_OVEN', ovenProfile())[1];
+    const { laundry } = setup({ name: 'Oven' }, undefined, oven);
+    laundry.update(running({ state: 'COOKING_IN_PROGRESS' }));
+    laundry.update(status({ state: 'DONE', done: true }));
+    laundry.update(status());
+    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+  });
+
   test('done after a dryer\'s wrinkle care: switched off there, it ends at once (someone is at the machine)', () => {
     const { laundry } = setup();
     laundry.update(running());
@@ -585,6 +631,9 @@ function defineTests(hap: Hap): void {
     assert.equal(shown(), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     laundry.update(status({ state: 'INITIAL', remoteControl: false }));
     assert.equal(shown(), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    // A delayed start is already set to run: not waiting for one
+    laundry.update(status({ state: 'RESERVED', remoteControl: true, startsIn: 3600 }));
+    assert.equal(shown(), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     const off = setup({ allowControl: false }, acc);
     assert.equal(off.acc.getServiceById(S.OccupancySensor, 'remote-start'), undefined, 'removed when control is turned off');
   });
@@ -596,6 +645,10 @@ function defineTests(hap: Hap): void {
     laundry.update(status({ state: 'END', done: true, cycleCount: 17 }));
     assert.ok(lines.includes('info: [Washer] LG now counts 17 cycles.'), lines.join('\n'));
     assert.ok(!lines.some((l) => l.includes('LG counts 16')));
+    // The power-on blip as LG sent it (17 → 0 → 17): no new count logged
+    laundry.update(status({ state: 'INITIAL', cycleCount: 0 }));
+    laundry.update(status({ state: 'INITIAL', cycleCount: 17 }));
+    assert.equal(lines.filter((l) => l.includes('LG now counts')).length, 1);
     laundry.stop();
   });
 

@@ -30,8 +30,8 @@ Each washer or dryer shows up as:
   notifications for it** in the Home app (choose "Occupancy Detected") to be told when the laundry
   is ready. Many washers switch themselves off a minute after finishing; "Done" then stays on, so
   you can see the laundry is waiting, until the machine is next switched on or started, for 2 hours
-  at most (setting: *Keep "Done" on after the machine switches itself off*). A dryer keeps it on
-  through wrinkle care; switching it off there ends it.
+  at most (setting: *Keep "Done" on after the machine switches itself off*), also across a
+  Homebridge restart. A dryer keeps it on through wrinkle care; switching it off there ends it.
 - **"Washer Problem"** (contact sensor): open while the machine reports an error (door, drain,
   water supply, unbalanced load and so on), or after LG's "drying failed" or "error during
   washing" alert, until the next cycle starts or the machine is switched off. The machine's tile
@@ -47,9 +47,9 @@ Each washer or dryer shows up as:
   machine is waiting to be started, so an automation or a notification can tell you it's ready
   to be started from the Home app. It isn't detected during a cycle, while paused, or after it
   finished, even though LG keeps Remote Start on then (and a dryer turns it on by itself during
-  wrinkle care, where a start would begin a new cycle).
+  wrinkle care, where a start would begin a new cycle), nor during a delayed start.
 
-When a cycle finishes, the log also notes LG's cycle count for machines that keep one.
+The log also notes LG's cycle count when it goes up, for machines that keep one.
 
 The names follow your machines' names in the ThinQ app.
 
