@@ -612,6 +612,26 @@ function defineTests(hap: Hap): void {
     assert.ok(!kept.lines.some((l) => l.includes('cycle time changed')));
   });
 
+  test('problem sensor as an occupancy sensor (setting): detected while there\'s a problem; the contact sensor it replaces is removed', () => {
+    const first = setup();
+    assert.ok(first.acc.getServiceById(S.ContactSensor, 'problem'), 'contact sensor by default (1.x)');
+    const { acc, laundry } = setup({ problemAsOccupancy: true }, first.acc);
+    assert.equal(acc.getServiceById(S.ContactSensor, 'problem'), undefined, 'the old one is gone');
+    const sensor = acc.getServiceById(S.OccupancySensor, 'problem')!;
+    assert.equal(value(sensor.getCharacteristic(C.ConfiguredName)), 'Washer Problem', 'same name');
+    const shown = () => value(sensor.getCharacteristic(C.OccupancyDetected));
+    laundry.update(status({ state: 'INITIAL' }));
+    assert.equal(shown(), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    laundry.update(status({ state: 'ERROR', error: true, errorName: 'DOOR_OPEN_ERROR' }));
+    assert.equal(shown(), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    laundry.update(status());
+    assert.equal(shown(), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    // And back
+    const back = setup({ problemAsOccupancy: false }, acc);
+    assert.equal(back.acc.getServiceById(S.OccupancySensor, 'problem'), undefined);
+    assert.ok(back.acc.getServiceById(S.ContactSensor, 'problem'));
+  });
+
   test('remote start sensor: on while Remote Start is on, only when control is allowed', () => {
     assert.equal(unit.reportsRemoteStart, true, 'our washer reports Remote Start');
     assert.equal(setup().acc.getServiceById(S.OccupancySensor, 'remote-start'), undefined, 'no sensor without control');
