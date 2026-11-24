@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.0 - 2026-11-23
+
+The first stable release: everything from the betas below, with no changes since 1.0.0-beta.1.
+
+- **LG's official ThinQ Connect API**, signed in with a personal access token from LG (not your
+  LG password), with live updates from LG and scheduled checks as a fallback.
+- **Washers and dryers** (tested on real machines): time left on the tile, a "done" sensor for
+  notifications, a problem sensor, optional phase sensors, a tub-clean reminder, a remote start
+  sensor, and optional start, pause and resume from the Home app.
+- **Air conditioners, dehumidifiers and range hoods**, checked against Home Assistant's data from
+  real appliances, added automatically. Fridges, dishwashers, ovens, air purifiers and more with
+  **Experimental appliances** on.
+- **Energy use** in the Eve app, for appliances LG reports it for.
+- A settings screen with a token check and **Copy diagnostics** for bug reports.
+- **A compatibility promise**: 1.x updates never rename or remove a tile, sensor, switch or
+  setting, so your scenes and automations keep working.
+- Homebridge 1.6+ and 2.0, Node.js 22, 24 and 26.
+
 ## 1.0.0-beta.1 - 2026-11-23
 
 ### Changed
