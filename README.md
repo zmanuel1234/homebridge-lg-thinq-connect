@@ -59,10 +59,13 @@ after **Remote Start** is pressed on the machine itself, a safety rule of LG's. 
 the tap is refused and the log says why.
 
 You can't pick the program, temperature or spin speed from the Home app: LG's API doesn't offer
-that. Choose those on the machine. Note: Home Assistant users report that on some washers a
-**start** through LG's official API runs the default program (Cotton) instead of the one chosen
-on the dial; LG hasn't answered yet. Pausing and resuming aren't affected. If your machine does
-this, start it on the machine and use the Home app for pause, resume and the notifications.
+that. Choose those on the machine. **A start from the Home app may run the machine's default
+program instead of the one on the dial**: LG's API can only send "start". Seen on an LG washer
+(F3P2CYVAT): Speed Wash on the dial, started from the Home app, ran Normal; Home Assistant users
+report the same (Cotton on European models). When a washer's cycle time jumps right after a start
+like that, the log says so. Pausing and resuming aren't affected. So a remote start suits loads you'd
+run on the default program anyway; for anything else, start on the machine and use the Home app
+for pause, resume and the notifications.
 
 ## Requirements
 

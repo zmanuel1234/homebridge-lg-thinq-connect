@@ -31,7 +31,7 @@
         "title": "Allow starting and pausing from the Home app",
         "type": "boolean",
         "default": false,
-        "description": "Tapping the machine's tile starts, pauses or resumes it. LG only accepts this after Remote Start is pressed on the machine. Off: the tile only shows the cycle."
+        "description": "Tapping the machine's tile starts, pauses or resumes it. LG only accepts this after Remote Start is pressed on the machine, and a start may run the machine's default program rather than the one on the dial (LG's API can't choose one). Off: the tile only shows the cycle."
       },
       "experimental": {
         "title": "Experimental appliances",

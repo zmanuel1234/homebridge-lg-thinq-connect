@@ -1,6 +1,7 @@
 // What every appliance shares: a Home app accessory, services named after the appliance, commands
 // sent one at a time, and LG's problem alerts shown on a "problem" sensor.
 
+import { ThinQError } from '../api';
 import { displayName, keepOrUpdate } from '../names';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service, WithUUID } from 'homebridge';
 import type { Device } from '../api';
@@ -67,9 +68,13 @@ export function limit(ch: Characteristic, props: { minValue?: number; maxValue?:
   return ch.setProps(props);
 }
 
-/** Update a characteristic only when its value changes. */
+/**
+ * Update a characteristic when its value changes, or when it carries an error status: HAP-NodeJS
+ * keeps the error from a refused tap and returns it for every later read (the Home app then shows
+ * "No Response") until a value is pushed again.
+ */
 export function set(ch: Characteristic, value: CharacteristicValue): void {
-  if (ch.value !== value) { ch.updateValue(value); }
+  if (ch.value !== value || ch.statusCode !== 0) { ch.updateValue(value); }
 }
 
 export abstract class Appliance implements Part {
@@ -153,7 +158,14 @@ export abstract class Appliance implements Part {
         await this.ctx.send(payload);
         this.ctx.log.info(`[${this.ctx.name}] ${label}.`);
       } catch (err) {
+        if (err instanceof ThinQError && err.unconfirmed) {
+          // LG may well have carried it out: the next check shows what happened
+          this.ctx.log[err.timedOut ? 'warn' : 'info'](
+            `[${this.ctx.name}] Sent "${label}", but LG didn't confirm it (${err.message}): checking the appliance.`);
+          return;
+        }
         this.ctx.log.warn(`[${this.ctx.name}] LG refused "${label}": ${(err as Error).message}`);
+        // The Home app shows the error; the next check pushes the values again, which clears it
         throw new this.hap.HapStatusError(this.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
       } finally {
         this.ctx.refreshSoon();

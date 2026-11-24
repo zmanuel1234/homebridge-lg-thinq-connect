@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { ThinQError } from '../src/api';
 import assert from 'node:assert/strict';
 import type { API, Characteristic, Logging, PlatformAccessory } from 'homebridge';
 import type * as HapNodejs from '@homebridge/hap-nodejs';
@@ -33,7 +34,7 @@ function defineTests(hap: Hap): void {
 
   const status = (over: Partial<LaundryStatus> = {}): LaundryStatus => ({
     state: 'POWER_OFF', running: false, paused: false, done: false, error: false, errorName: '',
-    remaining: 0, total: 0, remoteControl: false, ...over,
+    remaining: 0, total: 0, programTime: 0, remoteControl: false, ...over,
   });
   const running = (over: Partial<LaundryStatus> = {}) => status({ state: 'RUNNING', running: true, remaining: 1800, total: 3600, ...over });
 
@@ -397,6 +398,61 @@ function defineTests(hap: Hap): void {
     const again = setup({}, first.acc);
     assert.equal(value(again.laundry.doneSensor.getCharacteristic(C.ConfiguredName)), 'Washer Done');
     assert.equal(value(again.laundry.problemSensor.getCharacteristic(C.ConfiguredName)), 'Laundry trouble');
+  });
+
+  test('a refused tap leaves the tile readable (HAP-NodeJS kept the error and the Home app showed No Response)', async () => {
+    const { laundry } = setup({ allowControl: true });
+    laundry.update(status({ state: 'INITIAL' }));
+    const active = laundry.valve.getCharacteristic(C.Active);
+    // No Remote Start: refused, as on the real washer at 10:30
+    await assert.rejects(active.handleSetRequest(1));
+    await new Promise((r) => setTimeout(r, 120));
+    assert.equal(active.statusCode, 0, 'the error is cleared');
+    assert.equal(await active.handleGetRequest(), 0, 'reads work again: off');
+    // And a later update with nothing changed keeps it that way
+    laundry.update(status({ state: 'INITIAL' }));
+    assert.equal(await active.handleGetRequest(), 0);
+  });
+
+  test('LG error 2211 (device timeout) on START isn\'t a refusal: the washer had started; the plugin checks', async () => {
+    const { laundry, lines, failSends, refreshes } = setup({ allowControl: true });
+    laundry.update(status({ state: 'INITIAL', remoteControl: true, programTime: 3900 }));
+    failSends(new ThinQError(400, '2211', 'Device Timeout'));
+    await laundry.valve.getCharacteristic(C.Active).handleSetRequest(1);
+    assert.ok(lines.some((l) => l.startsWith('info: [Washer] Sent start, but LG didn\'t confirm it') && l.includes('2211')), lines.join('\n'));
+    assert.ok(!lines.some((l) => l.includes('LG refused')));
+    assert.ok(refreshes() > 0, 'asks LG for the state');
+    // An outright refusal still is one
+    failSends(new ThinQError(400, '2302', 'Not possible'));
+    await assert.rejects(laundry.valve.getCharacteristic(C.Active).handleSetRequest(1));
+    assert.ok(lines.some((l) => l.startsWith('warn: [Washer] LG refused START')));
+  });
+
+  test('start from the Home app: a program time that jumps right after is logged (Speed Wash 15 min became Normal 65)', async () => {
+    const { laundry, lines } = setup({ allowControl: true });
+    laundry.update(status({ state: 'INITIAL', remoteControl: true, programTime: 15 * 60 }));
+    await laundry.valve.getCharacteristic(C.Active).handleSetRequest(1);
+    // As LG reported it: detecting with the dial's 15 min, then washing with Normal's 65
+    laundry.update(running({ state: 'DETECTING', remaining: 900, total: 900, programTime: 900, remoteControl: true }));
+    assert.ok(!lines.some((l) => l.includes('cycle time changed')));
+    laundry.update(running({ state: 'RUNNING', remaining: 3900, total: 3900, programTime: 3900 }));
+    assert.ok(lines.some((l) => l.startsWith('warn: [Washer] The cycle time changed from 15 min to 1 h 5 min right after the start')),
+      lines.join('\n'));
+    // Once only, and not for a program that kept its time
+    laundry.update(running({ state: 'RUNNING', remaining: 3800, total: 3900, programTime: 3900 }));
+    assert.equal(lines.filter((l) => l.includes('cycle time changed')).length, 1);
+    // A start LG refuses (door open) leaves nothing behind: a hand start then isn't flagged
+    const refused = setup({ allowControl: true });
+    refused.laundry.update(status({ state: 'INITIAL', remoteControl: true, programTime: 900 }));
+    refused.failSends(new ThinQError(400, '2302', 'Not possible'));
+    await assert.rejects(refused.laundry.valve.getCharacteristic(C.Active).handleSetRequest(1));
+    refused.laundry.update(running({ state: 'RUNNING', remaining: 3900, total: 3900, programTime: 3900 }));
+    assert.ok(!refused.lines.some((l) => l.includes('cycle time changed')));
+    const kept = setup({ allowControl: true });
+    kept.laundry.update(status({ state: 'INITIAL', remoteControl: true, programTime: 3900 }));
+    await kept.laundry.valve.getCharacteristic(C.Active).handleSetRequest(1);
+    kept.laundry.update(running({ state: 'RUNNING', remaining: 3840, total: 3840, programTime: 3840 }));
+    assert.ok(!kept.lines.some((l) => l.includes('cycle time changed')));
   });
 
   test('remote start sensor: on while Remote Start is on, only when control is allowed', () => {

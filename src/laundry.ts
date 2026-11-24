@@ -188,6 +188,9 @@ export interface LaundryStatus {
   /** Seconds left and in total for the cycle under way; 0 when there is none. */
   remaining: number;
   total: number;
+  /** The program's time in seconds as LG reports it in any state, e.g. the one chosen on the dial
+   * before a start; 0 when not reported. */
+  programTime: number;
   /** Remote Start is enabled on the machine, so it accepts commands. */
   remoteControl: boolean;
   /** Times the washer has run, when it reports it. */
@@ -258,6 +261,7 @@ export function laundryStatus(unit: LaundryUnit, state: unknown): LaundryStatus 
     errorName: current === 'ERROR' && typeof errorWord === 'string' ? errorWord : '',
     remaining: inCycle ? num(field(timer, 'remainHour')) * 3600 + num(field(timer, 'remainMinute')) * 60 + num(field(timer, 'remainSecond')) : 0,
     total: inCycle ? num(field(timer, 'totalHour')) * 3600 + num(field(timer, 'totalMinute')) * 60 : 0,
+    programTime: num(field(timer, 'totalHour')) * 3600 + num(field(timer, 'totalMinute')) * 60,
     remoteControl: field(field(s, 'remoteControlEnable'), 'remoteControlEnabled') === true,
     cycleCount: typeof count === 'number' ? count : undefined,
     doorOpen: door === undefined ? undefined : door === 'OPEN',

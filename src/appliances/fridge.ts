@@ -178,7 +178,9 @@ export class Fridge extends Appliance {
     const level = this.values.get('light');
     if (this.light && this.lightRange && typeof level === 'number') {
       set(this.light.getCharacteristic(C.On), level > 0);
-      if (level > 0) { set(this.light.getCharacteristic(C.Brightness), Math.round((level / this.lightRange.max) * 100)); }
+      const brightness = this.light.getCharacteristic(C.Brightness);
+      // Off keeps the last brightness (pushed again, so a refused change can't leave an error behind)
+      set(brightness, level > 0 ? Math.round((level / this.lightRange.max) * 100) : Number(brightness.value) || 0);
     }
   }
 
