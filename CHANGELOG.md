@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.3 - 2026-11-24
+
+### Changed
+- **Energy use without an extra Home app tile.** Back to 1.0.1's energy section (Eve's own
+  Consumption service), which Eve may list in a different room from the appliance; 1.0.2's
+  "<name> energy" outlet tile is removed on its own.
+
 ## 1.0.2 - 2026-11-24
 
 ### Fixed

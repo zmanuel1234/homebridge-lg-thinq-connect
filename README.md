@@ -130,7 +130,7 @@ What LG's error codes in the log mean:
 | Experimental appliances | Off | Also add the appliance types that are still experimental (see [Other appliances](#other-appliances)). Air conditioners, dehumidifiers and range hoods are added without it |
 | Extra switches | On | Air conditioner, air purifier and cooktop switches; turn off for a tidier Home app |
 | Live updates from LG | On | Changes and alerts arrive the moment they happen; scheduled checks continue as a backup |
-| Energy use in the Eve app | On | A read-only "<name> energy" outlet with this month's energy use for Eve, for appliances LG reports it for (see [Energy use](#energy-use)) |
+| Energy use in the Eve app | On | This month's energy use for appliances LG reports it for, shown in the Eve app (see [Energy use](#energy-use)) |
 | Phase sensors | None | Extra sensors that are on during a chosen phase |
 | Tub clean reminder after | 0 (off) | Cycles counted by LG at which the washer's tub-clean sensor turns on |
 | Leave out these appliances | None | Names, as in the ThinQ app, to keep out of the Home app |
@@ -248,15 +248,14 @@ app, then choose:
 
 ### Energy use
 
-For appliances LG keeps energy figures for, the plugin adds a **"<name> energy"** outlet, such as
-"Front Load Washer energy". It's on and *in use* while the appliance runs, and tapping it changes
-nothing. Apple's Home app doesn't show energy figures; the **Eve** app (free on the App Store)
-shows this month's use (kWh) as **Total Consumption** on that outlet. Eve only shows energy on
-outlets, which is why it's a separate tile. LG updates the figure with a
+For appliances LG keeps energy figures for, this month's use (kWh) is added for the **Eve** app
+(free on the App Store; Apple's Home app doesn't show energy and adds no tile for it). In Eve,
+open the appliance: **Total Consumption** is listed with its other values. If you don't see it,
+check every room: Eve may list the energy figure in a different room from the appliance. LG updates the figure with a
 delay, often a day, so the plugin checks it once at startup and then once a day, at a random
 time between 1 and 6 am (as Home Assistant does, to spread the load on LG's servers). It's this month's figure, so it starts
 again from 0 on the 1st (Eve treats it as a running total). Turn it off with **Energy use in the
-Eve app**; the outlet is then removed.
+Eve app**; the figure is then taken off.
 
 ### Help add or fix an appliance
 
