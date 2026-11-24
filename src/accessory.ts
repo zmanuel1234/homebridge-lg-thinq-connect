@@ -29,6 +29,8 @@ export interface LaundryContext {
   location?: string;
 }
 
+/** How long the tile shows a start or pause sent from the Home app before LG reports it. */
+const PENDING_MS = 30_000;
 /** How long after a start the program time is compared with the one chosen before it. */
 const START_CHECK_MS = 3 * 60_000;
 /** A change in program time this large (seconds) after a start means another program. */
@@ -86,6 +88,12 @@ export class LaundryAccessory {
   readonly ovenThermostat: Service | undefined;
   /** After a start from the Home app: the program time chosen before it, checked for a few minutes. */
   private startCheck: { programTime: number; until: number } | undefined;
+  /**
+   * A start (on) or pause (off) sent from the Home app that LG hasn't reported yet: the tile shows
+   * it meanwhile, and taps asking for the same aren't sent again (seen: a dryer took 7 s to report
+   * running, the tile showed off, and four more starts were sent).
+   */
+  private pending: { on: boolean; until: number } | undefined;
   readonly remoteStartSensor: Service | undefined;
   /** The temperature to start the oven at (°C), from the Home app or the oven. */
   private ovenTarget = DEFAULT_OVEN_C;
@@ -272,6 +280,13 @@ export class LaundryAccessory {
     }
   }
 
+  /** Running, or what was just asked from the Home app until LG reports it (or 30 s pass). */
+  private shownOn(s: LaundryStatus | null | undefined): boolean {
+    const p = this.pending;
+    if (p && (Date.now() > p.until || !!s?.running === p.on)) { this.pending = undefined; }
+    return this.pending ? this.pending.on : !!s?.running;
+  }
+
   /** "Done" for a minute: the machine is already off, so nothing else would end it. */
   private briefDone(): void {
     this.inferredDoneUntil = Date.now() + INFERRED_DONE_MS;
@@ -324,8 +339,9 @@ export class LaundryAccessory {
     const { Characteristic: C } = this.deps.api.hap;
     const s = this.status;
     // On only while running: a paused cycle shows off, so a tap on resumes it
-    set(this.valve.getCharacteristic(C.Active), s?.running ? C.Active.ACTIVE : C.Active.INACTIVE);
-    set(this.valve.getCharacteristic(C.InUse), s?.running ? C.InUse.IN_USE : C.InUse.NOT_IN_USE);
+    const on = this.shownOn(s);
+    set(this.valve.getCharacteristic(C.Active), on ? C.Active.ACTIVE : C.Active.INACTIVE);
+    set(this.valve.getCharacteristic(C.InUse), on ? C.InUse.IN_USE : C.InUse.NOT_IN_USE);
     set(this.valve.getCharacteristic(C.RemainingDuration), Math.min(s?.remaining ?? 0, 86_400));
     set(this.valve.getCharacteristic(C.SetDuration), Math.min(s?.total ?? 0, 86_400));
     set(this.valve.getCharacteristic(C.StatusFault), unreachable || this.problem ? C.StatusFault.GENERAL_FAULT : C.StatusFault.NO_FAULT);
@@ -478,6 +494,8 @@ export class LaundryAccessory {
     const s = this.status;
     const wantOn = value === 1 || value === true;
     if (wantOn === !!s?.running) { return; }
+    // Already sent, LG hasn't reported it yet: don't send it again
+    if (this.pending && this.pending.on === wantOn && Date.now() <= this.pending.until) { return; }
     if (this.ovenThermostat && wantOn) {
       // An oven starts from its thermostat, always with a temperature and mode
       if (s?.paused) { this.refuse('The oven is paused: resume it at the oven.'); }
@@ -492,6 +510,9 @@ export class LaundryAccessory {
       this.startCheck = { programTime: s.programTime, until: Date.now() + START_CHECK_MS };
     }
     await this.sendPayload(operationPayload(this.unit, operation), `Sent ${wantOn ? (s?.paused ? 'resume' : 'start') : 'pause'}.`, operation);
+    // Sent (or LG didn't confirm): show it until LG reports it
+    this.pending = { on: wantOn, until: Date.now() + PENDING_MS };
+    this.render();
   }
 
   stop(): void {

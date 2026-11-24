@@ -422,10 +422,49 @@ function defineTests(hap: Hap): void {
     assert.ok(lines.some((l) => l.startsWith('info: [Washer] Sent start, but LG didn\'t confirm it') && l.includes('2211')), lines.join('\n'));
     assert.ok(!lines.some((l) => l.includes('LG refused')));
     assert.ok(refreshes() > 0, 'asks LG for the state');
+    // Meanwhile the tile shows it started, and another tap doesn't send it again
+    assert.equal(value(laundry.valve.getCharacteristic(C.Active)), C.Active.ACTIVE);
     // An outright refusal still is one
-    failSends(new ThinQError(400, '2302', 'Not possible'));
-    await assert.rejects(laundry.valve.getCharacteristic(C.Active).handleSetRequest(1));
-    assert.ok(lines.some((l) => l.startsWith('warn: [Washer] LG refused START')));
+    const other = setup({ allowControl: true });
+    other.laundry.update(status({ state: 'INITIAL', remoteControl: true }));
+    other.failSends(new ThinQError(400, '2302', 'Not possible'));
+    await assert.rejects(other.laundry.valve.getCharacteristic(C.Active).handleSetRequest(1));
+    assert.ok(other.lines.some((l) => l.startsWith('warn: [Washer] LG refused START')));
+    assert.equal(value(other.laundry.valve.getCharacteristic(C.Active)), C.Active.INACTIVE, 'refused: not shown as started');
+  });
+
+  test('a start sent from the Home app shows at once and isn\'t sent again while LG catches up (dryer: 7 s, four extra starts)', async () => {
+    const { laundry, sent } = setup({ allowControl: true });
+    const active = laundry.valve.getCharacteristic(C.Active);
+    laundry.update(status({ state: 'INITIAL', remoteControl: true }));
+    await active.handleSetRequest(1);
+    assert.equal(sent.length, 1);
+    // LG hasn't reported it yet: still shown as started, and more taps send nothing
+    laundry.update(status({ state: 'INITIAL', remoteControl: true }));
+    assert.equal(value(active), C.Active.ACTIVE);
+    await active.handleSetRequest(1);
+    await active.handleSetRequest(1);
+    assert.equal(sent.length, 1, 'one start only');
+    // LG reports it running: normal again; a pause is sent
+    laundry.update(running({ remoteControl: true }));
+    assert.equal(value(active), C.Active.ACTIVE);
+    await active.handleSetRequest(0);
+    assert.equal(sent.length, 2);
+    assert.equal(value(active), C.Active.INACTIVE, 'shown paused at once');
+    laundry.update(running({ remoteControl: true }));
+    assert.equal(value(active), C.Active.INACTIVE, 'still shown paused until LG reports it');
+    laundry.update(status({ state: 'PAUSE', paused: true, remoteControl: true, remaining: 1800, total: 3600 }));
+    assert.equal(value(active), C.Active.INACTIVE);
+  });
+
+  test('a start LG never reports goes back to off after 30 s', async () => {
+    const { laundry } = setup({ allowControl: true });
+    const active = laundry.valve.getCharacteristic(C.Active);
+    laundry.update(status({ state: 'INITIAL', remoteControl: true }));
+    await active.handleSetRequest(1);
+    (laundry as unknown as { pending: { until: number } }).pending.until = Date.now() - 1;
+    laundry.update(status({ state: 'INITIAL', remoteControl: true }));
+    assert.equal(value(active), C.Active.INACTIVE);
   });
 
   test('start from the Home app: a program time that jumps right after is logged (Speed Wash 15 min became Normal 65)', async () => {

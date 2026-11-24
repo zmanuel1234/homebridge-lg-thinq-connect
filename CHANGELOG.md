@@ -12,6 +12,10 @@
   logs that LG didn't confirm it and checks the appliance's state right away (a command that got
   no answer at all in time is handled the same way, logged as a warning).
 
+- **A start or pause from the Home app shows on the tile at once**, until LG reports it (up to 30
+  s), and more taps meanwhile don't send it again. A dryer took 7 seconds to report running, the
+  tile stayed off, and four more starts were sent.
+
 ### Changed
 - **A washer start from the Home app that switches program is logged.** LG's API can only send
   "start", and some washers then run their default program instead of the one on the dial (seen:
