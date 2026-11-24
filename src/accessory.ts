@@ -29,6 +29,8 @@ export interface LaundryContext {
   location?: string;
 }
 
+/** Minutes "done" stays on by default after the machine switches itself off from finished. */
+const DEFAULT_DONE_HOLD_MIN = 120;
 /** How long the tile shows a start or pause sent from the Home app before LG reports it. */
 const PENDING_MS = 30_000;
 /**
@@ -50,6 +52,8 @@ export interface LaundryOptions {
   phaseSensors: string[];
   /** Cycles counted by LG at which the tub-clean reminder turns on; 0 = no reminder. */
   tubCleanAfter: number;
+  /** Minutes "done" stays on after the machine switches itself off straight from finished (default 120). */
+  doneHoldMinutes?: number;
   /** The Remote Start sensor (when the machine reports it and control is allowed); default on. */
   remoteStartSensor?: boolean;
 }
@@ -80,6 +84,8 @@ const EARLY_ALERT_LEFT = 10 * 60;
 const NEAR_END = 3 * 60;
 /** How long "done" stays detected when the finish was only inferred (the machine already powered off). */
 const INFERRED_DONE_MS = 60_000;
+/** A cycle count of 0 after a real one is only believed when it lasts this long (seen: 16 → 0 → 16 at power-on). */
+const ZERO_COUNT_MS = 30_000;
 
 export class LaundryAccessory {
   readonly valve: Service;
@@ -92,6 +98,8 @@ export class LaundryAccessory {
   readonly ovenThermostat: Service | undefined;
   /** After a start from the Home app: the program time chosen before it, checked for a few minutes. */
   private startCheck: { programTime: number; until: number } | undefined;
+  /** When LG started reporting a cycle count of 0 after a real one (0: it isn't). */
+  private zeroCountSince = 0;
   /**
    * A start (on) or pause (off) sent from the Home app that LG hasn't reported yet: the tile shows
    * it meanwhile, and taps asking for the same aren't sent again (seen: a dryer took 7 s to report
@@ -217,8 +225,9 @@ export class LaundryAccessory {
   }
 
   /** New status from LG; null when LG can't be reached. */
-  update(next: LaundryStatus | null): void {
+  update(incoming: LaundryStatus | null): void {
     const prev = this.status;
+    const next = this.steadyCount(incoming, prev);
     this.checkProgramAfterStart(next);
     if (this.heldFinish && next) {
       this.heldFinish = false;
@@ -243,20 +252,32 @@ export class LaundryAccessory {
       this.problemAlert = '';
     } else if (next && next.state === 'POWER_OFF') {
       // Switched off: alerts end (an inferred finish still shows briefly)
+      if (prev?.state === 'END' || (this.finishedAlert && prev?.state !== 'WRINKLE_CARE')) {
+        // Straight from finished (many washers switch themselves off a minute later): the laundry is
+        // still waiting, so "done" stays on until the machine is next used. From wrinkle care
+        // someone switched it off at the machine, so it ends.
+        this.holdDone();
+      }
       this.finishedAlert = false;
       this.problemAlert = '';
+    } else if (next && !next.done && !next.error && prev?.state === 'POWER_OFF') {
+      // Switched on again: the next load
+      this.inferredDoneUntil = 0;
     }
     if (next && prev && next.state !== prev.state) {
       const left = next.remaining ? `, ${Math.round(next.remaining / 60)} min left` : '';
-      const cycles = next.done && !prev.done && next.cycleCount !== undefined ? ` (LG counts ${next.cycleCount} cycles)` : '';
       const course = next.course && (next.running || next.paused) ? ` (${stateLabel(next.course).toLowerCase()})` : '';
       const wait = next.startsIn ? `, starts in ${duration(next.startsIn)}` : '';
-      this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state, this.unit.kind)}${course}${left}${wait}${cycles}.`);
+      this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state, this.unit.kind)}${course}${left}${wait}.`);
       if (next.error) {
         this.deps.log.warn(`[${this.options.name}] The machine reports an error${next.errorName ? `: ${next.errorName}` : ''}.`);
       }
     }
     const count = next?.cycleCount;
+    // LG sends the new count in an update of its own, right after the end
+    if (count !== undefined && prev?.cycleCount !== undefined && count > prev.cycleCount && prev.cycleCount > 0) {
+      this.deps.log.info(`[${this.options.name}] LG now counts ${count} cycles.`);
+    }
     if (this.tubCleanSensor && count !== undefined && count >= this.options.tubCleanAfter
       && (prev?.cycleCount === undefined || prev.cycleCount < this.options.tubCleanAfter)) {
       this.deps.log.info(`[${this.options.name}] Time for a Tub Clean: LG counts ${count} cycles (reminder set at ${this.options.tubCleanAfter}).`);
@@ -293,14 +314,49 @@ export class LaundryAccessory {
 
   /** "Done" for a minute: the machine is already off, so nothing else would end it. */
   private briefDone(): void {
-    this.inferredDoneUntil = Date.now() + INFERRED_DONE_MS;
+    this.keepDone(Math.max(INFERRED_DONE_MS, this.holdMs));
+  }
+
+  /** "Done" kept after the machine switched itself off from finished, until it's next used. */
+  private holdDone(): void {
+    if (this.holdMs > 0) { this.keepDone(this.holdMs); }
+  }
+
+  /** Ovens finish cooking, not a load to take out: their "done" ends with them. */
+  private get holdMs(): number {
+    return this.unit.kind === 'oven' ? 0 : (this.options.doneHoldMinutes ?? DEFAULT_DONE_HOLD_MIN) * 60_000;
+  }
+
+  private keepDone(ms: number): void {
+    this.inferredDoneUntil = Date.now() + ms;
     clearTimeout(this.inferredTimer);
-    this.inferredTimer = setTimeout(() => { this.inferredDoneUntil = 0; this.render(); }, INFERRED_DONE_MS);
+    this.inferredTimer = setTimeout(() => { this.inferredDoneUntil = 0; this.render(); }, ms);
     this.inferredTimer.unref?.();
+  }
+
+  /**
+   * LG briefly reports a cycle count of 0 when a washer is switched on, then the real one (seen:
+   * 16 → 0 → 16). Believing it would switch the tub-clean sensor off and on (with a notification)
+   * at every power-on, so a 0 after a real count only counts once it has lasted a while.
+   */
+  private steadyCount(next: LaundryStatus | null, prev: LaundryStatus | null): LaundryStatus | null {
+    if (!next || next.cycleCount !== 0 || !prev?.cycleCount) { this.zeroCountSince = 0; return next; }
+    if (!this.zeroCountSince) { this.zeroCountSince = Date.now(); }
+    if (Date.now() - this.zeroCountSince >= ZERO_COUNT_MS) { return next; }
+    return { ...next, cycleCount: prev.cycleCount };
   }
 
   get done(): boolean {
     return !!this.status?.done || this.finishedAlert || this.inferredDoneUntil > Date.now();
+  }
+
+  /**
+   * Remote Start is on and the machine waits to be started. LG's flag alone also stays on during a
+   * cycle and comes on by itself in a dryer's wrinkle care, where "start" would begin a new cycle.
+   */
+  get waitingForStart(): boolean {
+    const s = this.status;
+    return !!s?.remoteControl && !s.running && !s.paused && !s.done && !s.error && s.state !== 'POWER_OFF';
   }
 
   get problem(): boolean {
@@ -368,7 +424,7 @@ export class LaundryAccessory {
     }
     if (this.remoteStartSensor) {
       set(this.remoteStartSensor.getCharacteristic(C.OccupancyDetected),
-        s?.remoteControl ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+        this.waitingForStart ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     }
     if (this.ovenThermostat) {
       const t = this.ovenThermostat;

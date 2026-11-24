@@ -1,12 +1,33 @@
 # Changelog
 
-## Unreleased
+## 1.0.7 - 2026-11-24
+
+From the first full cycles on a real washer and dryer.
 
 ### Changed
+- **"Done" stays on after a washer switches itself off.** The washer switched itself off 30 seconds
+  after finishing, which turned "Done" off too (and sent an "unoccupied" notification), so it
+  couldn't show that the laundry was waiting. "Done" now stays on until the machine is next
+  switched on or started, for 2 hours at most: new setting *Keep "Done" on after the machine
+  switches itself off* (0 = as before). A dryer switched off from wrinkle care still ends it at
+  once.
+- **"Remote Start" means "waiting to be started".** LG keeps Remote Start on during a cycle, and a
+  dryer turns it on by itself in wrinkle care, so the sensor showed Detected on a finished load (an
+  automation starting the dryer then would begin a new cycle). It's now Detected only while the
+  machine waits to be started; pausing and resuming from the Home app work as before.
 - The program-switch warning after a washer start from the Home app only looks at the first 15
   seconds (was 3 minutes). LG reports a program switch within about a second; the washer's own
   adjustment for the load comes later (seen: 65 → 53 min after 43 seconds) and could have set off a
   false warning.
+
+### Fixed
+- The cycle count in the log was one behind ("16" when LG then sent 17 in an update of its own):
+  the log now says "LG now counts 17 cycles" when the count goes up.
+- The error name was missing from the log ("The machine reports an error.") when LG sends it as a
+  plain `"error": "DOOR_OPEN_ERROR"`; it's read now.
+- At power-on LG briefly reports a cycle count of 0 before the real one; once past the tub-clean
+  setting, that switched the Tub Clean sensor off and on (with a notification) every time. A 0 now
+  only counts when it lasts (as after a Tub Clean).
 
 ## 1.0.6 - 2026-11-24
 

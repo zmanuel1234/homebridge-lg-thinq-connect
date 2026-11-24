@@ -247,7 +247,9 @@ export function laundryStatus(unit: LaundryUnit, state: unknown): LaundryStatus 
   const running = !paused && !IDLE.has(current) && !(unit.kind === 'oven' && OVEN_IDLE.has(current));
   const timer = field(s, 'timer');
   const inCycle = running || paused;
-  const errorWord = field(field(s, 'error'), 'errorCode') ?? field(s, 'errorCode');
+  // LG sends it as error.errorCode, errorCode, or (seen on a washer) a plain "error": "DOOR_OPEN_ERROR"
+  const errorField = field(s, 'error');
+  const errorWord = typeof errorField === 'string' ? errorField : field(errorField, 'errorCode') ?? field(s, 'errorCode');
   const count = field(field(s, 'cycle'), 'cycleCount');
   const door = field(field(s, 'doorStatus'), 'doorState');
   const rinse = field(field(s, 'dishWashingStatus'), 'rinseRefill');
