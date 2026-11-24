@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import { ThinQError } from '../src/api';
 import assert from 'node:assert/strict';
 import type { API, Characteristic, Logging, PlatformAccessory } from 'homebridge';
@@ -487,6 +487,20 @@ function defineTests(hap: Hap): void {
     await assert.rejects(refused.laundry.valve.getCharacteristic(C.Active).handleSetRequest(1));
     refused.laundry.update(running({ state: 'RUNNING', remaining: 3900, total: 3900, programTime: 3900 }));
     assert.ok(!refused.lines.some((l) => l.includes('cycle time changed')));
+    // The washer's own adjustment for the load, later than the window: not a program switch
+    // (seen: Normal, 65 min, became 53 min 43 s after the start)
+    const adjusted = setup({ allowControl: true });
+    adjusted.laundry.update(status({ state: 'INITIAL', remoteControl: true, programTime: 3900 }));
+    await adjusted.laundry.valve.getCharacteristic(C.Active).handleSetRequest(1);
+    adjusted.laundry.update(running({ state: 'DETECTING', remaining: 0, total: 3900, programTime: 3900, remoteControl: true }));
+    mock.timers.enable({ apis: ['Date'], now: Date.now() });
+    try {
+      mock.timers.tick(43_000);
+      adjusted.laundry.update(running({ state: 'RUNNING', remaining: 3180, total: 3180, programTime: 3180, remoteControl: true }));
+    } finally {
+      mock.timers.reset();
+    }
+    assert.ok(!adjusted.lines.some((l) => l.includes('cycle time changed')), adjusted.lines.join('\n'));
     const kept = setup({ allowControl: true });
     kept.laundry.update(status({ state: 'INITIAL', remoteControl: true, programTime: 3900 }));
     await kept.laundry.valve.getCharacteristic(C.Active).handleSetRequest(1);

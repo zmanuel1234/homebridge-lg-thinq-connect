@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- The program-switch warning after a washer start from the Home app only looks at the first 15
+  seconds (was 3 minutes). LG reports a program switch within about a second; the washer's own
+  adjustment for the load comes later (seen: 65 → 53 min after 43 seconds) and could have set off a
+  false warning.
+
 ## 1.0.6 - 2026-11-24
 
 ### Fixed

@@ -31,8 +31,12 @@ export interface LaundryContext {
 
 /** How long the tile shows a start or pause sent from the Home app before LG reports it. */
 const PENDING_MS = 30_000;
-/** How long after a start the program time is compared with the one chosen before it. */
-const START_CHECK_MS = 3 * 60_000;
+/**
+ * How long after a start the program time is compared with the one chosen before it. LG reports a
+ * program switch within about a second (Speed Wash 15 min → Normal 65 min, 1 s after the start);
+ * the washer's own adjustment for the load comes later (65 → 53 min after 43 s), so it's left out.
+ */
+const START_CHECK_MS = 15_000;
 /** A change in program time this large (seconds) after a start means another program. */
 const PROGRAM_CHANGE = 10 * 60;
 
