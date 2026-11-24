@@ -146,10 +146,10 @@ function defineTests(hap: Hap): void {
 
   const TOTAL = 'E863F10C-079E-48FF-8F27-9C2605A29F52';
   const EVE_CONSUMPTION = 'E863F008-079E-48FF-8F27-9C2605A29F52';
-  const energyOf = (acc: PlatformAccessory) => acc.getServiceById(S.Outlet, 'energy');
+  const energyOf = (acc: PlatformAccessory) => acc.services.find((x) => x.UUID === EVE_CONSUMPTION && x.subtype === 'energy');
   const kwh = (acc: PlatformAccessory) => energyOf(acc)?.characteristics.find((c) => c.UUID === TOTAL)?.value;
 
-  test('energy: this month\'s use on a read-only "energy" outlet for Eve, for appliances LG keeps it for', async (t) => {
+  test('energy: this month\'s use on an Eve Consumption service, for appliances LG keeps it for', async (t) => {
     const hb = await homebridge(t);
     hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 12345 };
     const platform = await hb.start();
@@ -160,14 +160,6 @@ function defineTests(hap: Hap): void {
     await until(() => kwh(washer) === 12.345);
     // Not on the washer's valve, where Eve doesn't show it
     assert.ok(!washer.getService(S.Valve)!.characteristics.some((c) => c.UUID === TOTAL));
-    const outlet = energyOf(washer)!;
-    assert.equal(outlet.getCharacteristic(C.ConfiguredName).value, 'Front Load Washer energy');
-    assert.equal(outlet.getCharacteristic(C.On).value, false, 'off: the washer isn\'t running');
-    assert.equal(outlet.getCharacteristic(C.OutletInUse).value, false);
-    // A tap changes nothing on the washer, and the outlet flips back
-    await outlet.getCharacteristic(C.On).handleSetRequest(true);
-    await until(() => outlet.getCharacteristic(C.On).value === false);
-    assert.ok(!hb.lg.requests.some((r) => r.method === 'POST'), 'nothing sent to LG');
     assert.ok(hb.lines.includes('info: [Front Load Washer] Energy use this month is shown in the Eve app (LG updates it daily).'));
     // The dryer: LG keeps no figures for it, so nothing is added and nothing is logged above debug
     const dryer = hb.calls.registered.find((a) => a.displayName === 'Dryer')!;
@@ -176,38 +168,20 @@ function defineTests(hap: Hap): void {
     platform.stop();
   });
 
-  test('energy: where 1.0.0 (the valve) and 1.0.1 (Eve\'s Consumption service) put it is cleared, the outlet added', async (t) => {
+  test('energy: 1.0.0\'s figure on the valve and 1.0.2\'s outlet are replaced by the Eve Consumption service', async (t) => {
     const hb = await homebridge(t);
     hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 2000 };
     const first = await hb.start([], { energy: false });
     first.stop();
     const cached = hb.calls.registered.splice(0);
     const washer = cached.find((a) => a.displayName === 'Front Load Washer')!;
-    // As 1.0.0 left it (the figure on the valve) and 1.0.1 (an Eve Consumption service)
+    // As 1.0.0 left it (the figure on the valve) and 1.0.2 (an "energy" outlet tile)
     washer.getService(S.Valve)!.addCharacteristic(totalConsumption(hb.api as unknown as API));
-    washer.addService(new hap.Service('Washer energy', EVE_CONSUMPTION, 'energy'));
+    washer.addService(S.Outlet, 'Front Load Washer energy', 'energy');
     const platform = await hb.start(cached);
     await until(() => kwh(washer) === 2);
     assert.ok(!washer.getService(S.Valve)!.characteristics.some((c) => c.UUID === TOTAL));
-    assert.ok(!washer.services.some((x) => x.UUID === EVE_CONSUMPTION));
-    platform.stop();
-  });
-
-  test('energy: the outlet is on and in use while the washer runs, and refuses taps after a restart', async (t) => {
-    const hb = await homebridge(t);
-    hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 500 };
-    const first = await hb.start();
-    const washer = hb.calls.registered.find((a) => a.displayName === 'Front Load Washer')!;
-    await until(() => kwh(washer) === 0.5);
-    first.stop();
-    const cached = hb.calls.registered.splice(0);
-    hb.lg.devices[0].state = { ...(hb.lg.devices[0].state as object), runState: { currentState: 'RUNNING' }, timer: { remainHour: 0, remainMinute: 40 } };
-    const platform = await hb.start(cached);
-    const outlet = energyOf(washer)!;
-    await until(() => outlet.getCharacteristic(C.On).value === true);
-    assert.equal(outlet.getCharacteristic(C.OutletInUse).value, true);
-    await outlet.getCharacteristic(C.On).handleSetRequest(false);
-    await until(() => outlet.getCharacteristic(C.On).value === true);
+    assert.equal(washer.getServiceById(S.Outlet, 'energy'), undefined, '1.0.2\'s outlet removed');
     platform.stop();
   });
 
