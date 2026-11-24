@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.8 - 2026-11-24
 
 ### Added
 - **Setting "Problem sensors show as": contact sensors (default, as before) or occupancy
