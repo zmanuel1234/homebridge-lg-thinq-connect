@@ -4,7 +4,7 @@ import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformCo
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { type Device, ThinQClient, ThinQError, clientIdFor } from './api';
 import { alertFor, alertKind, isCycleAppliance, isLaundry, laundryStatus, laundryUnits, mergeState, stateLabel } from './laundry';
-import { mainService, thisMonth, totalConsumption } from './energy';
+import { consumptionService, ENERGY_SUBTYPE, mainService, thisMonth, totalConsumption } from './energy';
 import { supportLevel } from './support';
 import { type ApplianceContext, type ApplianceOptions, type Part, categoryOf, mappingFor } from './appliances';
 import { type LaundryContext, LaundryAccessory } from './accessory';
@@ -485,20 +485,28 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
   }
 
   /**
-   * Energy use for the Eve app, for appliances LG keeps it for: this month's kWh on each part's main
-   * tile. Silent when LG keeps none; failures only delay it.
+   * Energy use for the Eve app, for appliances LG keeps it for: this month's kWh on an Eve
+   * Consumption service on each part. Silent when LG keeps none; failures only delay it.
    */
   async setupEnergy(machine: Machine): Promise<void> {
     const client = this.client;
     if (this.stopped || !client?.energyProperties || !client.energyUsage) { return; }
     const Total = totalConsumption(this.api);
+    const Consumption = consumptionService(this.api);
     const info = this.api.hap.Service.AccessoryInformation.UUID;
-    /** Takes the energy figure off tiles that shouldn't show one (setting off, or LG keeps none). */
+    const energyService = (part: Part) =>
+      part.accessory.services.find((s) => s.UUID === Consumption.UUID && s.subtype === ENERGY_SUBTYPE);
+    // 1.0.0 put the figure on the main tile, where Eve doesn't show it: take it off there
+    for (const part of machine.parts) {
+      const svc = mainService(part.accessory.services.filter((s) => s.UUID !== Consumption.UUID), info);
+      const old = svc?.characteristics.find((c) => c.UUID === Total.UUID);
+      if (svc && old) { svc.removeCharacteristic(old); }
+    }
+    /** Takes the energy figure off appliances that shouldn't show one (setting off, or LG keeps none). */
     const clear = (parts: Part[]) => {
       for (const part of parts) {
-        const svc = mainService(part.accessory.services, info);
-        const ch = svc?.characteristics.find((c) => c.UUID === Total.UUID);
-        if (svc && ch) { svc.removeCharacteristic(ch); }
+        const svc = energyService(part);
+        if (svc) { part.accessory.removeService(svc); }
       }
     };
     if (!this.settings.energy) { clear(machine.parts); return; }
@@ -531,12 +539,12 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     const check = async () => {
       let failed = false;
       for (const { part, property } of targets) {
-        const svc = mainService(part.accessory.services, info);
-        if (!svc) { continue; }
         try {
           const wh = await client.energyUsage!(device.deviceId, property, 'MONTHLY', thisMonth(), thisMonth());
           const kwh = Math.round(wh) / 1000;
-          const ch = svc.characteristics.find((c) => c.UUID === Total.UUID) || svc.addCharacteristic(Total);
+          const svc = energyService(part)
+            || part.accessory.addService(new Consumption(`${part.accessory.displayName} energy`, ENERGY_SUBTYPE));
+          const ch = svc.getCharacteristic(Total);
           if (ch.value !== kwh) {
             this.log.debug(`[${part.accessory.displayName}] Energy this month: ${kwh} kWh.`);
             ch.updateValue(kwh);

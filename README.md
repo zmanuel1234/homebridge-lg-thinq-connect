@@ -248,12 +248,13 @@ app, then choose:
 
 ### Energy use
 
-For appliances LG keeps energy figures for, this month's use (kWh) is added to the appliance's main
-tile. Apple's Home app doesn't show energy; the **Eve** app does. LG updates the figure with a
+For appliances LG keeps energy figures for, this month's use (kWh) is added for the **Eve** app
+(free on the App Store; Apple's Home app doesn't show energy). In Eve, open the appliance (for
+example in its room): **Total Consumption** is listed under its own heading below the tiles. LG updates the figure with a
 delay, often a day, so the plugin checks it once at startup and then once a day, at a random
 time between 1 and 6 am (as Home Assistant does, to spread the load on LG's servers). It's this month's figure, so it starts
 again from 0 on the 1st (Eve treats it as a running total). Turn it off with **Energy use in the
-Eve app**; the figure is then taken off the tiles.
+Eve app**; the figure is then taken off.
 
 ### Help add or fix an appliance
 
