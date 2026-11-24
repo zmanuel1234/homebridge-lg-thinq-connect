@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 - 2026-11-24
+
+### Fixed
+- **Energy use now shows in the Eve app.** 1.0.0 put it on the appliance's main tile, which Eve
+  doesn't show for washers and dryers (they appear as a valve). It's now on Eve's own Consumption
+  service, which Eve shows for any accessory and the Home app ignores. Nothing changes in the Home
+  app; the figure moves on its own after updating.
+
 ## 1.0.0 - 2026-11-23
 
 The first stable release: everything from the betas below, with no changes since 1.0.0-beta.1.

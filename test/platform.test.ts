@@ -7,6 +7,7 @@ import type { API, Logging, PlatformAccessory, PlatformConfig } from 'homebridge
 import type * as HapNodejs from '@homebridge/hap-nodejs';
 import { LGThinQPlatform, readSettings, untilNextEnergyCheck } from '../src/platform';
 import { ThinQClient } from '../src/api';
+import { totalConsumption } from '../src/energy';
 import { FakeLG } from './fake-lg';
 import { FakeBroker } from './fake-broker';
 import { connect } from 'node:net';
@@ -143,7 +144,12 @@ function defineTests(hap: Hap): void {
     }
   };
 
-  test('energy: this month\'s use on the main tile for Eve, for appliances LG keeps it for', async (t) => {
+  const TOTAL = 'E863F10C-079E-48FF-8F27-9C2605A29F52';
+  const EVE_CONSUMPTION = 'E863F008-079E-48FF-8F27-9C2605A29F52';
+  const energyOf = (acc: PlatformAccessory) => acc.services.find((x) => x.UUID === EVE_CONSUMPTION && x.subtype === 'energy');
+  const kwh = (acc: PlatformAccessory) => energyOf(acc)?.characteristics.find((c) => c.UUID === TOTAL)?.value;
+
+  test('energy: this month\'s use on an Eve Consumption service, for appliances LG keeps it for', async (t) => {
     const hb = await homebridge(t);
     hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 12345 };
     const platform = await hb.start();
@@ -151,30 +157,45 @@ function defineTests(hap: Hap): void {
     const month = `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}`;
     assert.deepEqual(hb.lg.energyQueries, [`property=energyUsage&period=MONTHLY&startDate=${month}&endDate=${month}`]);
     const washer = hb.calls.registered.find((a) => a.displayName === 'Front Load Washer')!;
-    const valve = washer.getService(S.Valve)!;
-    await until(() => valve.characteristics.some((c) => c.UUID === 'E863F10C-079E-48FF-8F27-9C2605A29F52' && c.value === 12.345));
+    await until(() => kwh(washer) === 12.345);
+    // Not on the washer's valve, where Eve doesn't show it
+    assert.ok(!washer.getService(S.Valve)!.characteristics.some((c) => c.UUID === TOTAL));
     assert.ok(hb.lines.includes('info: [Front Load Washer] Energy use this month is shown in the Eve app (LG updates it daily).'));
     // The dryer: LG keeps no figures for it, so nothing is added and nothing is logged above debug
     const dryer = hb.calls.registered.find((a) => a.displayName === 'Dryer')!;
-    assert.ok(!dryer.getService(S.Valve)!.characteristics.some((c) => c.UUID === 'E863F10C-079E-48FF-8F27-9C2605A29F52'));
+    assert.equal(energyOf(dryer), undefined);
     assert.ok(!hb.lines.some((l) => l.includes('[Dryer] Energy') && !l.startsWith('debug')));
     platform.stop();
   });
 
-  test('energy: turned off in the settings, LG isn\'t asked and an earlier figure is taken off the tile', async (t) => {
+  test('energy: 1.0.0\'s figure on the valve is moved to the Eve Consumption service', async (t) => {
+    const hb = await homebridge(t);
+    hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 2000 };
+    const first = await hb.start([], { energy: false });
+    first.stop();
+    const cached = hb.calls.registered.splice(0);
+    const washer = cached.find((a) => a.displayName === 'Front Load Washer')!;
+    // As 1.0.0 left it: the figure on the valve
+    washer.getService(S.Valve)!.addCharacteristic(totalConsumption(hb.api as unknown as API));
+    const platform = await hb.start(cached);
+    await until(() => kwh(washer) === 2);
+    assert.ok(!washer.getService(S.Valve)!.characteristics.some((c) => c.UUID === TOTAL));
+    platform.stop();
+  });
+
+  test('energy: turned off in the settings, LG isn\'t asked and an earlier figure is taken off', async (t) => {
     const hb = await homebridge(t);
     hb.lg.energy['device-1'] = { properties: ['energyUsage'], wh: 1000 };
     const first = await hb.start();
-    const isEnergy = (c: { UUID: string }) => c.UUID === 'E863F10C-079E-48FF-8F27-9C2605A29F52';
     const washer = hb.calls.registered.find((a) => a.displayName === 'Front Load Washer')!;
-    await until(() => washer.getService(S.Valve)!.characteristics.some(isEnergy));
+    await until(() => kwh(washer) === 1);
     first.stop();
     const cached = hb.calls.registered.splice(0);
     const queries = hb.lg.energyQueries.length;
     await hb.start(cached, { energy: false });
     await new Promise((r) => setTimeout(r, 50));
     assert.equal(hb.lg.energyQueries.length, queries);
-    assert.ok(!washer.getService(S.Valve)!.characteristics.some(isEnergy));
+    assert.equal(energyOf(washer), undefined);
   });
 
   test('energy: a failed daily check is tried again within the hour', async (t) => {
