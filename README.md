@@ -245,6 +245,7 @@ app, then choose:
 | Modes on the tile | Air conditioner | All it has, cooling only, or heating only (for a unit used one way) |
 | The tile's swing moves | Air conditioner | Up and down (default), left and right, or both; the other direction gets a switch |
 | Room temperature sensor | Air conditioner | The room temperature as a sensor of its own, for automations |
+| Leave out the Remote Start sensor | Washer, dryer (and other cycle appliances) | No Remote Start sensor for this one; the others keep theirs |
 
 ### Energy use
 

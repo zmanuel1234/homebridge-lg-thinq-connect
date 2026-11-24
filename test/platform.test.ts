@@ -32,11 +32,11 @@ test('settings: defaults, limits and clean-up', () => {
   const t = readSettings({
     platform: 'LGThinQConnect', token: ' abc ', country: 'gb', pollInterval: 5, runningPollInterval: '9999',
     allowControl: 'yes', liveUpdates: false, phaseSensors: ['SPINNING', '', 3], tubCleanAfter: 500, experimental: 'yes', extraControls: false, ignore: [' Dryer '], energy: false,
-    appliances: [{ name: ' Living Room AC ', acModes: 'cool', acSwing: 'both', temperatureSensor: true, extraControls: false, odd: 1 },
+    appliances: [{ name: ' Living Room AC ', acModes: 'cool', acSwing: 'both', temperatureSensor: true, extraControls: false, hideRemoteStart: true, odd: 1 },
       { name: '', acModes: 'cool' }, { name: 'Purifier', acModes: 'sideways', acSwing: 7 }, 'junk'],
   } as unknown as PlatformConfig);
   assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, liveUpdates: false, phaseSensors: ['SPINNING'], tubCleanAfter: 200, experimental: false, extraControls: false, ignore: ['dryer'], energy: false,
-    appliances: new Map([['living room ac', { acModes: 'cool', acSwing: 'both', temperatureSensor: true, extraControls: false }], ['purifier', {}]]) });
+    appliances: new Map([['living room ac', { acModes: 'cool', acSwing: 'both', temperatureSensor: true, extraControls: false, hideRemoteStart: true }], ['purifier', {}]]) });
 });
 
 if (!hap) {
@@ -329,6 +329,15 @@ function defineTests(hap: Hap): void {
     set('END', 0);
     await platform.poll(machine);
     assert.equal(acc.doneSensor.getCharacteristic(C.OccupancyDetected).value, C.OccupancyDetected.OCCUPANCY_DETECTED);
+  });
+
+  test('options per appliance: the Remote Start sensor left out for one machine, kept for the other', async (t) => {
+    const hb = await homebridge(t, { allowControl: true, appliances: [{ name: ' dryer ', hideRemoteStart: true }] });
+    const platform = await hb.start();
+    const [washer, dryer] = platform.machines.map((m) => m.units[0]);
+    assert.ok(washer.remoteStartSensor, 'the washer keeps its sensor');
+    assert.equal(dryer.remoteStartSensor, undefined, 'the dryer has none');
+    assert.equal(dryer.accessory.getServiceById(S.OccupancySensor, 'remote-start'), undefined);
   });
 
   test('control on: a tap in the Home app reaches LG as a command for the right drum', async (t) => {

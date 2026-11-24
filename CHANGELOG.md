@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.5 - 2026-11-24
+
+### Added
+- **Options per appliance → "Washer, dryer: leave out the Remote Start sensor"**: no Remote Start
+  sensor for that machine, while the others keep theirs (for example, keep the washer's and leave
+  out the dryer's).
+
 ## 1.0.4 - 2026-11-24
 
 ### Changed

@@ -238,6 +238,7 @@
     "appliances[].acModes",
     "appliances[].acSwing",
     "appliances[].extraControls",
+    "appliances[].hideRemoteStart",
     "appliances[].name",
     "appliances[].temperatureSensor",
     "country",

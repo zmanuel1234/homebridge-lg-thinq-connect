@@ -38,6 +38,8 @@ export interface LaundryOptions {
   phaseSensors: string[];
   /** Cycles counted by LG at which the tub-clean reminder turns on; 0 = no reminder. */
   tubCleanAfter: number;
+  /** The Remote Start sensor (when the machine reports it and control is allowed); default on. */
+  remoteStartSensor?: boolean;
 }
 
 export interface Deps {
@@ -148,7 +150,8 @@ export class LaundryAccessory {
     }
 
     // Remote Start on at the machine: only useful when the Home app may start it
-    this.remoteStartSensor = this.optional(unit.reportsRemoteStart && options.allowControl && unit.kind !== 'oven',
+    this.remoteStartSensor = this.optional(unit.reportsRemoteStart && options.allowControl && unit.kind !== 'oven'
+      && options.remoteStartSensor !== false,
       S.OccupancySensor, `${name} remote start`, 'remote-start');
 
     // Oven temperature, when the oven accepts one

@@ -219,6 +219,11 @@
               "type": "boolean",
               "title": "Air conditioner: room temperature sensor",
               "description": "The room temperature as a sensor of its own, for automations."
+            },
+            "hideRemoteStart": {
+              "type": "boolean",
+              "title": "Washer, dryer: leave out the Remote Start sensor",
+              "description": "For this appliance only; the others keep theirs."
             }
           }
         }

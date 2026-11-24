@@ -34,6 +34,8 @@ export interface ApplianceOptions {
   acSwing?: 'up-down' | 'left-right' | 'both';
   /** Air conditioners: the room temperature as a sensor of its own, for automations (purifiers that measure it always get one). */
   temperatureSensor?: boolean;
+  /** Washers, dryers and other cycle appliances: leave out the Remote Start sensor. */
+  hideRemoteStart?: boolean;
 }
 
 /** One appliance (or one part of one) in the Home app, kept up to date from LG's state. */

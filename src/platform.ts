@@ -64,6 +64,7 @@ function applianceOptions(v: unknown): Map<string, ApplianceOptions> {
     if (o.acModes === 'all' || o.acModes === 'cool' || o.acModes === 'heat') { opts.acModes = o.acModes; }
     if (o.acSwing === 'up-down' || o.acSwing === 'left-right' || o.acSwing === 'both') { opts.acSwing = o.acSwing; }
     if (typeof o.temperatureSensor === 'boolean') { opts.temperatureSensor = o.temperatureSensor; }
+    if (typeof o.hideRemoteStart === 'boolean') { opts.hideRemoteStart = o.hideRemoteStart; }
     out.set(name, opts);
   }
   return out;
@@ -418,7 +419,8 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       const serial = createHash('sha256').update(`${device.deviceId}:${unit.location}`).digest('hex').slice(0, 12).toUpperCase();
       const laundry = new LaundryAccessory(this, accessory, unit,
         { name, model: modelName, serial, allowControl: this.settings.allowControl,
-          phaseSensors: this.settings.phaseSensors, tubCleanAfter: this.settings.tubCleanAfter },
+          phaseSensors: this.settings.phaseSensors, tubCleanAfter: this.settings.tubCleanAfter,
+          remoteStartSensor: this.settings.appliances.get(alias.trim().toLowerCase())?.hideRemoteStart !== true },
         (payload) => this.client!.control(device.deviceId, payload),
         () => this.schedule(machine, 3));
       machine.units.push(laundry);
