@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
+import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service } from 'homebridge';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { type Device, ThinQClient, ThinQError, clientIdFor } from './api';
 import { alertFor, alertKind, isCycleAppliance, isLaundry, laundryStatus, laundryUnits, mergeState, stateLabel } from './laundry';
+import { keepOrUpdate } from './names';
 import { consumptionService, ENERGY_SUBTYPE, mainService, thisMonth, totalConsumption } from './energy';
 import { supportLevel } from './support';
 import { type ApplianceContext, type ApplianceOptions, type Part, categoryOf, mappingFor } from './appliances';
@@ -547,7 +548,8 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
           const wh = await client.energyUsage!(device.deviceId, property, 'MONTHLY', thisMonth(), thisMonth());
           const kwh = Math.round(wh) / 1000;
           const svc = energyService(part)
-            || part.accessory.addService(new Consumption(`${part.accessory.displayName} energy`, ENERGY_SUBTYPE));
+            || part.accessory.addService(new Consumption(`${part.accessory.displayName} Energy`, ENERGY_SUBTYPE));
+          this.nameEnergyService(svc, `${part.accessory.displayName} Energy`);
           const ch = svc.getCharacteristic(Total);
           if (ch.value !== kwh) {
             this.log.debug(`[${part.accessory.displayName}] Energy this month: ${kwh} kWh.`);
@@ -565,6 +567,18 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     };
     this.log.info(`[${device.deviceInfo.alias}] Energy use this month is shown in the Eve app (LG updates it daily).`);
     await check();
+  }
+
+  /** Names the energy section, so Eve shows "<name> Energy" rather than its internal type name. */
+  private nameEnergyService(svc: Service, name: string): void {
+    const { Characteristic: C } = this.api.hap;
+    for (const ch of [C.Name, C.ConfiguredName]) {
+      if (!svc.testCharacteristic(ch)) { svc.addOptionalCharacteristic(ch); }
+    }
+    svc.getCharacteristic(C.Name).updateValue(name);
+    const configured = svc.getCharacteristic(C.ConfiguredName);
+    const shown = keepOrUpdate(configured.value, name);
+    if (shown) { configured.updateValue(shown); }
   }
 
   /** Check one appliance's state now, then schedule the next check. */

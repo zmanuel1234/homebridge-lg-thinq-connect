@@ -1,6 +1,7 @@
 // What every appliance shares: a Home app accessory, services named after the appliance, commands
 // sent one at a time, and LG's problem alerts shown on a "problem" sensor.
 
+import { displayName, keepOrUpdate } from '../names';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service, WithUUID } from 'homebridge';
 import type { Device } from '../api';
 import type { LaundryContext } from '../accessory';
@@ -107,13 +108,15 @@ export abstract class Appliance implements Part {
   stop(): void {}
 
   /** Get or add a service, and keep its name in step (a name changed in the Home app wins). */
-  protected service(type: WithUUID<typeof Service>, name: string, subtype: string): Service {
+  protected service(type: WithUUID<typeof Service>, raw: string, subtype: string): Service {
     const { Characteristic: C } = this.hap;
+    const name = displayName(this.ctx.name, raw);
     const svc = this.accessory.getServiceById(type, subtype) || this.accessory.addService(type, name, subtype);
     svc.setCharacteristic(C.Name, name);
     if (!svc.testCharacteristic(C.ConfiguredName)) { svc.addOptionalCharacteristic(C.ConfiguredName); }
     const configured = svc.getCharacteristic(C.ConfiguredName);
-    if (!configured.value) { configured.updateValue(name); }
+    const shown = keepOrUpdate(configured.value, name);
+    if (shown) { configured.updateValue(shown); }
     return svc;
   }
 

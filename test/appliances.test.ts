@@ -180,7 +180,7 @@ function defineTests(hap: Hap): void {
     const sw = (sub: string) => accessory.getServiceById(S.Switch, sub);
     assert.deepEqual(accessory.services.filter((x) => x.UUID === S.Switch.UUID).map((x) => x.subtype).sort(),
       ['air-purify', 'energy-saving', 'mode-AIR_DRY', 'swing-left-right']);
-    assert.equal(val(sw('energy-saving')!.getCharacteristic(C.ConfiguredName)), 'AC energy saving');
+    assert.equal(val(sw('energy-saving')!.getCharacteristic(C.ConfiguredName)), 'AC Energy Saving');
     assert.equal(val(sw('energy-saving')!.getCharacteristic(C.On)), false);
     const aq = accessory.getServiceById(S.AirQualitySensor, 'air-quality')!;
     assert.equal(val(aq.getCharacteristic(C.AirQuality)), C.AirQuality.EXCELLENT + 1, 'GOOD');
@@ -352,7 +352,7 @@ function defineTests(hap: Hap): void {
     assert.ok(cycle.isPrimaryService);
     assert.equal(val(cycle.getCharacteristic(C.InUse)), 1);
     assert.equal(val(cycle.getCharacteristic(C.RemainingDuration)), 150);
-    assert.equal(val(accessory.getServiceById(S.Fanv2, 'fan')!.getCharacteristic(C.ConfiguredName)), 'Microwave fan');
+    assert.equal(val(accessory.getServiceById(S.Fanv2, 'fan')!.getCharacteristic(C.ConfiguredName)), 'Microwave Fan');
     assert.equal(val(accessory.getServiceById(S.Lightbulb, 'lamp')!.getCharacteristic(C.Brightness)), 50);
     assert.ok(part.busy);
     part.update({ runState: { currentState: 'END' }, timer: { remainMinute: 0, remainSecond: 0 }, ventilation: { fanSpeed: 0 }, lamp: { lampBrightness: 0 } });
@@ -464,7 +464,7 @@ function defineTests(hap: Hap): void {
       waterFilterInfo: { waterFilter1RemainPercent: 40 },
     });
     const door = accessory.getServiceById(S.ContactSensor, 'door-MAIN')!;
-    assert.equal(val(door.getCharacteristic(C.ConfiguredName)), 'Fridge door');
+    assert.equal(val(door.getCharacteristic(C.ConfiguredName)), 'Fridge Door');
     assert.equal(val(door.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_NOT_DETECTED);
     const freezer = accessory.getServiceById(S.Thermostat, 'temp-FREEZER')!;
     assert.equal(val(freezer.getCharacteristic(C.TargetTemperature)), -18);
@@ -610,7 +610,7 @@ function defineTests(hap: Hap): void {
     const lf = accessory.getServiceById(S.OccupancySensor, 'zone-LEFT_FRONT')!;
     const rf = accessory.getServiceById(S.OccupancySensor, 'zone-RIGHT_FRONT')!;
     assert.equal(any.isPrimaryService, true);
-    assert.equal(lf.getCharacteristic(C.Name).value, 'Cooktop left front');
+    assert.equal(lf.getCharacteristic(C.Name).value, 'Cooktop Left Front');
     part.update([zone('LEFT_FRONT', 'COOK'), zone('RIGHT_FRONT', 'INITIAL'), zone('LEFT_REAR', 'LOCK')]);
     assert.equal(val(any.getCharacteristic(C.OccupancyDetected)), 1);
     assert.equal(val(lf.getCharacteristic(C.OccupancyDetected)), 1);
@@ -699,7 +699,7 @@ function defineTests(hap: Hap): void {
     part.update({ operation: { airConOperationMode: 'POWER_OFF' }, airConJobMode: { currentJobMode: 'COOL' }, runState: { currentState: 'NORMAL' },
       windDirection: { forestWind: true } });
     const forest = accessory.getServiceById(S.Switch, 'wind-forestWind')!;
-    assert.equal(forest.getCharacteristic(C.Name).value, 'AC forest wind');
+    assert.equal(forest.getCharacteristic(C.Name).value, 'AC Forest Wind');
     assert.equal(val(forest.getCharacteristic(C.On)), true);
     assert.equal(accessory.getServiceById(S.Switch, 'wind-mannerWind'), undefined, 'read-only: no switch');
     await write(forest.getCharacteristic(C.On), false);
@@ -775,7 +775,7 @@ function defineTests(hap: Hap): void {
     assert.deepEqual(sent, [{ powerSave: { powerSaveEnabled: true } }]);
     const filters = accessory.services.filter((x) => x.UUID === S.FilterMaintenance.UUID);
     assert.deepEqual(filters.map((f) => [f.getCharacteristic(C.Name).value, f.getCharacteristic(C.FilterLifeLevel).value]),
-      [['Fridge water filter', 80], ['Fridge water filter 2', 8], ['Fridge water filter 3', 50], ['Fridge air filter', 30]]);
+      [['Fridge Water Filter', 80], ['Fridge Water Filter 2', 8], ['Fridge Water Filter 3', 50], ['Fridge Air Filter', 30]]);
     assert.equal(val(filters[1].getCharacteristic(C.FilterChangeIndication)), C.FilterChangeIndication.CHANGE_FILTER);
     assert.equal(filters[0].subtype, 'filter', 'the first keeps the subtype it had');
   });
@@ -807,7 +807,7 @@ function defineTests(hap: Hap): void {
     const turbo = accessory.getServiceById(S.Switch, 'mode-TURBO')!;
     assert.equal(val(turbo.getCharacteristic(C.On)), true);
     assert.equal(accessory.getServiceById(S.Switch, 'mode-AUTO'), undefined);
-    assert.equal(accessory.getServiceById(S.Switch, 'mode-HEAT_PUMP')!.getCharacteristic(C.Name).value, 'Water heat pump');
+    assert.equal(accessory.getServiceById(S.Switch, 'mode-HEAT_PUMP')!.getCharacteristic(C.Name).value, 'Water Heat Pump');
     await write(turbo.getCharacteristic(C.On), false);
     await write(accessory.getServiceById(S.Switch, 'mode-VACATION')!.getCharacteristic(C.On), true);
     assert.deepEqual(sent, [{ waterHeaterJobMode: { currentJobMode: 'AUTO' } }, { waterHeaterJobMode: { currentJobMode: 'VACATION' } }]);

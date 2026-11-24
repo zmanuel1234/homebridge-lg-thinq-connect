@@ -26,20 +26,20 @@ Each washer or dryer shows up as:
 - **The machine** (a valve tile): on while it runs, with the **minutes left** on the tile. While
   paused, it's off and keeps the time left. For the first minute or so of a wash the machine is
   still sensing the load and hasn't worked out the time, so none is shown yet.
-- **"Washer done"** (occupancy sensor): detected when the cycle finishes, until the machine
+- **"Washer Done"** (occupancy sensor): detected when the cycle finishes, until the machine
   starts again or is switched off. **Turn on notifications for it** in the Home app to be told
   when the laundry is ready.
-- **"Washer problem"** (contact sensor): open while the machine reports an error (door, drain,
+- **"Washer Problem"** (contact sensor): open while the machine reports an error (door, drain,
   water supply, unbalanced load and so on), or after LG's "drying failed" or "error during
   washing" alert, until the next cycle starts or the machine is switched off. The machine's tile
   also shows a fault.
 - **Phase sensors** (optional): a sensor that's on during a phase you choose, such as
   *Spinning* or *Drying*, for automations like "turn on the fan while the washer spins".
-- **"Washer tub clean"** (optional, washers that count their cycles): detected once LG's cycle
+- **"Washer Tub Clean"** (optional, washers that count their cycles): detected once LG's cycle
   count reaches the number you set (LG suggests a Tub Clean about every 30 washes). Turn on
   notifications for it as a reminder. The count is LG's own; it's expected to start again after a
   Tub Clean.
-- **"Washer remote start"** (occupancy sensor, with *Allow starting and pausing* on, for
+- **"Washer Remote Start"** (occupancy sensor, with *Allow starting and pausing* on, for
   machines that report it; dishwashers and Stylers too): detected while Remote Start is on at the machine, so an automation
   or a notification can tell you the machine is ready to be started from the Home app.
 
@@ -350,8 +350,8 @@ This plugin can run next to [homebridge-lg-thinq](https://github.com/nVuln/homeb
    | homebridge-lg-thinq | This plugin |
    |---|---|
    | Washer/dryer valve (time left) | The same kind of tile, `<name>` |
-   | "Program finished" sensor (`washer_trigger`) | `<name> done` (always on) |
-   | Tub clean event (`washer_tub_clean`) | `<name> tub clean`, after the cycles you set |
+   | "Program finished" sensor (`washer_trigger`) | `<name> Done` (always on) |
+   | Tub clean event (`washer_tub_clean`) | `<name> Tub Clean`, after the cycles you set |
    | Door lock (`washer_door_lock`) | Not available: LG's official API doesn't report it |
    | AC options (`ac_mode`, `ac_swing_mode`, `ac_temperature_sensor`) | **Options per appliance** |
    | Fridge express/eco switches | The same switches, added automatically |

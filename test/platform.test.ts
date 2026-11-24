@@ -158,6 +158,7 @@ function defineTests(hap: Hap): void {
     assert.deepEqual(hb.lg.energyQueries, [`property=energyUsage&period=MONTHLY&startDate=${month}&endDate=${month}`]);
     const washer = hb.calls.registered.find((a) => a.displayName === 'Front Load Washer')!;
     await until(() => kwh(washer) === 12.345);
+    assert.equal(energyOf(washer)!.getCharacteristic(C.ConfiguredName).value, 'Front Load Washer Energy', 'a name for Eve to show');
     // Not on the washer's valve, where Eve doesn't show it
     assert.ok(!washer.getService(S.Valve)!.characteristics.some((c) => c.UUID === TOTAL));
     assert.ok(hb.lines.includes('info: [Front Load Washer] Energy use this month is shown in the Eve app (LG updates it daily).'));
