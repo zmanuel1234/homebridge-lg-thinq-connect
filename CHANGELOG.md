@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.6 - 2026-11-24
+
+### Fixed
+- **A refused tap no longer leaves the tile at "No Response".** After the plugin or LG refused a
+  command (for example a start without Remote Start), HomeKit kept the error and the tile showed
+  "No Response" (Eve: "The read/write operation failed") until Homebridge restarted. The tile now
+  shows the error briefly and then works again, for every appliance type.
+- **LG's "device timeout" (error 2211) isn't treated as a refusal any more.** LG sometimes answers
+  with it although the appliance did what was asked (seen: the washer started). The plugin now
+  logs that LG didn't confirm it and checks the appliance's state right away (a command that got
+  no answer at all in time is handled the same way, logged as a warning).
+
+- **A start or pause from the Home app shows on the tile at once**, until LG reports it (up to 30
+  s), and more taps meanwhile don't send it again. A dryer took 7 seconds to report running, the
+  tile stayed off, and four more starts were sent.
+
+### Changed
+- **A washer start from the Home app that switches program is logged.** LG's API can only send
+  "start", and some washers then run their default program instead of the one on the dial (seen:
+  Speed Wash became Normal). When the cycle time jumps by 10 minutes or more right after a start,
+  the log says so. The README
+  and the "Allow starting and pausing" description explain it.
+
 ## 1.0.5 - 2026-11-24
 
 ### Added

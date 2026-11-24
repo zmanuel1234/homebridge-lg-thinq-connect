@@ -45,7 +45,7 @@ test('our machines as captured (both off): idle, no time left, even though the d
   const w = laundryStatus(laundryUnits('DEVICE_WASHER', washer.profile)[0], washer.state);
   assert.deepEqual(w, {
     state: 'POWER_OFF', running: false, paused: false, done: false, error: false, errorName: '',
-    remaining: 0, total: 0, remoteControl: false, cycleCount: 15, doorOpen: undefined, rinseAidLow: undefined,
+    remaining: 0, total: 0, programTime: 0, remoteControl: false, cycleCount: 15, doorOpen: undefined, rinseAidLow: undefined,
     course: undefined, startsIn: undefined,
   });
   const d = laundryStatus(laundryUnits('DEVICE_DRYER', dryer.profile)[0], dryer.state);

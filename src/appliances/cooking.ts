@@ -70,8 +70,12 @@ export class Cooktop extends Appliance {
       // A button: on sends "everything off", then it turns itself back off
       this.offSwitch.getCharacteristic(C.On).onSet(async (v) => {
         if (v !== true && v !== 1) { return; }
-        setTimeout(() => this.offSwitch && set(this.offSwitch.getCharacteristic(C.On), false), 1000).unref?.();
-        await this.command('Switched every burner off', { operation: { operationMode: 'POWER_OFF' } });
+        try {
+          await this.command('Switched every burner off', { operation: { operationMode: 'POWER_OFF' } });
+        } finally {
+          // Back off after a moment, whatever LG answered (also clears the error a refusal leaves)
+          setTimeout(() => this.offSwitch && set(this.offSwitch.getCharacteristic(C.On), false), 1000).unref?.();
+        }
       });
     }
     this.addProblemSensor();

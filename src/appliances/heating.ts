@@ -40,6 +40,8 @@ abstract class Thermostats extends Appliance {
 
   protected refuse(why: string): Promise<void> {
     this.ctx.log.info(`[${this.ctx.name}] ${why}`);
+    // Pushes the values again, which clears the error HAP-NodeJS keeps from the refusal
+    setTimeout(() => this.update(undefined), 50).unref?.();
     return Promise.reject(new this.hap.HapStatusError(this.hap.HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE));
   }
 }

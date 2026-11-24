@@ -65,6 +65,7 @@ export class RobotVacuum extends Appliance {
     if (on === this.cleaning) { return Promise.resolve(); }
     if (!this.canClean) {
       this.ctx.log.info(`[${this.ctx.name}] It can't be started or sent home through LG's API.`);
+      setTimeout(() => this.update(undefined), 50).unref?.();
       return Promise.reject(new this.hap.HapStatusError(this.hap.HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE));
     }
     // As Home Assistant does: wake a sleeping one, resume a paused one, otherwise start; off goes home
@@ -219,6 +220,7 @@ export class Basic extends Appliance {
     if (on === this.on) { return Promise.resolve(); }
     if (!this.powerInfo?.canWrite) {
       this.ctx.log.info(`[${this.ctx.name}] It can't be switched on or off through LG's API.`);
+      setTimeout(() => this.update(undefined), 50).unref?.();
       return Promise.reject(new this.hap.HapStatusError(this.hap.HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE));
     }
     return this.command(on ? 'Switched on' : 'Switched off', { operation: { [this.powerInfo.name]: on ? 'POWER_ON' : 'POWER_OFF' } })

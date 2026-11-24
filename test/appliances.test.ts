@@ -2,6 +2,7 @@
 // and the commands each sends. Air conditioners, the air purifier, dehumidifier and range hood use
 // Home Assistant's sample data (test/fixtures/ha); the rest are built from LG's documented
 // property names.
+import { ThinQError } from '../src/api';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -161,6 +162,22 @@ function defineTests(hap: Hap): void {
     failNext(new Error('HTTP 400 (LG error 2301: Fail device control)'));
     assert.equal(await write(tile.getCharacteristic(C.CoolingThresholdTemperature), 20), hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
     assert.ok(lines.some((l) => l.startsWith('warn: [AC] LG refused "Set to 20 °C": HTTP 400')));
+    // The next check from LG (asked for right away) makes the tile readable again, even when
+    // nothing changed: LG still says what the tile already shows
+    const target = tile.getCharacteristic(C.CoolingThresholdTemperature);
+    part.update(fixture('air_conditioner2', 'status'));
+    const shown = target.value;
+    failNext(new Error('HTTP 400 (LG error 2301: Fail device control)'));
+    await write(target, 22);
+    assert.notEqual(target.statusCode, 0, 'HAP-NodeJS keeps the error');
+    part.update(fixture('air_conditioner2', 'status'));
+    assert.equal(target.value, shown, 'the same value as before');
+    assert.equal(target.statusCode, 0, 'cleared, even though the value didn\'t change');
+    await target.handleGetRequest();
+    // LG's "device timeout" (2211) isn't a refusal: it may well have been done
+    failNext(new ThinQError(400, '2211', 'Device Timeout'));
+    assert.equal(await write(target, 21), undefined);
+    assert.ok(lines.some((l) => l.startsWith('info: [AC] Sent "Set to 21 °C", but LG didn\'t confirm it')), lines.join('\n'));
   });
 
   test('air conditioner: LG\'s "water is full" alert opens the problem sensor until it\'s switched off and on', () => {
@@ -630,6 +647,17 @@ function defineTests(hap: Hap): void {
     assert.equal(make('DEVICE_COOKTOP', cooktopProfile(false), 'C').accessory.getServiceById(S.Switch, 'power-off'), undefined);
     assert.equal(make('DEVICE_COOKTOP', cooktopProfile(), 'C', false).accessory.getServiceById(S.Switch, 'power-off'), undefined);
     assert.equal(make('DEVICE_COOKTOP', cooktopProfile(), 'C', true, { extraControls: false }).accessory.getServiceById(S.Switch, 'power-off'), undefined);
+  });
+
+  test('cooktop: "all burners off" refused by LG goes back off and stays readable', async () => {
+    const { part, accessory, failNext } = make('DEVICE_COOKTOP', cooktopProfile(), 'C');
+    part.update(undefined);
+    const on = accessory.getServiceById(S.Switch, 'power-off')!.getCharacteristic(C.On);
+    failNext(new Error('HTTP 400 (LG error 2301: Fail device control)'));
+    assert.equal(await write(on, 1), hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    await new Promise((r) => setTimeout(r, 1100));
+    assert.equal(on.value, false);
+    assert.equal(on.statusCode, 0, 'readable again');
   });
 
   test('cooktop: a burner LG stops listing counts as off (the stove-on sensor can\'t stick)', () => {

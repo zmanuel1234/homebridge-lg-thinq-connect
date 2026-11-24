@@ -18,6 +18,7 @@
 // Starting, pausing and resuming from the valve is off unless the "allow control" setting is on,
 // and LG only accepts it after Remote Start is pressed on the machine.
 
+import { ThinQError } from './api';
 import { displayName, keepOrUpdate } from './names';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service } from 'homebridge';
 import { type LaundryStatus, type LaundryUnit, operationPayload, ovenStartPayload, stateLabel } from './laundry';
@@ -27,6 +28,13 @@ export interface LaundryContext {
   deviceId?: string;
   location?: string;
 }
+
+/** How long the tile shows a start or pause sent from the Home app before LG reports it. */
+const PENDING_MS = 30_000;
+/** How long after a start the program time is compared with the one chosen before it. */
+const START_CHECK_MS = 3 * 60_000;
+/** A change in program time this large (seconds) after a start means another program. */
+const PROGRAM_CHANGE = 10 * 60;
 
 export interface LaundryOptions {
   name: string;
@@ -78,6 +86,14 @@ export class LaundryAccessory {
   readonly doorSensor: Service | undefined;
   readonly rinseAidSensor: Service | undefined;
   readonly ovenThermostat: Service | undefined;
+  /** After a start from the Home app: the program time chosen before it, checked for a few minutes. */
+  private startCheck: { programTime: number; until: number } | undefined;
+  /**
+   * A start (on) or pause (off) sent from the Home app that LG hasn't reported yet: the tile shows
+   * it meanwhile, and taps asking for the same aren't sent again (seen: a dryer took 7 s to report
+   * running, the tile showed off, and four more starts were sent).
+   */
+  private pending: { on: boolean; until: number } | undefined;
   readonly remoteStartSensor: Service | undefined;
   /** The temperature to start the oven at (°C), from the Home app or the oven. */
   private ovenTarget = DEFAULT_OVEN_C;
@@ -199,6 +215,7 @@ export class LaundryAccessory {
   /** New status from LG; null when LG can't be reached. */
   update(next: LaundryStatus | null): void {
     const prev = this.status;
+    this.checkProgramAfterStart(next);
     if (this.heldFinish && next) {
       this.heldFinish = false;
       if (next.running && next.remaining > EARLY_ALERT_LEFT) {
@@ -242,6 +259,32 @@ export class LaundryAccessory {
     }
     if (next) { this.status = next; }
     this.render(next === null);
+  }
+
+  /**
+   * LG's API can only send START, and some machines then run their default program instead of the
+   * one chosen on the dial (seen on an LG washer: Speed Wash, 15 min, became Normal, 65 min). Right
+   * after a start from the Home app, a program time that jumps says so in the log.
+   */
+  private checkProgramAfterStart(next: LaundryStatus | null): void {
+    const check = this.startCheck;
+    if (!check || !next) { return; }
+    if (Date.now() > check.until) { this.startCheck = undefined; return; }
+    if (!next.running || !next.total || next.state === 'DETECTING') { return; }
+    this.startCheck = undefined;
+    if (Math.abs(next.total - check.programTime) >= PROGRAM_CHANGE) {
+      const min = (s: number) => duration(s);
+      this.deps.log.warn(`[${this.options.name}] The cycle time changed from ${min(check.programTime)} to ${min(next.total)} `
+        + 'right after the start from the Home app: LG may have started the washer\'s default program rather than the '
+        + 'one chosen on it (LG\'s API can only send "start", not a program).');
+    }
+  }
+
+  /** Running, or what was just asked from the Home app until LG reports it (or 30 s pass). */
+  private shownOn(s: LaundryStatus | null | undefined): boolean {
+    const p = this.pending;
+    if (p && (Date.now() > p.until || !!s?.running === p.on)) { this.pending = undefined; }
+    return this.pending ? this.pending.on : !!s?.running;
   }
 
   /** "Done" for a minute: the machine is already off, so nothing else would end it. */
@@ -296,8 +339,9 @@ export class LaundryAccessory {
     const { Characteristic: C } = this.deps.api.hap;
     const s = this.status;
     // On only while running: a paused cycle shows off, so a tap on resumes it
-    set(this.valve.getCharacteristic(C.Active), s?.running ? C.Active.ACTIVE : C.Active.INACTIVE);
-    set(this.valve.getCharacteristic(C.InUse), s?.running ? C.InUse.IN_USE : C.InUse.NOT_IN_USE);
+    const on = this.shownOn(s);
+    set(this.valve.getCharacteristic(C.Active), on ? C.Active.ACTIVE : C.Active.INACTIVE);
+    set(this.valve.getCharacteristic(C.InUse), on ? C.InUse.IN_USE : C.InUse.NOT_IN_USE);
     set(this.valve.getCharacteristic(C.RemainingDuration), Math.min(s?.remaining ?? 0, 86_400));
     set(this.valve.getCharacteristic(C.SetDuration), Math.min(s?.total ?? 0, 86_400));
     set(this.valve.getCharacteristic(C.StatusFault), unreachable || this.problem ? C.StatusFault.GENERAL_FAULT : C.StatusFault.NO_FAULT);
@@ -432,6 +476,13 @@ export class LaundryAccessory {
       await this.send(payload);
       this.deps.log.info(`[${this.options.name}] ${done}`);
     } catch (err) {
+      if (err instanceof ThinQError && err.unconfirmed) {
+        // LG may well have carried it out (seen: the washer started, LG answered 2211): check
+        this.deps.log[err.timedOut ? 'warn' : 'info'](
+          `[${this.options.name}] ${done.replace(/\.$/, '')}, but LG didn't confirm it (${err.message}): checking the machine.`);
+        return;
+      }
+      this.startCheck = undefined;
       this.refuse(`LG refused ${what}: ${(err as Error).message}`, 'warn');
     } finally {
       this.refreshSoon();
@@ -443,6 +494,8 @@ export class LaundryAccessory {
     const s = this.status;
     const wantOn = value === 1 || value === true;
     if (wantOn === !!s?.running) { return; }
+    // Already sent, LG hasn't reported it yet: don't send it again
+    if (this.pending && this.pending.on === wantOn && Date.now() <= this.pending.until) { return; }
     if (this.ovenThermostat && wantOn) {
       // An oven starts from its thermostat, always with a temperature and mode
       if (s?.paused) { this.refuse('The oven is paused: resume it at the oven.'); }
@@ -453,7 +506,13 @@ export class LaundryAccessory {
     if (!this.unit.operations.includes(operation)) {
       this.refuse(`This machine doesn't accept ${operation} through LG's API.`);
     }
+    if (wantOn && !s?.paused && s?.programTime && this.unit.kind === 'washer') {
+      this.startCheck = { programTime: s.programTime, until: Date.now() + START_CHECK_MS };
+    }
     await this.sendPayload(operationPayload(this.unit, operation), `Sent ${wantOn ? (s?.paused ? 'resume' : 'start') : 'pause'}.`, operation);
+    // Sent (or LG didn't confirm): show it until LG reports it
+    this.pending = { on: wantOn, until: Date.now() + PENDING_MS };
+    this.render();
   }
 
   stop(): void {
@@ -461,9 +520,13 @@ export class LaundryAccessory {
   }
 }
 
-/** Update a characteristic only when its value changes (no needless events to the Home app). */
+/**
+ * Update a characteristic when its value changes, or when it carries an error status: HAP-NodeJS
+ * keeps the error from a refused tap and returns it for every later read (the Home app then shows
+ * "No Response") until a value is pushed again.
+ */
 function set(ch: Characteristic, value: CharacteristicValue): void {
-  if (ch.value !== value) { ch.updateValue(value); }
+  if (ch.value !== value || ch.statusCode !== 0) { ch.updateValue(value); }
 }
 
 /** "2 h 30 min", "45 min" */

@@ -54,6 +54,8 @@ export class ThinQError extends Error {
     readonly status: number,
     readonly code: string,
     readonly lgMessage: string,
+    /** The request got no answer in time (it may still have reached LG). */
+    readonly timedOut = false,
   ) {
     super(ThinQError.describe(status, code, lgMessage));
     this.name = 'ThinQError';
@@ -62,6 +64,14 @@ export class ThinQError extends Error {
   /** True when LG asks to slow down. */
   get isRateLimit(): boolean {
     return this.status === 429 || this.code === '1306';
+  }
+
+  /**
+   * True when LG may have carried out the command without confirming it: LG's "device timeout"
+   * (2211: it passed the command on but didn't hear back in time), or no answer at all in time.
+   */
+  get unconfirmed(): boolean {
+    return this.code === '2211' || this.timedOut;
   }
 
   /** True when the token is missing, wrong, expired or lacks a permission. */
@@ -274,7 +284,7 @@ export class ThinQClient {
       const e = err as { name?: string; message?: string; cause?: { code?: string; message?: string } } | null;
       const why = e?.name === 'TimeoutError' ? `no answer within ${this.timeoutMs / 1000} s`
         : e?.cause?.code || e?.cause?.message || e?.message || String(err);
-      throw new ThinQError(0, '', `Couldn't reach LG (${why})`);
+      throw new ThinQError(0, '', `Couldn't reach LG (${why})`, e?.name === 'TimeoutError');
     }
 
     let json: unknown;
