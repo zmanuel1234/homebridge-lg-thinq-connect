@@ -55,7 +55,7 @@
         "title": "Energy use in the Eve app",
         "type": "boolean",
         "default": true,
-        "description": "This month's energy use, for appliances LG reports it for, shown in the Eve app (Apple's Home app doesn't show energy). LG updates it with a delay, often a day."
+        "description": "Adds a read-only \"<name> energy\" outlet for appliances LG reports energy use for: on while the appliance runs, with this month's use shown in the Eve app (Apple's Home app doesn't show energy). LG updates it with a delay, often a day."
       },
       "phaseSensors": {
         "title": "Phase sensors",

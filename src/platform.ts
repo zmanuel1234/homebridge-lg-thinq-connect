@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
+import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service } from 'homebridge';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { type Device, ThinQClient, ThinQError, clientIdFor } from './api';
 import { alertFor, alertKind, isCycleAppliance, isLaundry, laundryStatus, laundryUnits, mergeState, stateLabel } from './laundry';
-import { consumptionService, ENERGY_SUBTYPE, mainService, thisMonth, totalConsumption } from './energy';
+import { CONSUMPTION_SERVICE_UUID, ENERGY_SUBTYPE, energyOutlet, mainService, thisMonth, totalConsumption } from './energy';
 import { supportLevel } from './support';
 import { type ApplianceContext, type ApplianceOptions, type Part, categoryOf, mappingFor } from './appliances';
 import { type LaundryContext, LaundryAccessory } from './accessory';
@@ -157,6 +157,8 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
   readonly api: API;
   readonly cached = new Map<string, PlatformAccessory<LaundryContext>>();
   readonly machines: Machine[] = [];
+  /** Energy outlets whose taps are already refused. */
+  private readonly wiredOutlets = new WeakSet<Service>();
   settings: Settings;
   client: Client | undefined;
   live: LiveUpdates | undefined;
@@ -365,7 +367,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     if (message.pushType === 'DEVICE_STATUS' && message.report !== undefined) {
       this.log.debug(`[${name}] Live update: ${JSON.stringify(message.report)}`);
       machine.state = mergeState(machine.state, message.report);
-      for (const part of machine.parts) { part.update(machine.state); }
+      for (const part of machine.parts) { part.update(machine.state); this.renderEnergyOutlet(part); }
       this.schedule(machine, this.interval(machine));
     } else if (message.pushType === 'DEVICE_PUSH' && message.pushCode) {
       const kind = alertKind(message.pushCode);
@@ -485,20 +487,21 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
   }
 
   /**
-   * Energy use for the Eve app, for appliances LG keeps it for: this month's kWh on an Eve
-   * Consumption service on each part. Silent when LG keeps none; failures only delay it.
+   * Energy use for the Eve app, for appliances LG keeps it for: this month's kWh on a read-only
+   * "<name> energy" outlet on each part. Silent when LG keeps none; failures only delay it.
    */
   async setupEnergy(machine: Machine): Promise<void> {
     const client = this.client;
     if (this.stopped || !client?.energyProperties || !client.energyUsage) { return; }
     const Total = totalConsumption(this.api);
-    const Consumption = consumptionService(this.api);
-    const info = this.api.hap.Service.AccessoryInformation.UUID;
-    const energyService = (part: Part) =>
-      part.accessory.services.find((s) => s.UUID === Consumption.UUID && s.subtype === ENERGY_SUBTYPE);
-    // 1.0.0 put the figure on the main tile, where Eve doesn't show it: take it off there
+    const { Service: S } = this.api.hap;
+    const info = S.AccessoryInformation.UUID;
+    const energyService = (part: Part) => energyOutlet(part.accessory);
+    // Where 1.0.0 (the main tile) and 1.0.1 (Eve's Consumption service) put it; Eve showed neither
     for (const part of machine.parts) {
-      const svc = mainService(part.accessory.services.filter((s) => s.UUID !== Consumption.UUID), info);
+      const consumption = part.accessory.services.find((s) => s.UUID === CONSUMPTION_SERVICE_UUID);
+      if (consumption) { part.accessory.removeService(consumption); }
+      const svc = mainService(part.accessory.services.filter((s) => s.UUID !== S.Outlet.UUID), info);
       const old = svc?.characteristics.find((c) => c.UUID === Total.UUID);
       if (svc && old) { svc.removeCharacteristic(old); }
     }
@@ -542,9 +545,11 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
         try {
           const wh = await client.energyUsage!(device.deviceId, property, 'MONTHLY', thisMonth(), thisMonth());
           const kwh = Math.round(wh) / 1000;
-          const svc = energyService(part)
-            || part.accessory.addService(new Consumption(`${part.accessory.displayName} energy`, ENERGY_SUBTYPE));
+          const existing = energyService(part);
+          if (existing) { this.wireEnergyOutlet(part, existing); }
+          const svc = existing || this.addEnergyOutlet(part);
           const ch = svc.getCharacteristic(Total);
+          this.renderEnergyOutlet(part);
           if (ch.value !== kwh) {
             this.log.debug(`[${part.accessory.displayName}] Energy this month: ${kwh} kWh.`);
             ch.updateValue(kwh);
@@ -563,6 +568,38 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     await check();
   }
 
+  /** A read-only "<name> energy" outlet: Eve shows Total Consumption on outlets. */
+  private addEnergyOutlet(part: Part): Service {
+    const { Service: S, Characteristic: C } = this.api.hap;
+    const name = `${part.accessory.displayName} energy`;
+    const svc = part.accessory.addService(S.Outlet, name, ENERGY_SUBTYPE);
+    svc.addOptionalCharacteristic(totalConsumption(this.api));
+    svc.addOptionalCharacteristic(C.ConfiguredName);
+    svc.setCharacteristic(C.ConfiguredName, name);
+    this.wireEnergyOutlet(part, svc);
+    return svc;
+  }
+
+  /** Taps on the energy outlet change nothing: it flips back to follow the appliance. */
+  private wireEnergyOutlet(part: Part, svc: Service): void {
+    if (this.wiredOutlets.has(svc)) { return; }
+    this.wiredOutlets.add(svc);
+    const { Characteristic: C } = this.api.hap;
+    svc.getCharacteristic(C.On).onSet(() => {
+      setTimeout(() => this.renderEnergyOutlet(part, true), 300).unref?.();
+    });
+  }
+
+  /** On and in use while the appliance runs. */
+  private renderEnergyOutlet(part: Part, force = false): void {
+    const svc = energyOutlet(part.accessory);
+    if (!svc) { return; }
+    const { Characteristic: C } = this.api.hap;
+    const busy = part.busy;
+    if (force || svc.getCharacteristic(C.On).value !== busy) { svc.getCharacteristic(C.On).updateValue(busy); }
+    if (svc.getCharacteristic(C.OutletInUse).value !== busy) { svc.getCharacteristic(C.OutletInUse).updateValue(busy); }
+  }
+
   /** Check one appliance's state now, then schedule the next check. */
   async poll(machine: Machine): Promise<void> {
     if (this.stopped) { return; }
@@ -574,7 +611,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       if (machine.failures >= FAULT_AFTER) { this.log.info(`[${name}] Reachable again.`); }
       machine.failures = 0;
       machine.state = state;
-      for (const part of machine.parts) { part.update(state); }
+      for (const part of machine.parts) { part.update(state); this.renderEnergyOutlet(part); }
       next = this.interval(machine);
     } catch (err) {
       next = this.settings.pollInterval;
