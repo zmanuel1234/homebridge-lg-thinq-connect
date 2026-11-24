@@ -23,6 +23,34 @@ export interface ApplianceContext {
   extraControls?: boolean;
   /** This appliance's own options from the settings (matched by its ThinQ name). */
   options?: ApplianceOptions;
+  /** The problem sensor as an occupancy sensor ("detected" = a problem) instead of a contact sensor. */
+  problemAsOccupancy?: boolean;
+}
+
+/**
+ * The problem sensor: a contact sensor (open = a problem; the 1.x default) or, by setting, an
+ * occupancy sensor (detected = a problem), like the other sensors. The one of the other kind, left
+ * from before the setting changed, is removed.
+ */
+export function problemSensor(
+  accessory: PlatformAccessory, hap: API['hap'], asOccupancy: boolean,
+  service: (type: WithUUID<typeof Service>, name: string, subtype: string) => Service, name: string,
+): Service {
+  const { Service: S } = hap;
+  const [wanted, other] = asOccupancy ? [S.OccupancySensor, S.ContactSensor] : [S.ContactSensor, S.OccupancySensor];
+  const old = accessory.getServiceById(other, 'problem');
+  if (old) { accessory.removeService(old); }
+  return service(wanted, name, 'problem');
+}
+
+/** Shows a problem (or none) on a problem sensor of either kind. */
+export function showProblem(svc: Service, hap: API['hap'], problem: boolean): void {
+  const { Characteristic: C, Service: S } = hap;
+  if (svc.UUID === S.OccupancySensor.UUID) {
+    set(svc.getCharacteristic(C.OccupancyDetected), problem ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+  } else {
+    set(svc.getCharacteristic(C.ContactSensorState), problem ? C.ContactSensorState.CONTACT_NOT_DETECTED : C.ContactSensorState.CONTACT_DETECTED);
+  }
 }
 
 /** Options for one appliance, from the "Options per appliance" setting. */
@@ -136,15 +164,14 @@ export abstract class Appliance implements Part {
 
   /** A "<name> problem" contact sensor: open after an LG problem alert until the state is fine. */
   protected addProblemSensor(): Service {
-    this.problemSensor = this.service(this.hap.Service.ContactSensor, `${this.ctx.name} problem`, 'problem');
+    this.problemSensor = problemSensor(this.accessory, this.hap, !!this.ctx.problemAsOccupancy,
+      (type, name, subtype) => this.service(type, name, subtype), `${this.ctx.name} problem`);
     return this.problemSensor;
   }
 
   protected renderProblem(error = false): void {
     if (!this.problemSensor) { return; }
-    const { Characteristic: C } = this.hap;
-    set(this.problemSensor.getCharacteristic(C.ContactSensorState),
-      error || this.problemAlert ? C.ContactSensorState.CONTACT_NOT_DETECTED : C.ContactSensorState.CONTACT_DETECTED);
+    showProblem(this.problemSensor, this.hap, error || !!this.problemAlert);
   }
 
   /**

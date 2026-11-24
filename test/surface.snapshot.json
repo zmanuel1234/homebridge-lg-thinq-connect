@@ -231,6 +231,7 @@
     "(read) liveUpdates",
     "(read) phaseSensors",
     "(read) pollInterval",
+    "(read) problemAsOccupancy",
     "(read) runningPollInterval",
     "(read) token",
     "(read) tubCleanAfter",
@@ -252,6 +253,7 @@
     "name",
     "phaseSensors",
     "pollInterval",
+    "problemSensor",
     "runningPollInterval",
     "token",
     "tubCleanAfter"

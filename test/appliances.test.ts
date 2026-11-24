@@ -76,7 +76,7 @@ if (!hap) {
 function defineTests(hap: Hap): void {
   const { Service: S, Characteristic: C } = hap;
 
-  function make(deviceType: string, profile: unknown, alias = 'Thing', extraControls = true, options?: ApplianceContext['options']) {
+  function make(deviceType: string, profile: unknown, alias = 'Thing', extraControls = true, options?: ApplianceContext['options'], problemAsOccupancy = false) {
     const lines: string[] = [];
     const sent: Record<string, unknown>[] = [];
     let refreshes = 0;
@@ -90,6 +90,7 @@ function defineTests(hap: Hap): void {
       refreshSoon: () => { refreshes++; },
       extraControls,
       options,
+      problemAsOccupancy,
     };
     const part = mappingFor(deviceType, profile)!.create(ctx, profile);
     return { part, accessory, lines, sent, refreshes: () => refreshes, failNext: (e: Error) => { fail = e; } };
@@ -178,6 +179,16 @@ function defineTests(hap: Hap): void {
     failNext(new ThinQError(400, '2211', 'Device Timeout'));
     assert.equal(await write(target, 21), undefined);
     assert.ok(lines.some((l) => l.startsWith('info: [AC] Sent "Set to 21 °C", but LG didn\'t confirm it')), lines.join('\n'));
+  });
+
+  test('problem sensor as an occupancy sensor (setting): an LG problem alert shows as detected', () => {
+    const { part, accessory } = make('DEVICE_AIR_CONDITIONER', fixture('air_conditioner', 'profile'), 'AC', true, undefined, true);
+    part.update(fixture('air_conditioner', 'status'));
+    assert.equal(accessory.getServiceById(S.ContactSensor, 'problem'), undefined);
+    const sensor = accessory.getServiceById(S.OccupancySensor, 'problem')!;
+    assert.equal(val(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    part.alert('problem', 'WATER_IS_FULL');
+    assert.equal(val(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
   });
 
   test('air conditioner: LG\'s "water is full" alert opens the problem sensor until it\'s switched off and on', () => {

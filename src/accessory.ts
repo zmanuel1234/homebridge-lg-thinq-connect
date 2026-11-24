@@ -23,7 +23,7 @@ import { ThinQError } from './api';
 import { displayName, keepOrUpdate } from './names';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service } from 'homebridge';
 import { type LaundryStatus, type LaundryUnit, operationPayload, ovenStartPayload, stateLabel } from './laundry';
-import { limit } from './appliances/base';
+import { limit, problemSensor, showProblem } from './appliances/base';
 
 export interface LaundryContext {
   deviceId?: string;
@@ -57,6 +57,8 @@ export interface LaundryOptions {
   tubCleanAfter: number;
   /** Minutes "done" stays on after the machine switches itself off straight from finished (default 120). */
   doneHoldMinutes?: number;
+  /** The problem sensor as an occupancy sensor (detected = a problem) instead of a contact sensor. */
+  problemAsOccupancy?: boolean;
   /** The Remote Start sensor (when the machine reports it and control is allowed); default on. */
   remoteStartSensor?: boolean;
 }
@@ -155,7 +157,8 @@ export class LaundryAccessory {
     this.valve.getCharacteristic(C.StatusFault);
 
     this.doneSensor = this.service(S.OccupancySensor, `${name} done`, 'done');
-    this.problemSensor = this.service(S.ContactSensor, `${name} problem`, 'problem');
+    this.problemSensor = problemSensor(accessory, deps.api.hap, !!options.problemAsOccupancy,
+      (type, n, subtype) => this.service(type as typeof S.Valve, n, subtype), `${name} problem`);
 
     // Phase sensors the machine can report; ones no longer wanted are removed
     const phases = options.phaseSensors.filter((p) => unit.states.includes(p));
@@ -436,8 +439,7 @@ export class LaundryAccessory {
     set(this.valve.getCharacteristic(C.StatusFault), unreachable || this.problem ? C.StatusFault.GENERAL_FAULT : C.StatusFault.NO_FAULT);
     set(this.doneSensor.getCharacteristic(C.OccupancyDetected),
       this.done ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
-    set(this.problemSensor.getCharacteristic(C.ContactSensorState),
-      this.problem ? C.ContactSensorState.CONTACT_NOT_DETECTED : C.ContactSensorState.CONTACT_DETECTED);
+    showProblem(this.problemSensor, this.deps.api.hap, this.problem);
     if (this.doorSensor && s?.doorOpen !== undefined) {
       set(this.doorSensor.getCharacteristic(C.ContactSensorState),
         s.doorOpen ? C.ContactSensorState.CONTACT_NOT_DETECTED : C.ContactSensorState.CONTACT_DETECTED);

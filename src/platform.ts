@@ -44,6 +44,8 @@ export interface Settings {
   experimental: boolean;
   /** Extra switches for experimental appliances (air conditioner modes, purifier sleep mode…). */
   extraControls: boolean;
+  /** Problem sensors as occupancy sensors instead of contact sensors. */
+  problemAsOccupancy: boolean;
   /** Appliance names (as in the ThinQ app) to leave out of the Home app. */
   ignore: string[];
   /** Options for single appliances, by name as in the ThinQ app (lower case). */
@@ -92,6 +94,7 @@ export function readSettings(config: PlatformConfig): Settings {
     doneHoldMinutes: clamp(config.doneHoldMinutes, 0, 1440, 120),
     experimental: config.experimental === true,
     extraControls: config.extraControls !== false,
+    problemAsOccupancy: config.problemSensor === 'occupancy',
     ignore: strings(config.ignore).map((s) => s.toLowerCase()),
     appliances: applianceOptions(config.appliances),
     energy: config.energy !== false,
@@ -423,7 +426,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       const laundry = new LaundryAccessory(this, accessory, unit,
         { name, model: modelName, serial, allowControl: this.settings.allowControl,
           phaseSensors: this.settings.phaseSensors, tubCleanAfter: this.settings.tubCleanAfter,
-          doneHoldMinutes: this.settings.doneHoldMinutes,
+          doneHoldMinutes: this.settings.doneHoldMinutes, problemAsOccupancy: this.settings.problemAsOccupancy,
           remoteStartSensor: this.settings.appliances.get(alias.trim().toLowerCase())?.hideRemoteStart !== true },
         (payload) => this.client!.control(device.deviceId, payload),
         () => this.schedule(machine, 3));
@@ -476,6 +479,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       send: (payload) => this.client!.control(device.deviceId, payload),
       refreshSoon: () => this.schedule(machine, 3),
       extraControls: this.settings.extraControls,
+      problemAsOccupancy: this.settings.problemAsOccupancy,
       options: this.settings.appliances.get(alias.trim().toLowerCase()),
     };
     machine.parts.push(mapping.create(ctx, profile));

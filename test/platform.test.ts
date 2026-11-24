@@ -28,14 +28,14 @@ try {
 
 test('settings: defaults, limits and clean-up', () => {
   const s = readSettings({ platform: 'LGThinQConnect' } as PlatformConfig);
-  assert.deepEqual(s, { token: '', country: 'US', pollInterval: 60, runningPollInterval: 30, allowControl: false, liveUpdates: true, phaseSensors: [], tubCleanAfter: 0, doneHoldMinutes: 120, experimental: false, extraControls: true, ignore: [], appliances: new Map(), energy: true });
+  assert.deepEqual(s, { token: '', country: 'US', pollInterval: 60, runningPollInterval: 30, allowControl: false, liveUpdates: true, phaseSensors: [], tubCleanAfter: 0, doneHoldMinutes: 120, experimental: false, extraControls: true, problemAsOccupancy: false, ignore: [], appliances: new Map(), energy: true });
   const t = readSettings({
     platform: 'LGThinQConnect', token: ' abc ', country: 'gb', pollInterval: 5, runningPollInterval: '9999',
-    allowControl: 'yes', liveUpdates: false, phaseSensors: ['SPINNING', '', 3], tubCleanAfter: 500, doneHoldMinutes: 99999, experimental: 'yes', extraControls: false, ignore: [' Dryer '], energy: false,
+    allowControl: 'yes', liveUpdates: false, phaseSensors: ['SPINNING', '', 3], tubCleanAfter: 500, doneHoldMinutes: 99999, experimental: 'yes', extraControls: false, problemSensor: 'occupancy', ignore: [' Dryer '], energy: false,
     appliances: [{ name: ' Living Room AC ', acModes: 'cool', acSwing: 'both', temperatureSensor: true, extraControls: false, hideRemoteStart: true, odd: 1 },
       { name: '', acModes: 'cool' }, { name: 'Purifier', acModes: 'sideways', acSwing: 7 }, 'junk'],
   } as unknown as PlatformConfig);
-  assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, liveUpdates: false, phaseSensors: ['SPINNING'], tubCleanAfter: 200, doneHoldMinutes: 1440, experimental: false, extraControls: false, ignore: ['dryer'], energy: false,
+  assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, liveUpdates: false, phaseSensors: ['SPINNING'], tubCleanAfter: 200, doneHoldMinutes: 1440, experimental: false, extraControls: false, problemAsOccupancy: true, ignore: ['dryer'], energy: false,
     appliances: new Map([['living room ac', { acModes: 'cool', acSwing: 'both', temperatureSensor: true, extraControls: false, hideRemoteStart: true }], ['purifier', {}]]) });
 });
 

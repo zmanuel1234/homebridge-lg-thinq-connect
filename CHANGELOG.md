@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Setting "Problem sensors show as": contact sensors (default, as before) or occupancy
+  sensors.** As an occupancy sensor, "Problem" reads like the other sensors ("Detected" = a
+  problem; in Eve "Occupied") instead of a contact sensor's "Open" (Eve: "Contact: No"). For every
+  appliance with a problem sensor. Changing it replaces the sensor (same name): set its
+  notifications and automations again.
+
 ## 1.0.7 - 2026-11-24
 
 From the first full cycles on a real washer and dryer.
