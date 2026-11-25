@@ -3,3 +3,6 @@ contact_links:
   - name: Security problem
     url: https://github.com/zmanuel1234/homebridge-lg-thinq-connect/security/advisories/new
     about: Report it privately, not as an issue.
+  - name: Troubleshooting
+    url: https://github.com/zmanuel1234/homebridge-lg-thinq-connect#troubleshooting
+    about: LG error codes, "No Response", Remote Start, energy, debug logging.
