@@ -1,29 +1,92 @@
-name: Problem
-description: Something doesn't work as described.
+name: Bug report
+description: Something doesn't work as the README describes.
 labels: [bug]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please **never paste your LG token**. First check
+        [Troubleshooting](https://github.com/zmanuel1234/homebridge-lg-thinq-connect#troubleshooting):
+        many problems are on LG's side (LG error codes are explained there).
   - type: textarea
     id: what
     attributes:
       label: What happened, and what did you expect?
+      description: What the Home app (or Eve) showed, and what the machine was actually doing.
+      placeholder: After the cycle finished, "Washer Done" turned on, then off again a minute later.
     validations:
       required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      description: What you did, step by step, and whether it happens every time.
+      placeholder: |
+        1. Turned on Remote Start on the washer
+        2. Tapped the washer's tile in the Home app
+        3. ...
   - type: input
     id: versions
     attributes:
       label: Versions
       description: This plugin, Homebridge, Node.js (all on the Homebridge UI's status page).
-      placeholder: 0.1.0, Homebridge 2.5.0, Node 22.20.0
+      placeholder: 1.0.8, Homebridge 2.0.0, Node 22.20.0
     validations:
       required: true
   - type: input
     id: appliance
     attributes:
       label: Appliance and model
+      description: As in the ThinQ app; the model is in the plugin's log at startup, or in Copy diagnostics.
       placeholder: Washer, F3P2CYVAT
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: What's affected
+      multiple: true
+      options:
+        - Setup, token or sign-in
+        - Time left or status on the tile
+        - Done, Problem, Remote Start or other sensors
+        - Notifications
+        - Starting or pausing from the Home app
+        - Energy in Eve
+        - Settings screen in the Homebridge UI
+        - Crash, warnings or errors in the log
+        - Something else
+  - type: textarea
+    id: settings
+    attributes:
+      label: Plugin settings
+      description: The plugin's part of config.json (Homebridge UI → the plugin → JSON config). **Replace the token with xxx.**
+      render: json
   - type: textarea
     id: log
     attributes:
       label: Log
-      description: The plugin's lines from the Homebridge log around the problem. Remove anything private.
+      description: |
+        The plugin's lines from the Homebridge log around the problem, best with debug logging on (see
+        [Troubleshooting](https://github.com/zmanuel1234/homebridge-lg-thinq-connect#troubleshooting)).
+        Remove anything private.
       render: text
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics (for problems with one appliance's data)
+      description: Plugin settings → **Copy diagnostics**, then paste here. The token, device IDs and serial numbers are already removed; look it over first.
+      render: json
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I'm on the latest version of the plugin.
+          required: true
+        - label: I searched the existing issues.
+          required: true
+        - label: There's no token in what I pasted.
+          required: true

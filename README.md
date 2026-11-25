@@ -28,7 +28,7 @@ Each washer or dryer shows up as:
   still sensing the load and hasn't worked out the time, so none is shown yet.
 - **"Washer Done"** (occupancy sensor): detected when the cycle finishes. **Turn on
   notifications for it** in the Home app (choose "Occupancy Detected") to be told when the laundry
-  is ready. Many washers switch themselves off a minute after finishing; "Done" then stays on, so
+  is ready. Many washers switch themselves off shortly after finishing (the tested one after 30 s); "Done" then stays on, so
   you can see the laundry is waiting, until the machine is next switched on or started, for 2 hours
   at most (setting: *Keep "Done" on after the machine switches itself off*), also across a
   Homebridge restart. A dryer keeps it on through wrinkle care; switching it off there ends it.
@@ -53,7 +53,14 @@ Each washer or dryer shows up as:
 
 The log also notes LG's cycle count when it goes up, for machines that keep one.
 
-The names follow your machines' names in the ThinQ app.
+The names follow your machines' names in the ThinQ app, in title case ("Washer Done"). Renaming a
+tile in the Home app is kept.
+
+**Tips for the Home app.** You get one notification per finish. The Home app's notification names
+the room and the sensor, so keep the machine's name in each sensor's name (the default) if several
+appliances share a room. Sensors you only use for automations can be taken off the Home view
+(the sensor's settings, *Include in Favorites* off); the Remote Start sensor can be left out per
+appliance, and the phase and tub-clean sensors are off unless you set them.
 
 Machines with two drums (wash combos) show one set per drum. WashTower units, wash combos and
 other laundry models are **experimental** until someone with one confirms they work. The
@@ -63,8 +70,17 @@ washer and dryer types are tested on an LG front-load washer (F3P2CYVAT) and dry
 
 With **Allow starting and pausing** on, tapping the machine's tile in the Home app pauses a
 running cycle, resumes a paused one, or starts a machine that's ready. LG only accepts this
-after **Remote Start** is pressed on the machine itself, a safety rule of LG's. Without it,
-the tap is refused and the log says why.
+after **Remote Start** is turned on at the machine itself, a safety rule of LG's. Without it,
+the tap is refused, the tile goes back within a few seconds, and the log says why.
+
+How Remote Start is turned on depends on the model; the manual says which button. On the tested
+machines: on the washer, hold *Pre-wash* for 3 seconds (after choosing the program); on the
+dryer, hold *Energy Saver* for 3 seconds, with the door closed. A Wi-Fi or remote symbol lights up,
+and the **Remote Start** sensor turns on. LG turns it off again after a while.
+
+LG sometimes answers a start or pause with *2211 "Device Timeout"* even though the machine did
+it. The plugin doesn't treat that as a failure: it logs it at info level and checks the machine,
+and the tile follows what the machine reports.
 
 You can't pick the program, temperature or spin speed from the Home app: LG's API doesn't offer
 that. Choose those on the machine. **A start from the Home app may run the machine's default
@@ -128,7 +144,8 @@ What LG's error codes in the log mean:
 | 1306 | Too many requests | Nothing: the plugin slows down and retries |
 | 1307, 1309 | Wrong country for this account | Set the country the account was created in |
 | 1222 | The appliance isn't connected | Check it's on and on Wi-Fi in the ThinQ app |
-| 2301 | Remote control is off | Press Remote Start on the appliance |
+| 2211 | LG didn't hear back from the appliance in time | Usually nothing: the command often worked anyway, and the tile follows the machine |
+| 2301 | Remote control is off | Turn on Remote Start at the appliance |
 | 2302, 2304 | Not possible right now (state, or switched off) | Try again when the appliance is ready |
 
 ### Settings
@@ -244,6 +261,12 @@ that as 0); some washers send "washing is complete" while still weighing the loa
 heater and heat pump temperatures can stay stale until someone opens the ThinQ app; older Wi-Fi
 modules answer slowly; some models (often dryers) have no energy figures or cycle count.
 
+Seen on the tested washer and dryer, all handled: the time left jumps in the first minutes while
+the washer weighs the load (both ways: 65 → 53 or 65 → 80 minutes), and rinse or spin can drop a
+few minutes at once; at power-on LG briefly reports a cycle count of 0 (ignored); a dryer turns
+Remote Start on by itself during wrinkle care; the dryer reports no door state, so opening its
+door isn't a "problem"; the washer's door locks during a cycle.
+
 Fridges report each compartment's **set** temperature, not the measured one, so that's what their
 tiles show. LG's API can't choose wash programs on any appliance.
 
@@ -305,7 +328,11 @@ run into most.
 | "LG error 1307 / 1309" | The country doesn't match the LG account: set the one the account was created in |
 | "LG error 1304" | LG has new terms: open the ThinQ app and accept them |
 | "LG error 1222" or the tile shows "No Response" | The appliance is off or offline: check it's on and connected in the ThinQ app |
-| Start or pause refused | Press **Remote Start** on the machine (it times out after a while), and check "Allow starting and pausing" |
+| Start or pause refused | Turn on **Remote Start** at the machine (see [Starting and pausing](#starting-and-pausing-optional); dryers need the door closed), and check "Allow starting and pausing" |
+| "LG didn't confirm it (2211)" in the log | Usually nothing: LG answered late, and the tile shows what the machine actually did |
+| A tile shows "No Response" after a refused tap | Fixed in 1.0.6: update the plugin |
+| "Done" didn't turn off when the machine switched itself off | As designed: it stays on until the machine is next switched on or started, for at most the time set in *Keep "Done" on…* |
+| No energy figure in Eve | Look in every room in Eve: it can show the figure in another room than the appliance |
 | A start ran a different program | Reported on some washers with LG's official API: start on the machine, and use the Home app for pause, resume and notifications |
 | Time left or status a little behind | Updates come live from LG; scheduled checks correct anything missed within 2 minutes during a cycle. Older Wi-Fi modules report less often |
 | Water heater or heat pump temperatures stale | An LG limit: they often update only when the ThinQ app is opened |
@@ -315,12 +342,19 @@ run into most.
 child bridge (in the Homebridge UI, the plugin's **Bridge Settings**), then turn on debug mode
 for that bridge, either there or by adding `"_bridge": { "debugModeEnabled": true }` to the
 plugin's config (with the child bridge's other `_bridge` settings). The log then also shows
-each live update from LG, appliances that still couldn't be set up, and energy checks.
+each live update from LG, appliances that still couldn't be set up, and energy checks. Turn it
+off again afterwards: it writes several lines a minute during a cycle.
 
-**Reporting a problem.** Open the plugin's settings and press **Copy diagnostics**: it collects
-what LG says about each appliance, with device IDs, serial numbers and the token removed. Look
-it over, then paste it into a
-[new issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose).
+To save the plugin's lines from the log on a Raspberry Pi with the official image:
+`grep -a '\[LG ThinQ\]' /var/lib/homebridge/homebridge.log > ~/lg-log.txt` (the `-a` is needed
+because grep otherwise takes the log for a binary file).
+
+**Reporting a problem.** Open a
+[bug report](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new?template=problem.yml)
+with the versions, what you did, and the plugin's log lines (debug logging helps). For a problem
+with one appliance's data, also press **Copy diagnostics** in the plugin's settings: it collects
+what LG says about each appliance, with device IDs, serial numbers and the token removed, and
+only copies it to your clipboard. Look it over before pasting. Never paste your token.
 
 ## Updates and compatibility
 

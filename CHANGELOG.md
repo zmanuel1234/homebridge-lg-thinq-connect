@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Documentation
+- README: how to turn on Remote Start on the tested washer and dryer; LG's 2211 "Device Timeout"
+  explained (the command often worked); what was seen on real machines in *LG quirks*; Home app
+  tips (one notification per finish, names, favourites); more troubleshooting rows; saving the
+  plugin's log lines on a Raspberry Pi; reporting a problem.
+- A fuller bug report form on GitHub, with a link to Troubleshooting when opening an issue.
+
 ## 1.0.8 - 2026-11-24
 
 ### Added

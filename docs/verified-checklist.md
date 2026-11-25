@@ -19,5 +19,10 @@ against this plugin. Last checked November 2026.
 | Doesn't log secrets | Yes: the token and certificate are never logged; Copy diagnostics removes them |
 | Accessories keep their identity across restarts | Yes: cached accessories are restored, and the HomeKit surface is frozen for 1.x |
 
-**Still to do before applying:** the first npm publish, and a few weeks of the 1.0 release on real
-washers and dryers.
+**Real-hardware testing:** done on 1.0.8 with an LG washer (F3P2CYVAT) and dryer (RV13D4AMH):
+full cycles, Done and Problem sensors, Remote Start, start, pause and resume, restarts mid-cycle,
+energy in Eve (see issue #22). Still open there: the tub-clean reminder at 30 cycles, a network
+outage, and a quiet week.
+
+**Still to do before applying:** the first npm publish (with trusted publishing set up), and that
+quiet week on 1.0.8.
