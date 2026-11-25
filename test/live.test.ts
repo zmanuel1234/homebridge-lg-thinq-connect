@@ -80,7 +80,10 @@ test('the certificate is saved privately and reused after a restart; subscriptio
   const saved = JSON.parse(readFileSync(s.storageFile, 'utf8')) as Record<string, string>;
   assert.equal(saved.certificatePem, 'CERT-1');
   assert.equal(saved.privateKeyPem, 'KEY');
-  assert.equal(statSync(s.storageFile).mode & 0o777, 0o600);
+  // Windows has no Unix file permissions: it reports every file as 0o666, so only check elsewhere.
+  if (process.platform !== 'win32') {
+    assert.equal(statSync(s.storageFile).mode & 0o777, 0o600);
+  }
   s.live.stop();
   await s.live.start(['device-1']);
   assert.ok(s.live.connected);
