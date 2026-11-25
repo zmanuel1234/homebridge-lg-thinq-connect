@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.0.9 - 2026-11-25
+
+The first release published to npm by GitHub Actions (npm shows it as built and signed from this
+repository). No change to how the plugin works.
 
 ### Documentation
 - README: how to turn on Remote Start on the tested washer and dryer; LG's 2211 "Device Timeout"
@@ -8,6 +11,10 @@
   tips (one notification per finish, names, favourites); more troubleshooting rows; saving the
   plugin's log lines on a Raspberry Pi; reporting a problem.
 - A fuller bug report form on GitHub, with a link to Troubleshooting when opening an issue.
+
+### Fixed
+- The tests pass on Windows: the check that the live-update certificate is saved readable only by
+  Homebridge's user is skipped there, since Windows has no Unix file permissions.
 
 ## 1.0.8 - 2026-11-24
 

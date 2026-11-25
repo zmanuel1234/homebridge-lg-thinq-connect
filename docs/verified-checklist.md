@@ -9,7 +9,7 @@ against this plugin. Last checked November 2026.
 | Dynamic platform, set up through the Homebridge UI | Yes: `LGThinQConnect` platform with `config.schema.json` and a custom settings screen |
 | Doesn't start without a configuration, and doesn't crash Homebridge without one | Yes: logs what's missing and adds nothing (tested in `test/platform.test.ts`) |
 | No post-install scripts, nothing that edits files outside its storage | Yes: no `install`/`postinstall` scripts |
-| Published on npm, with the source and issues on GitHub | GitHub: yes. npm: after the first publish |
+| Published on npm, with the source and issues on GitHub | Yes: published from GitHub Actions with npm trusted publishing (since 1.0.9) |
 | GitHub releases with release notes | Yes: each release has its notes from `CHANGELOG.md` |
 | Runs on the Node.js versions Homebridge supports | Node.js 22, 24 and 26, tested on each in CI |
 | Works on Homebridge 1.6+ and 2.0 | Yes: CI on Homebridge 2, and `npm run test:homebridge1` on 1.8 |
@@ -24,5 +24,4 @@ full cycles, Done and Problem sensors, Remote Start, start, pause and resume, re
 energy in Eve (see issue #22). Still open there: the tub-clean reminder at 30 cycles, a network
 outage, and a quiet week.
 
-**Still to do before applying:** the first npm publish (with trusted publishing set up), and that
-quiet week on 1.0.8.
+**Still to do before applying:** that quiet week (on 1.0.8 or later).
