@@ -48,6 +48,8 @@ test('settings screen: every default matches its type and limits, and the code u
   assert.equal(s.country, props.country.default);
   assert.equal(s.allowControl, props.allowControl.default);
   assert.equal(s.tubCleanAfter, props.tubCleanAfter.default);
+  assert.equal(s.lintFilterAfter, props.lintFilterAfter.default);
+  assert.equal(s.ventCheckPercent, props.ventCheckPercent.default);
   // The code's limits match the screen's
   assert.equal(readSettings({ platform: PLATFORM_NAME, pollInterval: 1 } as PlatformConfig).pollInterval, props.pollInterval.minimum);
   assert.equal(readSettings({ platform: PLATFORM_NAME, runningPollInterval: 1e6 } as PlatformConfig).runningPollInterval, props.runningPollInterval.maximum);
@@ -62,7 +64,7 @@ test('settings screen: every setting is in the layout, and intervals are number 
   const flat = flatten(layout);
   const keys = flat.map((i) => (typeof i === 'string' ? i : i.key)).filter(Boolean);
   for (const k of Object.keys(props)) { assert.ok(keys.includes(k), `${k} missing from the layout`); }
-  for (const k of ['pollInterval', 'runningPollInterval', 'tubCleanAfter']) {
+  for (const k of ['pollInterval', 'runningPollInterval', 'tubCleanAfter', 'lintFilterAfter', 'ventCheckPercent']) {
     const item = flat.find((i) => typeof i === 'object' && i.key === k);
     assert.ok(typeof item === 'object' && item.type === 'number', `${k} should be a number box`);
   }

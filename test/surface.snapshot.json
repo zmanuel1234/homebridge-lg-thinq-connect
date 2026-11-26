@@ -151,13 +151,19 @@
   "ours DEVICE_DRYER": [
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/lint-filter: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/vent-check: Configured Name, Name, Occupancy Detected",
+    "Switch/lint-filter-cleaned: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "ha washtower_dryer": [
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/lint-filter: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/vent-check: Configured Name, Name, Occupancy Detected",
+    "Switch/lint-filter-cleaned: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "washtower (one device) WASHER": [
@@ -170,7 +176,10 @@
   "washtower (one device) DRYER": [
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/lint-filter: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "OccupancySensor/vent-check: Configured Name, Name, Occupancy Detected",
+    "Switch/lint-filter-cleaned: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "washtower washer MAIN": [
@@ -228,6 +237,7 @@
     "(read) experimental",
     "(read) extraControls",
     "(read) ignore",
+    "(read) lintFilterAfter",
     "(read) liveUpdates",
     "(read) phaseSensors",
     "(read) pollInterval",
@@ -235,6 +245,7 @@
     "(read) runningPollInterval",
     "(read) token",
     "(read) tubCleanAfter",
+    "(read) ventCheckPercent",
     "allowControl",
     "appliances",
     "appliances[].acModes",
@@ -249,6 +260,7 @@
     "experimental",
     "extraControls",
     "ignore",
+    "lintFilterAfter",
     "liveUpdates",
     "name",
     "phaseSensors",
@@ -256,6 +268,7 @@
     "problemSensor",
     "runningPollInterval",
     "token",
-    "tubCleanAfter"
+    "tubCleanAfter",
+    "ventCheckPercent"
   ]
 }

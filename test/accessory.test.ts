@@ -482,6 +482,30 @@ function defineTests(hap: Hap): void {
       mock.timers.reset();
     }
     assert.equal(value(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.deepEqual(lines.filter((l) => l.includes('restarted')),
+      ['info: [Washer] LG\'s count restarted at 0 (was 31): Tub Clean done, the reminder is off.'], 'logged once');
+    // The next wash counts from 1 again, logged like any other
+    laundry.update(status({ cycleCount: 1 }));
+    assert.ok(lines.includes('info: [Washer] LG now counts 1 cycle.'));
+  });
+
+  test('a Tub Clean restarting LG\'s count is logged without the reminder too; a brief 0 isn\'t', () => {
+    const { laundry, lines } = setup();
+    laundry.update(status({ cycleCount: 23 }));
+    laundry.update(status({ state: 'INITIAL', cycleCount: 0 }));
+    laundry.update(status({ state: 'INITIAL', cycleCount: 23 }));
+    assert.equal(lines.filter((l) => l.includes('restarted')).length, 0, 'the power-on blip');
+    mock.timers.enable({ apis: ['Date'], now: Date.now() });
+    try {
+      laundry.update(status({ state: 'END', cycleCount: 0 }));
+      mock.timers.tick(31_000);
+      laundry.update(status({ state: 'POWER_OFF', cycleCount: 0 }));
+      laundry.update(status({ state: 'POWER_OFF', cycleCount: 0 }));
+    } finally {
+      mock.timers.reset();
+    }
+    assert.deepEqual(lines.filter((l) => l.includes('restarted')),
+      ['info: [Washer] LG\'s count restarted at 0 (was 23): Tub Clean done.']);
   });
 
   test('tub-clean reminder: none when off, for a dryer, or for a washer that doesn\'t count; removed when turned off', () => {
@@ -493,6 +517,101 @@ function defineTests(hap: Hap): void {
     const on = setup({ tubCleanAfter: 30 });
     const off = setup({ tubCleanAfter: 0 }, on.acc);
     assert.equal(off.acc.getServiceById(S.OccupancySensor, 'tub-clean'), undefined);
+  });
+
+  // Dryer care: the lint filter reminder and the vent check
+  const [, dryerDevice] = realDevices();
+  const dryerUnit = laundryUnits('DEVICE_DRYER', dryerDevice.profile)[0];
+  const dryerSetup = (options: Partial<LaundryOptions> = {}, accessory?: Acc) => setup({ name: 'Dryer', ...options }, accessory, dryerUnit);
+  const detected = (svc: { getCharacteristic: (c: typeof C.OccupancyDetected) => Characteristic } | undefined) =>
+    value(svc!.getCharacteristic(C.OccupancyDetected)) === C.OccupancyDetected.OCCUPANCY_DETECTED;
+  /** One dry: idle → running for `minutes` (with a pause that doesn't count) → END → off. */
+  function dry(laundry: LaundryAccessory, minutes: number): void {
+    laundry.update(status({ state: 'INITIAL' }));
+    laundry.update(running());
+    mock.timers.tick((minutes - 5) * 60_000);
+    laundry.update(status({ state: 'PAUSE', paused: true, remaining: 300, total: 3600 }));
+    mock.timers.tick(20 * 60_000);
+    laundry.update(running({ state: 'COOLING', remaining: 300 }));
+    mock.timers.tick(5 * 60_000);
+    laundry.update(status({ state: 'END', done: true }));
+    laundry.update(status({ state: 'POWER_OFF' }));
+  }
+  async function withClock(fn: () => void | Promise<void>): Promise<void> {
+    mock.timers.enable({ apis: ['Date', 'setTimeout'], now: Date.now() });
+    try { await fn(); } finally { mock.timers.reset(); }
+  }
+
+  test('dryer care: off by default; only for dryers; sensors and button named after the dryer', () => {
+    const plain = dryerSetup();
+    assert.equal(plain.laundry.lintSensor, undefined);
+    assert.equal(plain.laundry.ventSensor, undefined);
+    assert.equal(setup({ lintFilterAfter: 5, ventCheckPercent: 30 }).laundry.lintSensor, undefined, 'not for a washer');
+    const { acc, laundry } = dryerSetup({ lintFilterAfter: 5, ventCheckPercent: 30 });
+    assert.equal(value(laundry.lintSensor!.getCharacteristic(C.ConfiguredName)), 'Dryer Lint Filter');
+    assert.equal(value(laundry.lintButton!.getCharacteristic(C.ConfiguredName)), 'Dryer Lint Filter Cleaned');
+    assert.equal(value(laundry.ventSensor!.getCharacteristic(C.ConfiguredName)), 'Dryer Vent Check');
+    assert.equal(acc.getServiceById(S.Switch, 'lint-filter-cleaned'), laundry.lintButton);
+    // Turned off again: removed
+    const off = dryerSetup({}, acc);
+    assert.equal(acc.getServiceById(S.OccupancySensor, 'lint-filter'), undefined);
+    assert.equal(acc.getServiceById(S.Switch, 'lint-filter-cleaned'), undefined);
+    assert.equal(acc.getServiceById(S.OccupancySensor, 'vent-check'), undefined);
+    assert.equal(off.laundry.lintSensor, undefined);
+  });
+
+  test('lint filter: on after the set number of dries (kept across restarts); the button starts again and turns itself off', async () => {
+    const { acc, laundry } = dryerSetup({ lintFilterAfter: 2 });
+    await withClock(async () => {
+      dry(laundry, 50);
+      assert.equal(acc.context.lintDries, 1);
+      assert.equal(detected(laundry.lintSensor), false);
+      // A Homebridge restart between dries: the count is kept with the accessory
+      const again = dryerSetup({ lintFilterAfter: 2 }, acc);
+      dry(again.laundry, 50);
+      assert.equal(detected(again.laundry.lintSensor), true);
+      assert.ok(again.lines.includes('info: [Dryer] Time to clean the lint filter: 2 dries since it was last cleaned.'));
+      // A dry stopped half way isn't counted
+      again.laundry.update(running());
+      mock.timers.tick(10 * 60_000);
+      again.laundry.update(status({ state: 'INITIAL' }));
+      assert.equal(acc.context.lintDries, 2);
+      assert.equal(await write(again.laundry.lintButton!.getCharacteristic(C.On), 1), undefined);
+      assert.equal(acc.context.lintDries, 0);
+      assert.equal(detected(again.laundry.lintSensor), false);
+      assert.ok(again.lines.includes('info: [Dryer] Lint filter marked cleaned (after 2 dries).'));
+      mock.timers.tick(1000);
+      assert.equal(value(again.laundry.lintButton!.getCharacteristic(C.On)), false, 'the button turns itself off');
+    });
+  });
+
+  test('vent check: times each dry without its pauses; on when dries get 30 % longer, off when back to usual', async () => {
+    const { acc, laundry, lines } = dryerSetup({ ventCheckPercent: 30 });
+    await withClock(() => {
+      for (let i = 0; i < 8; i++) { dry(laundry, 50); }
+      assert.deepEqual(acc.context.dryMinutes, [50, 50, 50, 50, 50, 50, 50, 50], 'the 20-minute pauses don\'t count');
+      assert.equal(laundry.usualDryMinutes, 50);
+      dry(laundry, 70);
+      assert.equal(detected(laundry.ventSensor), false);
+      dry(laundry, 72);
+      assert.equal(detected(laundry.ventSensor), true);
+      assert.ok(lines.some((l) => l.startsWith('warn: [Dryer] Drying takes longer than usual (recent dries about 70 min, usually 50 min)')));
+      dry(laundry, 50);
+      dry(laundry, 49);
+      assert.equal(detected(laundry.ventSensor), false);
+      assert.ok(lines.includes('info: [Dryer] Drying times are back to usual (about 50 min): vent check off.'));
+    });
+  });
+
+  test('vent check: a dry already under way when the plugin started isn\'t timed (its start is unknown)', async () => {
+    const { acc, laundry } = dryerSetup({ ventCheckPercent: 30, lintFilterAfter: 3 });
+    await withClock(() => {
+      laundry.update(running());
+      mock.timers.tick(10 * 60_000);
+      laundry.update(status({ state: 'END', done: true }));
+    });
+    assert.equal(acc.context.dryMinutes, undefined);
+    assert.equal(acc.context.lintDries, 1, 'but it still counts for the lint filter');
   });
 
   test('names: 1.0.x lower-case defaults are brought up to date; names changed in the Home app are kept', () => {
