@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.16 - 2026-11-26
+
+### Added
+- Dryers, optional (both off by default):
+  - **Lint filter reminder**: a "Lint Filter" sensor on after the number of dries you set, and a
+    "Lint Filter Cleaned" button that starts the count again. LG's API doesn't report the filter,
+    so the plugin counts finished dries itself, across restarts.
+  - **Vent check**: a "Vent Check" sensor on when recent dries take clearly longer than usual (the
+    percentage you set; 30 is a good start), a common sign of a blocked vent. LG's dryers report
+    restricted airflow only on their display, so the plugin times each dry (without pauses) and
+    learns the usual time from the first 8. It's an estimate: big or wet loads take longer too, so
+    it needs two slow dries among the latest three.
+
 ## 1.0.15 - 2026-11-26
 
 ### Added

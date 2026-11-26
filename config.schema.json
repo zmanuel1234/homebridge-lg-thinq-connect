@@ -142,6 +142,22 @@
         "maximum": 200,
         "description": "Adds a \"tub clean\" sensor to washers that count their cycles. It turns on when LG's count reaches this number (LG suggests a Tub Clean about every 30 washes); turn on notifications for it. 0 = no reminder."
       },
+      "lintFilterAfter": {
+        "title": "Lint filter reminder after (dries)",
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 100,
+        "description": "Adds a \"lint filter\" sensor to dryers, on after this many finished dries, and a \"lint filter cleaned\" button that starts the count again (LG's API doesn't report the filter, so the plugin counts the dries). Turn on notifications for the sensor. 0 = no reminder."
+      },
+      "ventCheckPercent": {
+        "title": "Dryer vent check: warn when drying takes longer by (%)",
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 200,
+        "description": "Adds a \"vent check\" sensor to dryers. The plugin times each finished dry and turns it on when recent dries take this much longer than usual, a common sign of a blocked lint filter or vent (LG reports airflow only on the dryer's display). It learns the usual time from the first 8 dries, and is an estimate: big or wet loads take longer too. 30 is a good start. 0 = off."
+      },
       "doneHoldMinutes": {
         "title": "Keep \"Done\" on after the machine switches itself off (minutes)",
         "type": "integer",
@@ -290,6 +306,14 @@
     "phaseSensors",
     {
       "key": "tubCleanAfter",
+      "type": "number"
+    },
+    {
+      "key": "lintFilterAfter",
+      "type": "number"
+    },
+    {
+      "key": "ventCheckPercent",
       "type": "number"
     },
     {

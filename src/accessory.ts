@@ -10,6 +10,10 @@
 //    when the machine reports them;
 //  - optionally "<name> tub clean", an occupancy sensor: detected once the washer's cycle count
 //    (as LG counts it) reaches the setting, as a reminder to run Tub Clean;
+//  - dryers, optionally: "<name> lint filter", an occupancy sensor on after the dries you set,
+//    with a "<name> lint filter cleaned" button (a switch that turns itself off) to start counting
+//    again; and "<name> vent check", an occupancy sensor on while recent dries take clearly longer
+//    than usual (a sign of a blocked vent; see dryerCare.ts);
 //  - "<name> remote start", an occupancy sensor: on while Remote Start is on and the machine waits to
 //    be started, for a notification or an automation that starts it (machines that report it, when
 //    control is allowed);
@@ -24,8 +28,9 @@ import { displayName, keepOrUpdate } from './names';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service } from 'homebridge';
 import { type LaundryStatus, type LaundryUnit, operationPayload, ovenStartPayload, stateLabel } from './laundry';
 import { limit, problemSensor, showProblem } from './appliances/base';
+import { type DryerCareContext, recordDry, usualDryMinutes } from './dryerCare';
 
-export interface LaundryContext {
+export interface LaundryContext extends DryerCareContext {
   deviceId?: string;
   location?: string;
   /** "Done" held until then (ms since 1970), across Homebridge restarts. */
@@ -55,6 +60,10 @@ export interface LaundryOptions {
   phaseSensors: string[];
   /** Cycles counted by LG at which the tub-clean reminder turns on; 0 = no reminder. */
   tubCleanAfter: number;
+  /** Dryers: dries after which the lint-filter reminder turns on; 0 = no reminder. */
+  lintFilterAfter?: number;
+  /** Dryers: how much longer (%) recent dries must take than usual for the vent check; 0 = off. */
+  ventCheckPercent?: number;
   /** Minutes "done" stays on after the machine switches itself off straight from finished (default 120). */
   doneHoldMinutes?: number;
   /** The problem sensor as an occupancy sensor (detected = a problem) instead of a contact sensor. */
@@ -98,6 +107,11 @@ export class LaundryAccessory {
   readonly problemSensor: Service;
   readonly phaseSensors = new Map<string, Service>();
   readonly tubCleanSensor: Service | undefined;
+  readonly lintSensor: Service | undefined;
+  readonly lintButton: Service | undefined;
+  readonly ventSensor: Service | undefined;
+  /** A dry already under way when the plugin started: counted for the lint filter, not timed. */
+  private untimedDry = false;
   readonly doorSensor: Service | undefined;
   readonly rinseAidSensor: Service | undefined;
   readonly ovenThermostat: Service | undefined;
@@ -183,6 +197,14 @@ export class LaundryAccessory {
       accessory.removeService(tubClean);
     }
 
+    // Dryer care: lint filter reminder with its button, and the vent check
+    const dryer = unit.kind === 'dryer';
+    const lint = dryer && (options.lintFilterAfter ?? 0) > 0;
+    this.lintSensor = this.optional(lint, S.OccupancySensor, `${name} lint filter`, 'lint-filter');
+    this.lintButton = this.optional(lint, S.Switch, `${name} lint filter cleaned`, 'lint-filter-cleaned');
+    this.lintButton?.getCharacteristic(C.On).onSet((value) => this.lintCleaned(!!value));
+    this.ventSensor = this.optional(dryer && (options.ventCheckPercent ?? 0) > 0, S.OccupancySensor, `${name} vent check`, 'vent-check');
+
     // Remote Start on at the machine: only useful when the Home app may start it
     this.remoteStartSensor = this.optional(unit.reportsRemoteStart && options.allowControl && unit.kind !== 'oven'
       && options.remoteStartSensor !== false,
@@ -238,6 +260,7 @@ export class LaundryAccessory {
     const prev = this.status;
     const next = this.steadyCount(incoming, prev);
     this.checkProgramAfterStart(next);
+    if (this.unit.kind === 'dryer') { this.trackDrying(prev, next); }
     if (this.heldFinish && next) {
       this.heldFinish = false;
       if (next.running && next.remaining > EARLY_ALERT_LEFT) {
@@ -254,6 +277,7 @@ export class LaundryAccessory {
       // Only when a time was known: early on (DETECTING) LG reports 0 left, and stopping then isn't a finish.
       // Held like a finish when the machine went off; a minute when it's still on (it may just have been stopped).
       if (next.state === 'POWER_OFF') { this.holdDone(true); } else { this.briefDone(); }
+      this.dryFinished();
     }
     if (next && (next.running || next.paused)) {
       // A new cycle (or a resumed one): earlier finishes and alerts no longer apply
@@ -319,6 +343,92 @@ export class LaundryAccessory {
         + 'right after the start from the Home app: LG may have started the washer\'s default program rather than the '
         + 'one chosen on it (LG\'s API can only send "start", not a program).');
     }
+  }
+
+  /**
+   * Dryers: times the drying (running, cooling included; not paused or wrinkle care), kept in the
+   * accessory's context so a Homebridge restart mid-cycle keeps it, and notices the end.
+   */
+  private trackDrying(prev: LaundryStatus | null, next: LaundryStatus | null): void {
+    if (!next) { return; }
+    const ctx = this.accessory.context;
+    const now = Date.now();
+    const inCycle = (s: LaundryStatus | null) => !!s && (s.running || s.paused);
+    if (next.running && !ctx.runSince) {
+      if (prev && !inCycle(prev)) {
+        // A new dry
+        ctx.runMs = 0;
+        this.untimedDry = false;
+      } else if (!prev && ctx.runMs === undefined) {
+        // Already drying when the plugin started, with nothing kept: its start is unknown
+        this.untimedDry = true;
+      }
+      if (!this.untimedDry) { ctx.runSince = now; }
+    } else if (!next.running && ctx.runSince) {
+      ctx.runMs = (ctx.runMs || 0) + now - ctx.runSince;
+      ctx.runSince = undefined;
+    }
+    if (next.done) { this.dryFinished(); }
+    if (!inCycle(next) && !next.done) {
+      // Stopped, off or an error without finishing: not a dry to count
+      if (prev && inCycle(prev) && next.state !== 'POWER_OFF') { this.forgetDry(); }
+    }
+  }
+
+  private forgetDry(): void {
+    const ctx = this.accessory.context;
+    ctx.runMs = undefined;
+    ctx.runSince = undefined;
+    this.untimedDry = false;
+  }
+
+  /** A dry finished (once per dry): counts it for the lint filter, and times it for the vent check. */
+  private dryFinished(): void {
+    if (this.unit.kind !== 'dryer') { return; }
+    const ctx = this.accessory.context;
+    const timed = ctx.runMs !== undefined || ctx.runSince !== undefined;
+    if (!timed && !this.untimedDry) { return; }
+    const ms = (ctx.runMs || 0) + (ctx.runSince ? Date.now() - ctx.runSince : 0);
+    this.forgetDry();
+    const name = this.options.name;
+    const lintAfter = this.options.lintFilterAfter ?? 0;
+    if (this.lintSensor && lintAfter > 0) {
+      ctx.lintDries = (ctx.lintDries || 0) + 1;
+      if (ctx.lintDries === lintAfter) {
+        this.deps.log.info(`[${name}] Time to clean the lint filter: ${ctx.lintDries} ${ctx.lintDries === 1 ? 'dry' : 'dries'} since it was last cleaned.`);
+      }
+    }
+    if (timed) {
+      const minutes = ms / 60_000;
+      const r = recordDry(ctx, minutes, this.ventSensor ? this.options.ventCheckPercent ?? 0 : 0);
+      this.deps.log.debug(`[${name}] Dried for ${Math.round(minutes)} min (usual: ${r.usual !== undefined ? `${Math.round(r.usual)} min` : 'not known yet'}).`);
+      if (this.ventSensor && r.changed && r.recent !== undefined && r.usual !== undefined) {
+        if (r.warn) {
+          this.deps.log.warn(`[${name}] Drying takes longer than usual (recent dries about ${Math.round(r.recent)} min, usually ${Math.round(r.usual)} min): `
+            + 'check the lint filter and the vent to the outside for a blockage.');
+        } else {
+          this.deps.log.info(`[${name}] Drying times are back to usual (about ${Math.round(r.recent)} min): vent check off.`);
+        }
+      }
+    }
+    this.render();
+  }
+
+  /** The "lint filter cleaned" button: counting starts again, and the button turns itself off. */
+  private lintCleaned(on: boolean): void {
+    if (!on || !this.lintButton) { return; }
+    const { Characteristic: C } = this.deps.api.hap;
+    const was = this.accessory.context.lintDries || 0;
+    this.accessory.context.lintDries = 0;
+    this.deps.log.info(`[${this.options.name}] Lint filter marked cleaned (after ${was} ${was === 1 ? 'dry' : 'dries'}).`);
+    this.render();
+    const button = this.lintButton;
+    setTimeout(() => button.getCharacteristic(C.On).updateValue(false), 1000).unref?.();
+  }
+
+  /** The usual drying time for this dryer (minutes), once enough dries are known: for diagnostics. */
+  get usualDryMinutes(): number | undefined {
+    return usualDryMinutes(this.accessory.context);
   }
 
   /** Running, or what was just asked from the Home app until LG reports it (or 30 s pass). */
@@ -418,6 +528,7 @@ export class LaundryAccessory {
         return;
       }
       this.deps.log.info(`[${name}] LG says the cycle is finished.`);
+      this.dryFinished();
       if (s && (s.state === 'POWER_OFF')) {
         // Already off: held like a finish the machine switched itself off after
         this.holdDone(true);
@@ -458,6 +569,15 @@ export class LaundryAccessory {
       const due = s?.cycleCount !== undefined && s.cycleCount >= this.options.tubCleanAfter;
       set(this.tubCleanSensor.getCharacteristic(C.OccupancyDetected),
         due ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    }
+    if (this.lintSensor) {
+      const due = (this.accessory.context.lintDries || 0) >= (this.options.lintFilterAfter ?? 0);
+      set(this.lintSensor.getCharacteristic(C.OccupancyDetected),
+        due ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    }
+    if (this.ventSensor) {
+      set(this.ventSensor.getCharacteristic(C.OccupancyDetected),
+        this.accessory.context.ventBaseline !== undefined ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     }
     if (this.remoteStartSensor) {
       set(this.remoteStartSensor.getCharacteristic(C.OccupancyDetected),

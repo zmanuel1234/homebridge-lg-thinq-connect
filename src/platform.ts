@@ -38,6 +38,10 @@ export interface Settings {
   phaseSensors: string[];
   /** Cycles counted by LG at which the tub-clean reminder turns on; 0 = off. */
   tubCleanAfter: number;
+  /** Dryers: dries after which the lint-filter reminder turns on; 0 = off. */
+  lintFilterAfter: number;
+  /** Dryers: % longer than usual that recent dries must take for the vent check; 0 = off. */
+  ventCheckPercent: number;
   /** Minutes "done" stays on after a machine switches itself off straight from finished. */
   doneHoldMinutes: number;
   /** Add appliance types not yet confirmed on real hardware (everything but washers and dryers). */
@@ -91,6 +95,8 @@ export function readSettings(config: PlatformConfig): Settings {
     liveUpdates: config.liveUpdates !== false,
     phaseSensors: strings(config.phaseSensors),
     tubCleanAfter: clamp(config.tubCleanAfter, 0, 200, 0),
+    lintFilterAfter: clamp(config.lintFilterAfter, 0, 100, 0),
+    ventCheckPercent: clamp(config.ventCheckPercent, 0, 200, 0),
     doneHoldMinutes: clamp(config.doneHoldMinutes, 0, 1440, 120),
     experimental: config.experimental === true,
     extraControls: config.extraControls !== false,
@@ -426,6 +432,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       const laundry = new LaundryAccessory(this, accessory, unit,
         { name, model: modelName, serial, allowControl: this.settings.allowControl,
           phaseSensors: this.settings.phaseSensors, tubCleanAfter: this.settings.tubCleanAfter,
+          lintFilterAfter: this.settings.lintFilterAfter, ventCheckPercent: this.settings.ventCheckPercent,
           doneHoldMinutes: this.settings.doneHoldMinutes, problemAsOccupancy: this.settings.problemAsOccupancy,
           remoteStartSensor: this.settings.appliances.get(alias.trim().toLowerCase())?.hideRemoteStart !== true },
         (payload) => this.client!.control(device.deviceId, payload),
