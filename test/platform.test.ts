@@ -352,6 +352,20 @@ function defineTests(hap: Hap): void {
     assert.deepEqual(sent?.body, { operation: { washerOperationMode: 'STOP' }, location: { locationName: 'MAIN' } });
   });
 
+  test('a background task that fails is logged, never left as an unhandled rejection', async (t) => {
+    const hb = await homebridge(t);
+    const platform = await hb.start();
+    const background = (platform as unknown as { background(p: Promise<unknown>, what: string): void }).background.bind(platform);
+    let unhandled = false;
+    const onUnhandled = () => { unhandled = true; };
+    process.on('unhandledRejection', onUnhandled);
+    t.after(() => { process.off('unhandledRejection', onUnhandled); });
+    background(Promise.reject(new Error('boom')), 'Checking an appliance');
+    await until(() => hb.lines.includes('error: Checking an appliance failed: boom'));
+    await new Promise((r) => setImmediate(r));
+    assert.equal(unhandled, false);
+  });
+
   test('live updates: connected after finding the appliances; a state update moves the tile right away', async (t) => {
     const hb = await homebridge(t);
     const broker = await new FakeBroker().start();

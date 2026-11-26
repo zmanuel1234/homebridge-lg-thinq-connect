@@ -292,7 +292,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     this.discoveryTries++;
     this.log.error(`${why} Trying again in ${wait / 60} min. Appliances already in the Home app stay there meanwhile.`);
     clearTimeout(this.discoveryTimer);
-    this.discoveryTimer = setTimeout(() => { void this.discover(); }, wait * 1000);
+    this.discoveryTimer = setTimeout(() => { this.background(this.discover(), 'Finding appliances'); }, wait * 1000);
     this.discoveryTimer.unref?.();
   }
 
@@ -312,7 +312,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     const wait = DISCOVERY_RETRY[Math.min(this.setupTries, DISCOVERY_RETRY.length - 1)];
     this.setupTries++;
     clearTimeout(this.setupTimer);
-    this.setupTimer = setTimeout(() => { void this.retrySetups(); }, wait * 1000);
+    this.setupTimer = setTimeout(() => { this.background(this.retrySetups(), 'Setting up appliances again'); }, wait * 1000);
     this.setupTimer.unref?.();
   }
 
@@ -359,7 +359,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       },
       ...this.liveOverrides,
     });
-    void this.live.start(this.machines.map((m) => m.device.deviceId));
+    this.background(this.live.start(this.machines.map((m) => m.device.deviceId)), 'Starting live updates');
   }
 
   /** A live update from LG: a partial state, or an alert. */
@@ -441,7 +441,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       }
     }
     this.machines.push(machine);
-    void this.setupEnergy(machine);
+    this.background(this.setupEnergy(machine), 'Setting up energy use');
     await this.poll(machine);
   }
 
@@ -491,7 +491,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       this.api.updatePlatformAccessories([accessory]);
     }
     this.machines.push(machine);
-    void this.setupEnergy(machine);
+    this.background(this.setupEnergy(machine), 'Setting up energy use');
     await this.poll(machine);
   }
 
@@ -528,7 +528,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     const { device } = machine;
     const retryLater = () => {
       if (this.stopped) { return; }
-      machine.energyTimer = setTimeout(() => { void this.setupEnergy(machine); }, ENERGY_RETRY * 1000);
+      machine.energyTimer = setTimeout(() => { this.background(this.setupEnergy(machine), 'Setting up energy use'); }, ENERGY_RETRY * 1000);
       machine.energyTimer.unref?.();
     };
     let props: string[];
@@ -572,7 +572,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       }
       if (this.stopped) { return; }
       // A failed check is tried again within the hour, not tomorrow
-      machine.energyTimer = setTimeout(() => { void check(); }, failed ? ENERGY_RETRY * 1000 : untilNextEnergyCheck());
+      machine.energyTimer = setTimeout(() => { this.background(check(), 'Checking energy use'); }, failed ? ENERGY_RETRY * 1000 : untilNextEnergyCheck());
       machine.energyTimer.unref?.();
     };
     this.log.info(`[${device.deviceInfo.alias}] Energy use this month is shown in the Eve app (LG updates it daily).`);
@@ -623,8 +623,15 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
   private schedule(machine: Machine, seconds: number): void {
     if (this.stopped) { return; }
     clearTimeout(machine.timer);
-    machine.timer = setTimeout(() => { void this.poll(machine); }, seconds * 1000);
+    machine.timer = setTimeout(() => { this.background(this.poll(machine), 'Checking an appliance'); }, seconds * 1000);
     machine.timer.unref?.();
+  }
+
+  /** Runs a task in the background: any error is logged, never left as an unhandled rejection. */
+  private background(task: Promise<unknown>, what: string): void {
+    task.catch((err: unknown) => {
+      this.log.error(`${what} failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
   }
 
   stop(): void {
