@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.12 - 2026-11-26
+
+No change to how the plugin works.
+
+### Changed
+- Development only: CI runs the tests on Node 22, 24 and 26 in a single check.
+
 ## 1.0.11 - 2026-11-26
 
 No change to how the plugin works.
