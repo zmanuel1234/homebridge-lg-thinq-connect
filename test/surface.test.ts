@@ -185,7 +185,7 @@ function defineTests(hap: Hap): void {
       for (const unit of laundryUnits(l.type, l.profile)) {
         const accessory = newAccessory(`${l.name} ${unit.location}`);
         const laundry = new LaundryAccessory({ log, api }, accessory, unit,
-          { name: 'Machine', model: 'M', serial: 'S', allowControl: true, phaseSensors: ['SPINNING'], tubCleanAfter: l.tubClean ?? 0 },
+          { name: 'Machine', model: 'M', serial: 'S', allowControl: true, phaseSensors: ['SPINNING'], tubCleanAfter: l.tubClean ?? 0, lintFilterAfter: 5, ventCheckPercent: 30 },
           () => Promise.resolve({}));
         laundry.stop();
         checkNames(accessory, 'Machine');

@@ -42,8 +42,20 @@ Each washer or dryer shows up as:
   *Spinning* or *Drying*, for automations like "turn on the fan while the washer spins".
 - **"Washer Tub Clean"** (optional, washers that count their cycles): detected once LG's cycle
   count reaches the number you set (LG suggests a Tub Clean about every 30 washes). Turn on
-  notifications for it as a reminder. The count is LG's own; it's expected to start again after a
-  Tub Clean.
+  notifications for it as a reminder. The count is LG's own, and starts again after a Tub Clean
+  (checked on the tested washer: 23 → 0 at its end; the log says so).
+- **"Dryer Lint Filter"** (optional, dryers): detected after the number of dries you set, with a
+  **"Dryer Lint Filter Cleaned"** button (a switch that turns itself off) that starts the count
+  again. LG's API doesn't report the filter, so the plugin counts the finished dries itself (a dry
+  stopped half way doesn't count), and keeps the count across Homebridge restarts.
+- **"Dryer Vent Check"** (optional, dryers): detected when recent dries take clearly longer than
+  this dryer usually needs, a common sign of a clogged lint filter or a blocked vent. LG's dryers
+  warn about restricted airflow only on their display, not through LG's API, so the plugin times
+  each finished dry (pauses and wrinkle care left out) and compares: it learns the usual time from
+  the first 8 dries, and turns on when two of the latest three take the set percentage longer
+  (30 % is a good start). One big or wet load doesn't set it off; it goes off again once dries are
+  back to usual, for example after the vent is cleaned. It's an estimate, not a reading from the
+  dryer, so check the vent when it comes on rather than trusting it blindly.
 - **"Washer Remote Start"** (occupancy sensor, with *Allow starting and pausing* on, for
   machines that report it; dishwashers and Stylers too): detected while Remote Start is on and the
   machine is waiting to be started, so an automation or a notification can tell you it's ready
@@ -51,7 +63,8 @@ Each washer or dryer shows up as:
   finished, even though LG keeps Remote Start on then (and a dryer turns it on by itself during
   wrinkle care, where a start would begin a new cycle), nor during a delayed start.
 
-The log also notes LG's cycle count when it goes up, for machines that keep one.
+The log also notes LG's cycle count when it goes up, for machines that keep one, and when a Tub
+Clean starts it again. With debug logging on, it notes each dry's time and the usual one.
 
 The names follow your machines' names in the ThinQ app, in title case ("Washer Done"). Renaming a
 tile in the Home app is kept.
@@ -60,7 +73,7 @@ tile in the Home app is kept.
 the room and the sensor, so keep the machine's name in each sensor's name (the default) if several
 appliances share a room. Sensors you only use for automations can be taken off the Home view
 (the sensor's settings, *Include in Favorites* off); the Remote Start sensor can be left out per
-appliance, and the phase and tub-clean sensors are off unless you set them.
+appliance, and the phase, tub-clean, lint filter and vent check sensors are off unless you set them.
 
 Machines with two drums (wash combos) show one set per drum. WashTower units, wash combos and
 other laundry models are **experimental** until someone with one confirms they work. The
@@ -161,6 +174,8 @@ What LG's error codes in the log mean:
 | Energy use in the Eve app | On | This month's energy use for appliances LG reports it for, shown in the Eve app (see [Energy use](#energy-use)) |
 | Phase sensors | None | Extra sensors that are on during a chosen phase |
 | Tub clean reminder after | 0 (off) | Cycles counted by LG at which the washer's tub-clean sensor turns on |
+| Lint filter reminder after | 0 (off) | Dries after which the dryer's lint filter sensor turns on; its "cleaned" button starts the count again |
+| Dryer vent check | 0 (off) | How much longer (%) recent dries must take than usual for the vent check sensor; 30 is a good start |
 | Keep "Done" on after the machine switches itself off | 120 min | How long at most "Done" stays on after a machine switches itself off straight from finished (until it's next switched on or started); 0 = off together with the machine |
 | Problem sensors show as | Contact sensors | Contact sensors (open = a problem) or occupancy sensors (detected = a problem, like the Done sensors). Changing it replaces each Problem sensor: set its notifications and automations again |
 | Leave out these appliances | None | Names, as in the ThinQ app, to keep out of the Home app |
@@ -230,7 +245,7 @@ Each type has one of three levels:
 
 | Appliance | In the Home app | Status |
 |---|---|---|
-| Washer, dryer | Tile with time left; done, problem, phase and tub-clean sensors; start and pause | **Tested** |
+| Washer, dryer | Tile with time left; done, problem, phase and tub-clean sensors; start and pause; dryers: lint filter reminder and vent check (worked out by the plugin) | **Tested** |
 | WashTower, wash combo | As washer and dryer, one set per drum | Experimental (always on) |
 | Dishwasher | As a washer, plus door and "rinse aid low" sensors; the course and a delayed start in the log | Experimental |
 | Styler | As a washer: time left, done, problem | Experimental |
