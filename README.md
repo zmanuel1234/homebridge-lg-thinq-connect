@@ -325,11 +325,13 @@ cd /homebridge && node node_modules/homebridge-lg-thinq-connect/dist/bin/lg-thin
 lg-thinq-diagnostics --country US
 ```
 
-Use your LG account's country instead of US. It asks for your token without showing it, and saves
-`lg-diagnostics.json` in the current folder (your home folder in the first example): what LG reports
-about each appliance, with device IDs and serial numbers removed. Look it over, then attach it to a
+Use your LG account's country instead of US. It asks for your token without showing it, and prints
+what LG reports about each appliance, with device IDs and serial numbers removed. It writes nothing
+to disk unless you ask: add `--out lg-diagnostics.json` to save it to that file instead. Look it
+over, then paste or attach it to a
 [new appliance issue](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/issues/new/choose),
-with what works and what doesn't.
+with what works and what doesn't. (The settings screen's **Copy diagnostics** gives the same
+report without a command.)
 
 ## Troubleshooting
 

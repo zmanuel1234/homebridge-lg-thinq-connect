@@ -603,6 +603,39 @@ function defineTests(hap: Hap): void {
     });
   });
 
+  test('lint filter: LG\'s "drying complete" during cool-down and then END count as one dry, also across a restart', async () => {
+    const { acc, laundry } = dryerSetup({ lintFilterAfter: 5, ventCheckPercent: 30 });
+    await withClock(() => {
+      laundry.update(status({ state: 'INITIAL' }));
+      laundry.update(running());
+      mock.timers.tick(45 * 60_000);
+      laundry.update(running({ state: 'COOLING', remaining: 5 * 60 }));
+      laundry.alert('finished', 'DRYING_IS_COMPLETE');
+      mock.timers.tick(5 * 60_000);
+      laundry.update(running({ state: 'COOLING', remaining: 60 }));
+      // Homebridge restarts before the end
+      const again = dryerSetup({ lintFilterAfter: 5, ventCheckPercent: 30 }, acc);
+      again.laundry.update(running({ state: 'COOLING', remaining: 60 }));
+      mock.timers.tick(60_000);
+      again.laundry.update(status({ state: 'END', done: true }));
+      again.laundry.update(status({ state: 'POWER_OFF' }));
+      assert.equal(acc.context.lintDries, 1, 'one dry');
+      assert.deepEqual(acc.context.dryMinutes, [51], 'timed once, to the real end (cool-down included)');
+      // The next dry counts again
+      dry(again.laundry, 50);
+      assert.equal(acc.context.lintDries, 2);
+      // A restart between dries, and the next dry already running when the plugin starts: it's a
+      // new dry (counted, not timed), not the rest of the one counted earlier
+      mock.timers.tick(3 * 3600_000);
+      const later = dryerSetup({ lintFilterAfter: 5, ventCheckPercent: 30 }, acc);
+      later.laundry.update(running());
+      mock.timers.tick(40 * 60_000);
+      later.laundry.update(status({ state: 'END', done: true }));
+      assert.equal(acc.context.lintDries, 3);
+      assert.deepEqual(acc.context.dryMinutes, [51, 50], 'its start is unknown, so it isn\'t timed');
+    });
+  });
+
   test('vent check: a dry already under way when the plugin started isn\'t timed (its start is unknown)', async () => {
     const { acc, laundry } = dryerSetup({ ventCheckPercent: 30, lintFilterAfter: 3 });
     await withClock(() => {

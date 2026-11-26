@@ -14,6 +14,11 @@ export interface DryerCareContext {
   slowDries?: number;
   /** The usual drying time (minutes) the vent warning compares with; set while the warning is on. */
   ventBaseline?: number;
+  /**
+   * When the dry under way was counted (ms since 1970). LG can say "drying complete" during
+   * cool-down, before END: nothing more is counted or timed until the next dry starts.
+   */
+  dryCountedAt?: number;
   /** Drying time so far of the cycle under way (ms), and since when it has been running. */
   runMs?: number;
   runSince?: number;
@@ -21,6 +26,11 @@ export interface DryerCareContext {
 
 /** Dries shorter than this (minutes) aren't a sign of anything: a short timed dry or a stopped one. */
 export const MIN_DRY_MINUTES = 15;
+/**
+ * A running dryer first seen after a restart, this long after a dry was counted, is a new dry
+ * (cool-down after LG's "complete" takes minutes; wrinkle care doesn't count as running).
+ */
+export const COUNTED_DRY_MS = 30 * 60_000;
 /** Dries kept for the comparison. */
 const KEEP = 20;
 /** The newest dries compared with the usual (their median, so one big load doesn't count). */

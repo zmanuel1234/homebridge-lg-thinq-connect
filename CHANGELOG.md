@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.17 - 2026-11-26
+
+### Fixed
+- Dryers: the lint filter reminder could count one dry twice, when LG's "drying complete" alert
+  came during cool-down, before the end; the reminder then came on early. A dry now counts once,
+  also across a Homebridge restart during cool-down (and its time for the vent check is taken once).
+- Settings screen: *Options per appliance* now shows "Washer, dryer: leave out the Remote Start
+  sensor"; it worked in config.json but couldn't be set on the screen.
+
+### Changed
+- The `lg-thinq-diagnostics` command prints its report instead of saving `lg-diagnostics.json`
+  in the current folder; `--out FILE` saves it to a file you name. Its prompts and messages go to
+  standard error, so the printed report is clean JSON.
+
 ## 1.0.16 - 2026-11-26
 
 ### Added

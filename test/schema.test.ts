@@ -64,6 +64,14 @@ test('settings screen: every setting is in the layout, and intervals are number 
   const flat = flatten(layout);
   const keys = flat.map((i) => (typeof i === 'string' ? i : i.key)).filter(Boolean);
   for (const k of Object.keys(props)) { assert.ok(keys.includes(k), `${k} missing from the layout`); }
+  // Options inside lists (such as Options per appliance) too: one left out works in config.json
+  // but can't be set on the settings screen
+  for (const [k, p] of Object.entries(props)) {
+    const itemProps = (p as { items?: { properties?: Record<string, unknown> } }).items?.properties;
+    for (const sub of Object.keys(itemProps || {})) {
+      assert.ok(keys.includes(`${k}[].${sub}`), `${k}[].${sub} missing from the layout`);
+    }
+  }
   for (const k of ['pollInterval', 'runningPollInterval', 'tubCleanAfter', 'lintFilterAfter', 'ventCheckPercent']) {
     const item = flat.find((i) => typeof i === 'object' && i.key === k);
     assert.ok(typeof item === 'object' && item.type === 'number', `${k} should be a number box`);

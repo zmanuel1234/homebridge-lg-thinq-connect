@@ -28,7 +28,7 @@ import { displayName, keepOrUpdate } from './names';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service } from 'homebridge';
 import { type LaundryStatus, type LaundryUnit, operationPayload, ovenStartPayload, stateLabel } from './laundry';
 import { limit, problemSensor, showProblem } from './appliances/base';
-import { type DryerCareContext, recordDry, usualDryMinutes } from './dryerCare';
+import { COUNTED_DRY_MS, type DryerCareContext, recordDry, usualDryMinutes } from './dryerCare';
 
 export interface LaundryContext extends DryerCareContext {
   deviceId?: string;
@@ -277,7 +277,7 @@ export class LaundryAccessory {
       // Only when a time was known: early on (DETECTING) LG reports 0 left, and stopping then isn't a finish.
       // Held like a finish when the machine went off; a minute when it's still on (it may just have been stopped).
       if (next.state === 'POWER_OFF') { this.holdDone(true); } else { this.briefDone(); }
-      this.dryFinished();
+      this.dryFinished(false);
     }
     if (next && (next.running || next.paused)) {
       // A new cycle (or a resumed one): earlier finishes and alerts no longer apply
@@ -354,21 +354,26 @@ export class LaundryAccessory {
     const ctx = this.accessory.context;
     const now = Date.now();
     const inCycle = (s: LaundryStatus | null) => !!s && (s.running || s.paused);
+    const counted = ctx.dryCountedAt !== undefined;
+    if (next.running && ((prev && !inCycle(prev)) || (!prev && counted && now - ctx.dryCountedAt! > COUNTED_DRY_MS))) {
+      // A new dry (or, first seen after a restart, one long after the last was counted): whatever
+      // was kept about the last one no longer applies. One already running at a restart is untimed.
+      ctx.dryCountedAt = undefined;
+      this.untimedDry = !prev;
+      ctx.runMs = this.untimedDry ? undefined : 0;
+      ctx.runSince = undefined;
+    }
     if (next.running && !ctx.runSince) {
-      if (prev && !inCycle(prev)) {
-        // A new dry
-        ctx.runMs = 0;
-        this.untimedDry = false;
-      } else if (!prev && ctx.runMs === undefined) {
+      if (!prev && ctx.runMs === undefined && ctx.dryCountedAt === undefined) {
         // Already drying when the plugin started, with nothing kept: its start is unknown
         this.untimedDry = true;
       }
-      if (!this.untimedDry) { ctx.runSince = now; }
+      if (ctx.runMs !== undefined || (!this.untimedDry && ctx.dryCountedAt === undefined)) { ctx.runSince = now; }
     } else if (!next.running && ctx.runSince) {
       ctx.runMs = (ctx.runMs || 0) + now - ctx.runSince;
       ctx.runSince = undefined;
     }
-    if (next.done) { this.dryFinished(); }
+    if (next.done) { this.dryFinished(next.running); }
     if (!inCycle(next) && !next.done) {
       // Stopped, off or an error without finishing: not a dry to count
       if (prev && inCycle(prev) && next.state !== 'POWER_OFF') { this.forgetDry(); }
@@ -382,33 +387,38 @@ export class LaundryAccessory {
     this.untimedDry = false;
   }
 
-  /** A dry finished (once per dry): counts it for the lint filter, and times it for the vent check. */
-  private dryFinished(): void {
+  /**
+   * A dry finished. It counts once for the lint filter, even when LG says "drying complete" during
+   * cool-down and END follows; its time for the vent check is taken once it has actually stopped.
+   */
+  private dryFinished(stillRunning: boolean): void {
     if (this.unit.kind !== 'dryer') { return; }
     const ctx = this.accessory.context;
     const timed = ctx.runMs !== undefined || ctx.runSince !== undefined;
-    if (!timed && !this.untimedDry) { return; }
-    const ms = (ctx.runMs || 0) + (ctx.runSince ? Date.now() - ctx.runSince : 0);
-    this.forgetDry();
     const name = this.options.name;
-    const lintAfter = this.options.lintFilterAfter ?? 0;
-    if (this.lintSensor && lintAfter > 0) {
-      ctx.lintDries = (ctx.lintDries || 0) + 1;
-      if (ctx.lintDries === lintAfter) {
-        this.deps.log.info(`[${name}] Time to clean the lint filter: ${ctx.lintDries} ${ctx.lintDries === 1 ? 'dry' : 'dries'} since it was last cleaned.`);
+    if (ctx.dryCountedAt === undefined && (timed || this.untimedDry)) {
+      ctx.dryCountedAt = Date.now();
+      const lintAfter = this.options.lintFilterAfter ?? 0;
+      if (this.lintSensor && lintAfter > 0) {
+        ctx.lintDries = (ctx.lintDries || 0) + 1;
+        if (ctx.lintDries === lintAfter) {
+          this.deps.log.info(`[${name}] Time to clean the lint filter: ${ctx.lintDries} ${ctx.lintDries === 1 ? 'dry' : 'dries'} since it was last cleaned.`);
+        }
       }
     }
-    if (timed) {
-      const minutes = ms / 60_000;
-      const r = recordDry(ctx, minutes, this.ventSensor ? this.options.ventCheckPercent ?? 0 : 0);
-      this.deps.log.debug(`[${name}] Dried for ${Math.round(minutes)} min (usual: ${r.usual !== undefined ? `${Math.round(r.usual)} min` : 'not known yet'}).`);
-      if (this.ventSensor && r.changed && r.recent !== undefined && r.usual !== undefined) {
-        if (r.warn) {
-          this.deps.log.warn(`[${name}] Drying takes longer than usual (recent dries about ${Math.round(r.recent)} min, usually ${Math.round(r.usual)} min): `
-            + 'check the lint filter and the vent to the outside for a blockage.');
-        } else {
-          this.deps.log.info(`[${name}] Drying times are back to usual (about ${Math.round(r.recent)} min): vent check off.`);
-        }
+    // Still cooling down: timed on until it stops
+    if (stillRunning || !timed) { this.render(); return; }
+    const ms = (ctx.runMs || 0) + (ctx.runSince ? Date.now() - ctx.runSince : 0);
+    this.forgetDry();
+    const minutes = ms / 60_000;
+    const r = recordDry(ctx, minutes, this.ventSensor ? this.options.ventCheckPercent ?? 0 : 0);
+    this.deps.log.debug(`[${name}] Dried for ${Math.round(minutes)} min (usual: ${r.usual !== undefined ? `${Math.round(r.usual)} min` : 'not known yet'}).`);
+    if (this.ventSensor && r.changed && r.recent !== undefined && r.usual !== undefined) {
+      if (r.warn) {
+        this.deps.log.warn(`[${name}] Drying takes longer than usual (recent dries about ${Math.round(r.recent)} min, usually ${Math.round(r.usual)} min): `
+          + 'check the lint filter and the vent to the outside for a blockage.');
+      } else {
+        this.deps.log.info(`[${name}] Drying times are back to usual (about ${Math.round(r.recent)} min): vent check off.`);
       }
     }
     this.render();
@@ -528,7 +538,7 @@ export class LaundryAccessory {
         return;
       }
       this.deps.log.info(`[${name}] LG says the cycle is finished.`);
-      this.dryFinished();
+      this.dryFinished(!!s?.running);
       if (s && (s.state === 'POWER_OFF')) {
         // Already off: held like a finish the machine switched itself off after
         this.holdDone(true);
