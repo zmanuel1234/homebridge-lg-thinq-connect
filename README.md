@@ -10,8 +10,8 @@
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-zmanuel-FFDD00?logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/zmanuel)
 
 Shows LG ThinQ appliances in Apple Home through **LG's official ThinQ Connect API**. You sign in
-with a personal access token that LG issues, not your LG password, so the plugin doesn't break
-when LG changes its app's login.
+with a personal access token that LG issues, not your LG password, and the plugin uses LG's
+supported, documented API rather than the LG app's own sign-in.
 
 **Washers and dryers** are supported: the time left, a notification when a cycle finishes or
 stops on an error, and sensors for automations. **Air conditioners, dehumidifiers and range
@@ -414,8 +414,8 @@ official API: keep the old plugin for those, and leave them out of this one.
 ## Compared with other HomeKit plugins for LG
 
 Checked November 2026. Plugins that use **LG's official ThinQ Connect API** (a token from LG)
-keep working when LG changes its app; the others sign in the way LG's app does, with your LG
-password, and depend on that staying the same.
+rely on LG's supported, documented API; the others sign in the way LG's app does, with your LG
+password, and depend on that sign-in staying the same.
 
 | Plugin | LG API | Appliances |
 |---|---|---|

@@ -339,6 +339,12 @@ export class AirConditioner extends Appliance {
   private pendingOn?: { mode: Mode; timer: NodeJS.Timeout; done: (p: Promise<void>) => void };
 
   /** Cancels a waiting power-on; returns its mode (the caller now decides). */
+  /** Homebridge is shutting down: a pending switch-on is dropped, not sent. */
+  override stop(): void {
+    if (this.pendingOn) { clearTimeout(this.pendingOn.timer); this.pendingOn = undefined; }
+    super.stop();
+  }
+
   private cancelPendingOn(): Mode | undefined {
     const p = this.pendingOn;
     if (!p) { return undefined; }

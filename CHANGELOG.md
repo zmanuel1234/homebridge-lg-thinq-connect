@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.10 - 2026-11-26
+
+Maintenance release. No change to how the plugin works.
+
+### Changed
+- Background tasks (scheduled checks, live updates, energy checks) now share one error handler
+  that logs any failure with what was being done.
+- An air conditioner's pending switch-on is cleared when Homebridge shuts down.
+
+### Documentation
+- README: describes the official API as LG's supported, documented API.
+- Verified checklist: links the current requirements page and updates the testing notes.
+
 ## 1.0.9 - 2026-11-25
 
 The first release published to npm by GitHub Actions (npm shows it as built and signed from this

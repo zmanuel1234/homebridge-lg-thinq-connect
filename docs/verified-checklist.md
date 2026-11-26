@@ -1,6 +1,6 @@
 # Homebridge Verified checklist
 
-The [Verified requirements](https://github.com/homebridge/homebridge/wiki/verified-Plugins), checked
+The [Verified requirements](https://github.com/homebridge/plugins/wiki/Verified-Plugins), checked
 against this plugin. Last checked November 2026.
 
 | Requirement | Status |
@@ -15,13 +15,11 @@ against this plugin. Last checked November 2026.
 | Works on Homebridge 1.6+ and 2.0 | Yes: CI on Homebridge 2, and `npm run test:homebridge1` on 1.8 |
 | No analytics or tracking | Yes: the plugin talks only to LG (see [Privacy](../README.md#privacy)) |
 | Keeps its files in Homebridge's storage folder | Yes: the live-update key and certificate, readable only by the Homebridge user |
-| No unhandled exceptions or rejections | Yes: every LG request and timer is caught and logged; tested for outages, rate limits and bad replies |
+| No unhandled exceptions or rejections | Yes: every LG request is caught and logged, and every background task (timers, live updates, energy checks) goes through one catch that logs its error; tested for outages, rate limits and bad replies |
 | Doesn't log secrets | Yes: the token and certificate are never logged; Copy diagnostics removes them |
 | Accessories keep their identity across restarts | Yes: cached accessories are restored, and the HomeKit surface is frozen for 1.x |
 
 **Real-hardware testing:** done on 1.0.8 with an LG washer (F3P2CYVAT) and dryer (RV13D4AMH):
 full cycles, Done and Problem sensors, Remote Start, start, pause and resume, restarts mid-cycle,
-energy in Eve (see issue #22). Still open there: the tub-clean reminder at 30 cycles, a network
-outage, and a quiet week.
-
-**Still to do before applying:** that quiet week (on 1.0.8 or later).
+energy in Eve (see issue #22). Still open there: the tub-clean reminder at 30 cycles and a network
+outage.
