@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.13 - 2026-11-26
+
+No change to how the plugin works: the compiled plugin is identical to 1.0.12's.
+
+### Changed
+- Development only: built with TypeScript 7 (the native compiler) and linted with oxlint instead
+  of TypeScript 6 and ESLint, with the same rules. CI retries npm's package signature check up to
+  3 times, because npm's registry sometimes answers it with an invalid response.
+
 ## 1.0.12 - 2026-11-26
 
 No change to how the plugin works.

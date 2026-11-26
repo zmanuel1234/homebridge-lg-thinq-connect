@@ -1,7 +1,7 @@
 {
   "name": "homebridge-lg-thinq-connect",
   "displayName": "LG ThinQ Connect",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "LG ThinQ appliances in Apple Home through LG's official ThinQ Connect API: washer and dryer time left, cycle-done and error alerts, sign-in with a personal access token.",
   "author": "Manuel Zamfir",
   "license": "MIT",
@@ -37,7 +37,7 @@
   "scripts": {
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && node -e \"require('fs').cpSync('src/homebridge-ui/public','dist/homebridge-ui/public',{recursive:true})\"",
     "check": "tsc -p .",
-    "lint": "eslint . --max-warnings=0 && npm run check",
+    "lint": "oxlint && npm run check",
     "test": "node --import tsx --test test/*.test.ts",
     "prepare": "npm run build",
     "prepublishOnly": "npm run lint && npm test",
@@ -65,14 +65,12 @@
     "homebridge": "^1.6.0 || ^2.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.5",
-    "eslint": "^10.15.0",
-    "globals": "^17.14.0",
     "homebridge": "^2.5.0",
+    "oxlint": "1.94.0",
+    "oxlint-tsgolint": "7.0.2007",
     "tsx": "^4.23.15",
-    "typescript": "~6.0.3",
-    "typescript-eslint": "^8.73.0"
+    "typescript": "7.0.2"
   },
   "dependencies": {
     "@homebridge/plugin-ui-utils": "^2.3.0"
