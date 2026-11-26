@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.11 - 2026-11-26
+
+No change to how the plugin works.
+
+### Changed
+- New icon: a washer with a climate badge, for laundry and air conditioners.
+
 ## 1.0.10 - 2026-11-26
 
 Maintenance release. No change to how the plugin works.
