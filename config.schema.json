@@ -344,7 +344,8 @@
             "appliances[].extraControls",
             "appliances[].acModes",
             "appliances[].acSwing",
-            "appliances[].temperatureSensor"
+            "appliances[].temperatureSensor",
+            "appliances[].hideRemoteStart"
           ]
         },
         {
