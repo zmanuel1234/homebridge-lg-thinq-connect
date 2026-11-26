@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.14 - 2026-11-26
+
+No change to how the plugin works.
+
+### Changed
+- Development only: the linter again runs ESLint's no-dupe-args and no-octal (through a small
+  local oxlint plugin), so it checks everything the old ESLint setup did; oxlint-tsgolint
+  7.0.2007 → 7.0.2008.
+
 ## 1.0.13 - 2026-11-26
 
 No change to how the plugin works: the compiled plugin is identical to 1.0.12's.
