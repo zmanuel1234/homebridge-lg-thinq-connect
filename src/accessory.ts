@@ -285,8 +285,14 @@ export class LaundryAccessory {
     }
     const count = next?.cycleCount;
     // LG sends the new count in an update of its own, right after the end
-    if (count !== undefined && prev?.cycleCount !== undefined && count > prev.cycleCount && prev.cycleCount > 0) {
-      this.deps.log.info(`[${this.options.name}] LG now counts ${count} cycles.`);
+    if (count !== undefined && prev?.cycleCount !== undefined && count > prev.cycleCount) {
+      this.deps.log.info(`[${this.options.name}] LG now counts ${count} ${count === 1 ? 'cycle' : 'cycles'}.`);
+    }
+    // A Tub Clean restarts LG's count (seen: 23 → 0 at its end). steadyCount has already let the
+    // brief 0 at power-on through only once it lasted, so this is the real restart.
+    if (count === 0 && prev?.cycleCount !== undefined && prev.cycleCount > 0) {
+      const reminder = this.tubCleanSensor && prev.cycleCount >= this.options.tubCleanAfter ? ', the reminder is off' : '';
+      this.deps.log.info(`[${this.options.name}] LG's count restarted at 0 (was ${prev.cycleCount}): Tub Clean done${reminder}.`);
     }
     if (this.tubCleanSensor && count !== undefined && count >= this.options.tubCleanAfter
       && (prev?.cycleCount === undefined || prev.cycleCount < this.options.tubCleanAfter)) {

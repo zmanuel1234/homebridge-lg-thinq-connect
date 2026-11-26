@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.15 - 2026-11-26
+
+### Added
+- The log says when LG's cycle count restarts after a Tub Clean ("LG's count restarted at 0 (was
+  23): Tub Clean done, the reminder is off."); until now that happened silently. Checked on the
+  tested washer: its count went 23 → 0 at the end of a Tub Clean.
+
+### Fixed
+- The first wash after a Tub Clean is logged ("LG now counts 1 cycle."); counts going up from 0
+  weren't.
+
 ## 1.0.14 - 2026-11-26
 
 No change to how the plugin works.

@@ -482,6 +482,30 @@ function defineTests(hap: Hap): void {
       mock.timers.reset();
     }
     assert.equal(value(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.deepEqual(lines.filter((l) => l.includes('restarted')),
+      ['info: [Washer] LG\'s count restarted at 0 (was 31): Tub Clean done, the reminder is off.'], 'logged once');
+    // The next wash counts from 1 again, logged like any other
+    laundry.update(status({ cycleCount: 1 }));
+    assert.ok(lines.includes('info: [Washer] LG now counts 1 cycle.'));
+  });
+
+  test('a Tub Clean restarting LG\'s count is logged without the reminder too; a brief 0 isn\'t', () => {
+    const { laundry, lines } = setup();
+    laundry.update(status({ cycleCount: 23 }));
+    laundry.update(status({ state: 'INITIAL', cycleCount: 0 }));
+    laundry.update(status({ state: 'INITIAL', cycleCount: 23 }));
+    assert.equal(lines.filter((l) => l.includes('restarted')).length, 0, 'the power-on blip');
+    mock.timers.enable({ apis: ['Date'], now: Date.now() });
+    try {
+      laundry.update(status({ state: 'END', cycleCount: 0 }));
+      mock.timers.tick(31_000);
+      laundry.update(status({ state: 'POWER_OFF', cycleCount: 0 }));
+      laundry.update(status({ state: 'POWER_OFF', cycleCount: 0 }));
+    } finally {
+      mock.timers.reset();
+    }
+    assert.deepEqual(lines.filter((l) => l.includes('restarted')),
+      ['info: [Washer] LG\'s count restarted at 0 (was 23): Tub Clean done.']);
   });
 
   test('tub-clean reminder: none when off, for a dryer, or for a washer that doesn\'t count; removed when turned off', () => {
