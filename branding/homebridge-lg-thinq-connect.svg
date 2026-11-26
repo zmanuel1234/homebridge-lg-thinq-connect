@@ -1,15 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0d9488"/><stop offset="1" stop-color="#115e59"/></linearGradient>
-    <clipPath id="drum"><circle cx="50" cy="58" r="17"/></clipPath>
-  </defs>
-  <rect width="100" height="100" rx="22" fill="url(#bg)"/>
-  <rect x="22" y="17" width="56" height="68" rx="8" fill="#ffffff"/>
-  <path d="M22 33 H78" stroke="#115e59" stroke-width="2"/>
-  <circle cx="31" cy="25" r="3" fill="#115e59"/>
-  <rect x="40" y="23" width="16" height="4" rx="2" fill="#115e59"/>
-  <circle cx="50" cy="58" r="21" fill="#ffffff" stroke="#115e59" stroke-width="3"/>
-  <circle cx="50" cy="58" r="17" fill="#ccfbf1"/>
-  <path clip-path="url(#drum)" d="M30 61 Q36 55 42 61 T54 61 T66 61 T78 61 V80 H30 Z" fill="#14b8a6"/>
-  <circle cx="72" cy="25" r="5" fill="#fbbf24" stroke="#115e59" stroke-width="2"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0d9488"/><stop offset="1" stop-color="#115e59"/></linearGradient><clipPath id="drum"><circle cx="44" cy="53" r="15.5"/></clipPath></defs>
+<rect width="100" height="100" rx="22" fill="url(#bg)"/><rect x="18" y="15" width="52" height="64" rx="8" fill="#fff"/>
+<path d="M18 30 H70" stroke="#115e59" stroke-width="2"/><circle cx="27" cy="22.5" r="3" fill="#115e59"/><rect x="35" y="20.5" width="15" height="4" rx="2" fill="#115e59"/>
+<circle cx="44" cy="53" r="19" fill="#fff" stroke="#115e59" stroke-width="3"/><circle cx="44" cy="53" r="15.5" fill="#ccfbf1"/>
+<path clip-path="url(#drum)" d="M26 56 Q32 50 38 56 T50 56 T62 56 V72 H26 Z" fill="#14b8a6"/>
+<circle cx="72" cy="72" r="17" fill="#fbbf24" stroke="#115e59" stroke-width="3"/><line x1="72" y1="72" x2="82.5" y2="72.0" stroke="#115e59" stroke-width="2.4" stroke-linecap="round"/><line x1="78.5" y1="72.0" x2="81.8" y2="74.3" stroke="#115e59" stroke-width="2" stroke-linecap="round"/><line x1="78.5" y1="72.0" x2="81.8" y2="69.7" stroke="#115e59" stroke-width="2" stroke-linecap="round"/><line x1="72" y1="72" x2="77.2" y2="81.1" stroke="#115e59" stroke-width="2.4" stroke-linecap="round"/><line x1="75.3" y1="77.6" x2="74.9" y2="81.6" stroke="#115e59" stroke-width="2" stroke-linecap="round"/><line x1="75.3" y1="77.6" x2="78.9" y2="79.3" stroke="#115e59" stroke-width="2" stroke-linecap="round"/><line x1="72" y1="72" x2="66.8" y2="81.1" stroke="#115e59" stroke-width="2.4" stroke-linecap="round"/><line x1="68.7" y1="77.6" x2="65.1" y2="79.3" stroke="#115e59" stroke-width="2" stroke-linecap="round"/><line x1="68.7" y1="77.6" x2="69.1" y2="81.6" stroke="#115e59" stroke-width="2" stroke-linecap="round"/><line x1="72" y1="72" x2="61.5" y2="72.0" stroke="#115e59" stroke-width="2.4" stroke-linecap="round"/><line x1="65.5" y1="72.0" x2="62.2" y2="69.7" stroke="#115e59" stroke-width="2" stroke-linecap="round"/><line x1="65.5" y1="72.0" x2="62.2" y2="74.3" stroke="#115e59" stroke-width="2" stroke-linecap="round"/><line x1="72" y1="72" x2="66.8" y2="62.9" stroke="#115e59" stroke-width="2.4" stroke-linecap="round"/><line x1="68.7" y1="66.4" x2="69.1" y2="62.4" stroke="#115e59" stroke-width="2" stroke-linecap="round"/><line x1="68.7" y1="66.4" x2="65.1" y2="64.7" stroke="#115e59" stroke-width="2" stroke-linecap="round"/><line x1="72" y1="72" x2="77.2" y2="62.9" stroke="#115e59" stroke-width="2.4" stroke-linecap="round"/><line x1="75.3" y1="66.4" x2="78.9" y2="64.7" stroke="#115e59" stroke-width="2" stroke-linecap="round"/><line x1="75.3" y1="66.4" x2="74.9" y2="62.4" stroke="#115e59" stroke-width="2" stroke-linecap="round"/><circle cx="72" cy="72" r="2.5" fill="#115e59"/></svg>
