@@ -66,14 +66,22 @@ test('settings screen: every setting is in the layout, and intervals are number 
   const flat = flatten(layout);
   const keys = flat.map((i) => (typeof i === 'string' ? i : i.key)).filter(Boolean);
   for (const k of Object.keys(props)) { assert.ok(keys.includes(k), `${k} missing from the layout`); }
-  // Options inside lists (such as Options per appliance) too: one left out works in config.json
-  // but can't be set on the settings screen
+  // Options inside lists (such as Options per appliance) too: a list laid out by its key alone
+  // shows all of them; one that names its fields must name each, or the one left out works in
+  // config.json but can't be set on the settings screen
   for (const [k, p] of Object.entries(props)) {
     const itemProps = (p as { items?: { properties?: Record<string, unknown> } }).items?.properties;
-    for (const sub of Object.keys(itemProps || {})) {
+    const entry = flat.find((i) => typeof i === 'object' && i.key === k);
+    if (!itemProps || (typeof entry === 'object' && !entry.items)) { continue; }
+    for (const sub of Object.keys(itemProps)) {
       assert.ok(keys.includes(`${k}[].${sub}`), `${k}[].${sub} missing from the layout`);
     }
   }
+  // Options per appliance starts empty: a list that names its fields always shows one blank row,
+  // which the settings screen then saves (with its checkboxes as false)
+  const appliances = flat.find((i) => typeof i === 'object' && i.key === 'appliances') as LayoutItem & { listItems?: number };
+  assert.equal(typeof appliances === 'object' && appliances.items, undefined, 'laid out by its key alone');
+  assert.equal(typeof appliances === 'object' && appliances.listItems, 0);
   for (const k of ['pollInterval', 'runningPollInterval', 'tubCleanAfter', 'lintFilterAfter', 'ventCheckPercent']) {
     const item = flat.find((i) => typeof i === 'object' && i.key === k);
     assert.ok(typeof item === 'object' && item.type === 'number', `${k} should be a number box`);

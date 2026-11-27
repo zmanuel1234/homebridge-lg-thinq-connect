@@ -72,6 +72,7 @@ function applianceOptions(v: unknown): Map<string, ApplianceOptions> {
     if (!e || typeof e !== 'object') { continue; }
     const o = e as Record<string, unknown>;
     const name = typeof o.name === 'string' ? o.name.trim().toLowerCase() : '';
+    // A row without a name (the settings screen used to save a blank one) applies to nothing
     if (!name) { continue; }
     const opts: ApplianceOptions = {};
     if (typeof o.extraControls === 'boolean') { opts.extraControls = o.extraControls; }

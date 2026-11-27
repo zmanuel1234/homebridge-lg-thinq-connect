@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.2 - 2026-11-27
+
+### Fixed
+- Settings screen: *Options per appliance* starts empty. It used to show a blank row that was saved
+  with the settings (with its switches as off) even when untouched; such a row has no appliance
+  name, so it never applied to anything, and can be deleted. The list's fields are unchanged.
+
 ## 2.0.1 - 2026-11-27
 
 ### Fixed
