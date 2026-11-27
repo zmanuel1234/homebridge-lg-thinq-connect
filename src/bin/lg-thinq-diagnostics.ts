@@ -13,7 +13,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { Writable } from 'node:stream';
-import { ThinQClient, field } from '../api';
+import { ThinQClient, asText, field } from '../api';
 
 /** Keys whose values identify the appliance or the home network, whatever their spelling or type. */
 const PRIVATE_KEY = /serial|^mac(addr(ess)?)?$|ssid|wifi|deviceid|groupid/i;
@@ -111,7 +111,7 @@ async function main(): Promise<void> {
   if (out) { writeFileSync(out, json); } else { process.stdout.write(json); }
   for (const a of report.appliances) {
     const info = field(a, 'deviceInfo');
-    console.error(`- ${String(field(info, 'alias'))}: ${String(field(info, 'deviceType'))} ${String(field(info, 'modelName') ?? '')}`);
+    console.error(`- ${asText(field(info, 'alias'))}: ${asText(field(info, 'deviceType'))} ${asText(field(info, 'modelName'))}`);
   }
   console.error(out
     ? `Saved ${report.appliances.length} appliance(s) to ${out}. Look it over, then attach it to your issue.`

@@ -88,7 +88,8 @@ export class FakeLG {
       return [200, { response: {} }];
     }
     if (path === 'client/certificate' && req.method === 'POST') {
-      const csr = String((body as { csr?: unknown } | undefined)?.csr ?? '');
+      const sent = (body as { csr?: unknown } | undefined)?.csr;
+      const csr = typeof sent === 'string' ? sent : '';
       if (!csr.startsWith('-----BEGIN CERTIFICATE REQUEST-----')) { return [400, { error: { code: '1101', message: 'Bad CSR' } }]; }
       this.certificates.push(csr);
       return [200, { response: { result: { certificatePem: `CERT-${this.certificates.length}`, subscriptions: [`app/clients/${String(req.headers['x-client-id'])}/push`] } } }];
