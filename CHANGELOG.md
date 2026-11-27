@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.1 - 2026-11-27
+
+### Fixed
+- Renaming an appliance in the ThinQ app (say "Front Load Washer" to "Washer") now renames its
+  tiles and sensors at the next Homebridge restart ("Washer Finished"), and Eve's energy section;
+  before, they kept the old name. Names changed in the Home app are kept. The log notes the
+  rename.
+
 ## 2.0.0 - 2026-11-27
 
 One setting for how the Finished, Error and reminder sensors show, and contact sensors by default,

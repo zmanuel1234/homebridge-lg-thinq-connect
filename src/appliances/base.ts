@@ -2,7 +2,7 @@
 // sent one at a time, and LG's problem alerts shown on a "problem" sensor.
 
 import { ThinQError } from '../api';
-import { displayName, keepOrUpdate } from '../names';
+import { displayName, keepOrUpdate, namedBefore } from '../names';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service, WithUUID } from 'homebridge';
 import type { Device } from '../api';
 import type { LaundryContext } from '../accessory';
@@ -150,7 +150,9 @@ export abstract class Appliance implements Part {
     svc.setCharacteristic(C.Name, name);
     if (!svc.testCharacteristic(C.ConfiguredName)) { svc.addOptionalCharacteristic(C.ConfiguredName); }
     const configured = svc.getCharacteristic(C.ConfiguredName);
-    const shown = keepOrUpdate(configured.value, name);
+    // An earlier default from before the appliance was renamed in the ThinQ app follows the rename
+    const was = namedBefore(raw, this.ctx.name, (this.accessory.context as { applianceName?: string }).applianceName);
+    const shown = keepOrUpdate(configured.value, name, was ? [was] : []);
     if (shown) { configured.updateValue(shown); }
     return svc;
   }
