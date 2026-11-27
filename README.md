@@ -75,7 +75,10 @@ The log also notes LG's cycle count when it goes up, for machines that keep one,
 Clean starts it again. With debug logging on, it notes each dry's time and the usual one.
 
 The names follow your machines' names in the ThinQ app, in title case ("Washer Finished", "Dryer Clean Lint Filter"). Renaming a
-tile in the Home app is kept.
+tile in the Home app is kept. To shorten them all at once (say "Front Load Washer" to "Washer"),
+rename the machine in the ThinQ app: after the next Homebridge restart its tiles and sensors take
+the new name, except ones you renamed in the Home app. Entries under *Options per appliance* go by
+the ThinQ name, so update those too.
 
 **Tips for the Home app.** You get one notification per finish. The Home app's notification names
 the room and the sensor, so keep the machine's name in each sensor's name (the default) if several

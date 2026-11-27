@@ -25,7 +25,7 @@
 // and LG only accepts it after Remote Start is pressed on the machine.
 
 import { ThinQError } from './api';
-import { displayName, keepOrUpdate } from './names';
+import { displayName, keepOrUpdate, namedBefore } from './names';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service } from 'homebridge';
 import { type LaundryStatus, type LaundryUnit, operationPayload, ovenStartPayload, stateLabel } from './laundry';
 import { limit, showProblem } from './appliances/base';
@@ -50,6 +50,10 @@ export interface LaundryContext extends DryerCareContext {
   location?: string;
   /** "Done" held until then (ms since 1970), across Homebridge restarts. */
   doneUntil?: number;
+  /** The appliance's name (as in the ThinQ app) its tiles and sensors were last named after. */
+  applianceName?: string;
+  /** Its name before, when it was renamed in the ThinQ app since the last start (for the energy name). */
+  renamedFrom?: string;
 }
 
 /** Minutes "done" stays on by default after the machine switches itself off from finished. */
@@ -284,12 +288,16 @@ export class LaundryAccessory {
     const { Characteristic: C } = this.deps.api.hap;
     const name = displayName(this.options.name, raw);
     const before = PREVIOUS_NAMES[subtype];
+    // Earlier defaults: before 1.0.20's names, and before the appliance was renamed in the ThinQ app
+    const was = this.accessory.context.applianceName;
+    const previous = [namedBefore(raw, this.options.name, was)];
+    if (before) { previous.push(displayName(this.options.name, before(this.options.name)), was ? displayName(was, before(was)) : undefined); }
     const svc = this.accessory.getServiceById(type, subtype) || this.accessory.addService(type, name, subtype);
     svc.setCharacteristic(C.Name, name);
     if (!svc.testCharacteristic(C.ConfiguredName)) { svc.addOptionalCharacteristic(C.ConfiguredName); }
     // Set once: a name changed in the Home app wins after that
     const configured = svc.getCharacteristic(C.ConfiguredName);
-    const shown = keepOrUpdate(configured.value, name, before ? [displayName(this.options.name, before(this.options.name))] : []);
+    const shown = keepOrUpdate(configured.value, name, previous.filter((p): p is string => !!p));
     if (shown) { configured.updateValue(shown); }
     return svc;
   }

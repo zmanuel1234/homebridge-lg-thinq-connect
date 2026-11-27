@@ -126,6 +126,37 @@ function defineTests(hap: Hap): void {
     assert.equal(hb.calls.unregistered.length, 0);
   });
 
+  test('an appliance renamed in the ThinQ app: its tiles and sensors follow, except names changed in the Home app', async (t) => {
+    const hb = await homebridge(t);
+    await hb.start();
+    const cached = hb.calls.registered.splice(0);
+    const washer = cached.find((a) => a.context.deviceId === 'device-1')!;
+    const named = (sub: string) => washer.services.find((s) => s.subtype === sub)!.getCharacteristic(hap!.Characteristic.ConfiguredName);
+    const old = String(named('done').value);
+    assert.match(old, / Finished$/);
+    named('problem').updateValue('Laundry trouble');
+    const alias = hb.lg.devices.find((d) => d.deviceId === 'device-1')!.deviceInfo.alias;
+    hb.lg.devices.find((d) => d.deviceId === 'device-1')!.deviceInfo.alias = 'Washer';
+    await hb.start(cached);
+    assert.equal(named('done').value, 'Washer Finished');
+    assert.equal(named('cycle').value, 'Washer');
+    assert.equal(named('problem').value, 'Laundry trouble', 'a name chosen in the Home app stays');
+    assert.ok(hb.lines.includes(`info: "${alias}" is now "Washer" (renamed in the ThinQ app): its tiles and sensors take the new name, `
+      + 'except ones renamed in the Home app.'));
+  });
+
+  test('a ThinQ rename is followed for accessories cached before 2.0.1, from the name they were added with', async (t) => {
+    const hb = await homebridge(t);
+    await hb.start();
+    const cached = hb.calls.registered.splice(0);
+    const washer = cached.find((a) => a.context.deviceId === 'device-1')!;
+    delete (washer.context as { applianceName?: string }).applianceName;
+    hb.lg.devices.find((d) => d.deviceId === 'device-1')!.deviceInfo.alias = 'Washer';
+    await hb.start(cached);
+    const done = washer.services.find((s) => s.subtype === 'done')!;
+    assert.equal(done.getCharacteristic(hap!.Characteristic.ConfiguredName).value, 'Washer Finished');
+  });
+
   test('an appliance removed from the account, or ignored, is removed from the Home app', async (t) => {
     const hb = await homebridge(t);
     await hb.start();

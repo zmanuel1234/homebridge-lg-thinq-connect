@@ -13,6 +13,15 @@ export function displayName(appliance: string, name: string): string {
 }
 
 /**
+ * What `raw` (a name made from the appliance's name `now`) was by default while the appliance was
+ * called `before` in the ThinQ app, so a sensor still showing it follows a rename there.
+ */
+export function namedBefore(raw: string, now: string, before: string | undefined): string | undefined {
+  if (!before || before === now || !raw.startsWith(now)) { return undefined; }
+  return displayName(before, before + raw.slice(now.length));
+}
+
+/**
  * The name to show now, given the one the Home app has: ours on first use; then the Home app's,
  * unless it's only an earlier default of ours (the 1.0.x lower-case one, or one of `previous`),
  * which is brought up to date.

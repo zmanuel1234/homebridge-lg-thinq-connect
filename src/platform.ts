@@ -437,6 +437,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       }
       accessory.context.deviceId = device.deviceId;
       accessory.context.location = unit.location;
+      const renamedFrom = this.renamed(accessory, name);
       const serial = createHash('sha256').update(`${device.deviceId}:${unit.location}`).digest('hex').slice(0, 12).toUpperCase();
       const laundry = new LaundryAccessory(this, accessory, unit,
         { name, model: modelName, serial, allowControl: this.settings.allowControl,
@@ -449,6 +450,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
         () => this.schedule(machine, 3));
       machine.units.push(laundry);
       machine.parts.push(new LaundryPart(laundry));
+      this.named(accessory, name, renamedFrom);
       if (isNew) {
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
         this.cached.set(uuid, accessory);
@@ -489,6 +491,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     }
     accessory.context.deviceId = device.deviceId;
     accessory.context.location = '';
+    const renamedFrom = this.renamed(accessory, alias);
     const machine: Machine = { device, units: [], parts: [], failures: 0 };
     const ctx: ApplianceContext = {
       log: this.log, api: this.api, accessory, device, name: alias,
@@ -500,6 +503,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       options: this.settings.appliances.get(alias.trim().toLowerCase()),
     };
     machine.parts.push(mapping.create(ctx, profile));
+    this.named(accessory, alias, renamedFrom);
     if (isNew) {
       this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       this.cached.set(uuid, accessory);
@@ -576,7 +580,8 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
           const kwh = Math.round(wh) / 1000;
           const svc = energyService(part)
             || part.accessory.addService(new Consumption(`${part.accessory.displayName} Energy`, ENERGY_SUBTYPE));
-          this.nameEnergyService(svc, `${part.accessory.displayName} Energy`);
+          this.nameEnergyService(svc, `${part.accessory.displayName} Energy`,
+            (part.accessory.context as LaundryContext).renamedFrom);
           const ch = svc.getCharacteristic(Total);
           if (ch.value !== kwh) {
             this.log.debug(`[${part.accessory.displayName}] Energy this month: ${kwh} kWh.`);
@@ -596,15 +601,36 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     await check();
   }
 
+  /** The appliance's earlier name, when it was renamed in the ThinQ app since its sensors were named. */
+  private renamed(accessory: PlatformAccessory, name: string): string | undefined {
+    const ctx = accessory.context as LaundryContext;
+    // Before 2.0.1 it wasn't kept: the accessory's own name is the one it was added with
+    ctx.applianceName ??= accessory.displayName;
+    const was = ctx.applianceName;
+    return was && was !== name ? was : undefined;
+  }
+
+  /** After a ThinQ rename: the accessory takes the new name; sensors on default names have followed. */
+  private named(accessory: PlatformAccessory, name: string, renamedFrom: string | undefined): void {
+    const ctx = accessory.context as LaundryContext;
+    ctx.applianceName = name;
+    ctx.renamedFrom = renamedFrom;
+    if (!renamedFrom) { return; }
+    // Homebridge's own accessory name (logs, the bridge's list); not in every test double
+    if (accessory.displayName !== name) { (accessory as Partial<Pick<PlatformAccessory, 'updateDisplayName'>>).updateDisplayName?.(name); }
+    this.log.info(`"${renamedFrom}" is now "${name}" (renamed in the ThinQ app): its tiles and sensors take the new name, `
+      + 'except ones renamed in the Home app.');
+  }
+
   /** Names the energy section, so Eve shows "<name> Energy" rather than its internal type name. */
-  private nameEnergyService(svc: Service, name: string): void {
+  private nameEnergyService(svc: Service, name: string, renamedFrom?: string): void {
     const { Characteristic: C } = this.api.hap;
     for (const ch of [C.Name, C.ConfiguredName]) {
       if (!svc.testCharacteristic(ch)) { svc.addOptionalCharacteristic(ch); }
     }
     svc.getCharacteristic(C.Name).updateValue(name);
     const configured = svc.getCharacteristic(C.ConfiguredName);
-    const shown = keepOrUpdate(configured.value, name);
+    const shown = keepOrUpdate(configured.value, name, renamedFrom ? [`${renamedFrom} Energy`] : []);
     if (shown) { configured.updateValue(shown); }
   }
 
