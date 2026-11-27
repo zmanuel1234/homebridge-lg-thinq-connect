@@ -162,7 +162,7 @@ function defineTests(hap: Hap): void {
   const lowerCaseNames: string[] = [];
   const checkNames = (acc: PlatformAccessory, base: string) => {
     for (const s of acc.services.filter((x) => x.UUID !== S.AccessoryInformation.UUID)) {
-      const shown = String(s.getCharacteristic(hap.Characteristic.ConfiguredName).value || s.getCharacteristic(hap.Characteristic.Name).value || '');
+      const shown = (s.getCharacteristic(hap.Characteristic.ConfiguredName).value || s.getCharacteristic(hap.Characteristic.Name).value || '') as string;
       const rest = shown === base ? '' : shown.startsWith(`${base} `) ? shown.slice(base.length + 1) : `(not after "${base}") ${shown}`;
       if (rest.split(' ').some((w) => /^[a-z]/.test(w)) || rest.startsWith('(')) { lowerCaseNames.push(`${acc.displayName}: ${shown}`); }
     }

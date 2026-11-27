@@ -295,10 +295,17 @@ export class ThinQClient {
     }
     const error = field(json, 'error');
     if (status < 200 || status >= 300 || error !== undefined) {
-      throw new ThinQError(status, String(field(error, 'code') ?? ''), String(field(error, 'message') ?? ''));
+      throw new ThinQError(status, asText(field(error, 'code')), asText(field(error, 'message')));
     }
     return field(json, 'response');
   }
+}
+
+/** A value of unknown type as text: strings, numbers and booleans; '' for anything else (never "[object Object]") */
+export function asText(value: unknown): string {
+  if (typeof value === 'string') { return value; }
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') { return String(value); }
+  return '';
 }
 
 /** A property of an object, or undefined when it isn't an object. */

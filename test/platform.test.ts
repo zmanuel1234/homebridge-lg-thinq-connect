@@ -113,7 +113,7 @@ function defineTests(hap: Hap): void {
     assert.ok(!hb.lines.some((l) => l.includes('experimental')), 'washer and dryer are tested types');
     // The serial shown in the Home app is not LG's device ID
     const serial = hb.calls.registered[0].getService(S.AccessoryInformation)!.getCharacteristic(C.SerialNumber).value;
-    assert.match(String(serial), /^[0-9A-F]{12}$/);
+    assert.match(serial as string, /^[0-9A-F]{12}$/);
   });
 
   test('restarting reuses the cached accessories instead of adding new ones', async (t) => {
@@ -153,7 +153,7 @@ function defineTests(hap: Hap): void {
     const cached = hb.calls.registered.splice(0);
     const washer = cached.find((a) => a.context.deviceId === 'device-1')!;
     const named = (sub: string) => washer.services.find((s) => s.subtype === sub)!.getCharacteristic(hap!.Characteristic.ConfiguredName);
-    const old = String(named('done').value);
+    const old = named('done').value as string;
     assert.match(old, / Finished$/);
     named('problem').updateValue('Laundry trouble');
     const alias = hb.lg.devices.find((d) => d.deviceId === 'device-1')!.deviceInfo.alias;

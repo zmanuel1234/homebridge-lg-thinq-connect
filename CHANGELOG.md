@@ -31,6 +31,15 @@
 
 ## 3.0.0 - 2026-11-27
 
+### Breaking
+- Only for `config.json` edited by hand or kept in a backup: its settings have new names
+  (grouped, below); use those from then on.
+- Otherwise nothing to do. Your 2.x settings keep working as they are (the plugin reads both
+  shapes, with the same result), and the settings screen converts them to the groups when you open
+  it: press Save to keep that. A row under Options per appliance with no name (2.x's screen could
+  save one) applied to nothing and is dropped.
+- No tile, sensor, switch or identifier changes: scenes, automations and notifications stay.
+
 ### Changed
 - **Settings, grouped.** `config.json` now keeps them the way the settings screen shows them:
   `general` (allowControl, liveUpdates, energy, sensorType, experimental, extraControls),
@@ -46,14 +55,6 @@
   general setting.
 - **Add my appliances.** After Check token, one button adds a row for every appliance on your LG
   account, with its name and type.
-
-### Migrating from 2.x
-- Nothing to do. Your 2.x settings keep working as they are (the plugin reads both shapes, with
-  the same result), and the settings screen converts them to the groups when you open it: press
-  Save to keep that. A row under Options per appliance with no name (2.x's screen could save one)
-  applied to nothing and is dropped.
-- No tile, sensor, switch or identifier changes: scenes, automations and notifications stay.
-- If you edit `config.json` by hand or keep it in a backup, use the new names from then on.
 
 ## 2.0.3 - 2026-11-27
 
@@ -87,7 +88,7 @@
 One setting for how the Finished, Error and reminder sensors show, and contact sensors by default,
 so iOS's notifications name them. The only change that needs anything from you is below.
 
-### Migration from 1.x
+### Breaking
 - The Finished (was Done), Tub Clean Due, Clean Lint Filter, Check Vent and Rinse Aid Low sensors
   are now **contact sensors** (open = on), like the Error sensor already was, unless you choose
   otherwise. Each is replaced on the first start of 2.0 (the log says which), keeping its name:
