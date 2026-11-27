@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.19 - 2026-11-27
+
+### Added
+- **Done and reminder sensors show as** (setting): occupancy sensors (as before, the default) or
+  contact sensors (open = done / due) for Done, Tub Clean, Lint Filter, Vent Check and Rinse Aid.
+  For occupancy sensors iOS's notifications only say "There is activity in <room>", the same for
+  all of them; contact sensors are named ("Dryer Done opened"). Changing it replaces those sensors:
+  set their notifications and automations again.
+
+### Fixed
+- The Problem sensor stayed on after a machine error was over (the door closed and the cycle
+  cancelled, say), until the next cycle or switching off: LG's "error during washing" alert kept
+  it. It now goes off with the error, and when the machine is back to ready.
+
 ## 1.0.18 - 2026-11-27
 
 ### Added

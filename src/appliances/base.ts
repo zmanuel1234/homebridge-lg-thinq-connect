@@ -43,7 +43,7 @@ export function problemSensor(
   return service(wanted, name, 'problem');
 }
 
-/** Shows a problem (or none) on a problem sensor of either kind. */
+/** Shows a problem (or none) on a problem sensor of either kind; also any on/off sensor of either kind (open/detected = on). */
 export function showProblem(svc: Service, hap: API['hap'], problem: boolean): void {
   const { Characteristic: C, Service: S } = hap;
   if (svc.UUID === S.OccupancySensor.UUID) {

@@ -71,6 +71,12 @@ export interface LaundryOptions {
   doneHoldMinutes?: number;
   /** The problem sensor as an occupancy sensor (detected = a problem) instead of a contact sensor. */
   problemAsOccupancy?: boolean;
+  /**
+   * Done, tub clean, lint filter, vent check and rinse aid as contact sensors (open = on) instead of
+   * occupancy sensors: iOS names a contact sensor in its notification ("Dryer Done opened"), while
+   * for occupancy it only says "There is activity in <room>".
+   */
+  notifyAsContact?: boolean;
   /** The Remote Start sensor (when the machine reports it and control is allowed); default on. */
   remoteStartSensor?: boolean;
 }
@@ -173,7 +179,7 @@ export class LaundryAccessory {
     this.valve.getCharacteristic(C.Active).onSet((value) => this.setActive(value));
     this.valve.getCharacteristic(C.StatusFault);
 
-    this.doneSensor = this.service(S.OccupancySensor, `${name} done`, 'done');
+    this.doneSensor = this.notifySensor(true, `${name} done`, 'done')!;
     this.problemSensor = problemSensor(accessory, deps.api.hap, !!options.problemAsOccupancy,
       (type, n, subtype) => this.service(type as typeof S.Valve, n, subtype), `${name} problem`);
 
@@ -190,23 +196,19 @@ export class LaundryAccessory {
 
     // Dishwasher door and rinse aid, when reported
     this.doorSensor = this.optional(unit.hasDoor, S.ContactSensor, `${name} door`, 'door');
-    this.rinseAidSensor = this.optional(unit.hasRinseAid, S.OccupancySensor, `${name} rinse aid low`, 'rinse-aid');
+    this.rinseAidSensor = this.notifySensor(unit.hasRinseAid, `${name} rinse aid low`, 'rinse-aid');
 
     // Tub-clean reminder: washers that report a cycle count, when the setting is on
-    const tubClean = accessory.getServiceById(S.OccupancySensor, 'tub-clean');
-    if (options.tubCleanAfter > 0 && unit.kind === 'washer' && unit.countsCycles) {
-      this.tubCleanSensor = this.service(S.OccupancySensor, `${name} tub clean`, 'tub-clean');
-    } else if (tubClean) {
-      accessory.removeService(tubClean);
-    }
+    this.tubCleanSensor = this.notifySensor(options.tubCleanAfter > 0 && unit.kind === 'washer' && unit.countsCycles,
+      `${name} tub clean`, 'tub-clean');
 
     // Dryer care: lint filter reminder with its button, and the vent check
     const dryer = unit.kind === 'dryer';
     const lint = dryer && (options.lintFilterAfter ?? 0) > 0;
-    this.lintSensor = this.optional(lint, S.OccupancySensor, `${name} lint filter`, 'lint-filter');
+    this.lintSensor = this.notifySensor(lint, `${name} lint filter`, 'lint-filter');
     this.lintButton = this.optional(lint && !options.lintFilterAutoClear, S.Switch, `${name} lint filter cleaned`, 'lint-filter-cleaned');
     this.lintButton?.getCharacteristic(C.On).onSet((value) => this.lintCleaned(!!value));
-    this.ventSensor = this.optional(dryer && (options.ventCheckPercent ?? 0) > 0, S.OccupancySensor, `${name} vent check`, 'vent-check');
+    this.ventSensor = this.notifySensor(dryer && (options.ventCheckPercent ?? 0) > 0, `${name} vent check`, 'vent-check');
 
     // Remote Start on at the machine: only useful when the Home app may start it
     this.remoteStartSensor = this.optional(unit.reportsRemoteStart && options.allowControl && unit.kind !== 'oven'
@@ -242,6 +244,20 @@ export class LaundryAccessory {
     const old = this.accessory.getServiceById(type, subtype);
     if (old) { this.accessory.removeService(old); }
     return undefined;
+  }
+
+  /**
+   * A sensor to be notified by: an occupancy sensor, or a contact sensor with notifyAsContact (iOS
+   * names those in its notifications). The one of the other kind, from before the setting
+   * changed, is removed, and both when the sensor isn't wanted.
+   */
+  private notifySensor(wanted: boolean, name: string, subtype: string): Service | undefined {
+    const { Service: S } = this.deps.api.hap;
+    const contact = !!this.options.notifyAsContact;
+    const [type, other] = contact ? [S.ContactSensor, S.OccupancySensor] : [S.OccupancySensor, S.ContactSensor];
+    const old = this.accessory.getServiceById(other, subtype);
+    if (old) { this.accessory.removeService(old); }
+    return this.optional(wanted, type as typeof S.Valve, name, subtype);
   }
 
   /** Get or add a service, and keep its name in step with the settings. */
@@ -297,7 +313,12 @@ export class LaundryAccessory {
       }
       this.finishedAlert = false;
       this.problemAlert = '';
-    } else if (next && !next.done && !next.error && prev?.state === 'POWER_OFF') {
+    } else if (next && !next.error && (prev?.error || next.state === 'INITIAL') && this.problemAlert) {
+      // The error is over (the door closed and the cycle cancelled, say, so the machine is back to
+      // ready): LG's alert about it no longer applies either
+      this.problemAlert = '';
+    }
+    if (next && !next.done && !next.error && prev?.state === 'POWER_OFF' && next.state !== 'POWER_OFF') {
       // Switched on again: the next load
       this.clearHold();
     }
@@ -577,30 +598,25 @@ export class LaundryAccessory {
     set(this.valve.getCharacteristic(C.RemainingDuration), Math.min(s?.remaining ?? 0, 86_400));
     set(this.valve.getCharacteristic(C.SetDuration), Math.min(s?.total ?? 0, 86_400));
     set(this.valve.getCharacteristic(C.StatusFault), unreachable || this.problem ? C.StatusFault.GENERAL_FAULT : C.StatusFault.NO_FAULT);
-    set(this.doneSensor.getCharacteristic(C.OccupancyDetected),
-      this.done ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    showProblem(this.doneSensor, this.deps.api.hap, this.done);
     showProblem(this.problemSensor, this.deps.api.hap, this.problem);
     if (this.doorSensor && s?.doorOpen !== undefined) {
       set(this.doorSensor.getCharacteristic(C.ContactSensorState),
         s.doorOpen ? C.ContactSensorState.CONTACT_NOT_DETECTED : C.ContactSensorState.CONTACT_DETECTED);
     }
     if (this.rinseAidSensor && s?.rinseAidLow !== undefined) {
-      set(this.rinseAidSensor.getCharacteristic(C.OccupancyDetected),
-        s.rinseAidLow ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+      showProblem(this.rinseAidSensor, this.deps.api.hap, !!s.rinseAidLow);
     }
     if (this.tubCleanSensor) {
       const due = s?.cycleCount !== undefined && s.cycleCount >= this.options.tubCleanAfter;
-      set(this.tubCleanSensor.getCharacteristic(C.OccupancyDetected),
-        due ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+      showProblem(this.tubCleanSensor, this.deps.api.hap, due);
     }
     if (this.lintSensor) {
       const due = (this.accessory.context.lintDries || 0) >= (this.options.lintFilterAfter ?? 0);
-      set(this.lintSensor.getCharacteristic(C.OccupancyDetected),
-        due ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+      showProblem(this.lintSensor, this.deps.api.hap, due);
     }
     if (this.ventSensor) {
-      set(this.ventSensor.getCharacteristic(C.OccupancyDetected),
-        this.accessory.context.ventBaseline !== undefined ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+      showProblem(this.ventSensor, this.deps.api.hap, this.accessory.context.ventBaseline !== undefined);
     }
     if (this.remoteStartSensor) {
       set(this.remoteStartSensor.getCharacteristic(C.OccupancyDetected),
