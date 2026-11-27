@@ -29,7 +29,7 @@ import { displayName, keepOrUpdate, namedBefore } from './names';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service } from 'homebridge';
 import { type LaundryStatus, type LaundryUnit, operationPayload, ovenStartPayload, stateLabel } from './laundry';
 import { limit, showProblem } from './appliances/base';
-import { COUNTED_DRY_MS, type DryerCareContext, recordDry, usualDryMinutes } from './dryerCare';
+import { COUNTED_DRY_MS, type DryerCareContext, noteEstimate, recordDry, recordOverrun, usualDryMinutes } from './dryerCare';
 
 /**
  * Sensors whose default names changed in 1.0.20, by subtype: their earlier default (before the
@@ -423,6 +423,8 @@ export class LaundryAccessory {
       this.lintAutoClear();
       ctx.runMs = this.untimedDry ? undefined : 0;
       ctx.runSince = undefined;
+      ctx.dryEstimate = undefined;
+      ctx.dryEstimateMax = undefined;
     }
     if (next.running && !ctx.runSince) {
       if (!prev && ctx.runMs === undefined && ctx.dryCountedAt === undefined) {
@@ -433,6 +435,11 @@ export class LaundryAccessory {
     } else if (!next.running && ctx.runSince) {
       ctx.runMs = (ctx.runMs || 0) + now - ctx.runSince;
       ctx.runSince = undefined;
+    }
+    // The estimate (drying so far + time left), for how far the dry runs past it; cooling down isn't drying
+    if (this.unit.kind === 'dryer' && next.running && next.state !== 'COOLING' && next.state !== 'DETECTING'
+      && ctx.runMs !== undefined && !this.untimedDry) {
+      noteEstimate(ctx, ctx.runMs + (ctx.runSince ? now - ctx.runSince : 0), next.remaining);
     }
     if (next.done) { this.dryFinished(next.running); }
     if (!inCycle(next) && !next.done) {
@@ -445,6 +452,8 @@ export class LaundryAccessory {
     const ctx = this.accessory.context;
     ctx.runMs = undefined;
     ctx.runSince = undefined;
+    ctx.dryEstimate = undefined;
+    ctx.dryEstimateMax = undefined;
     this.untimedDry = false;
   }
 
@@ -470,8 +479,18 @@ export class LaundryAccessory {
     // Still cooling down: timed on until it stops
     if (stillRunning || !timed) { this.render(); return; }
     const ms = (ctx.runMs || 0) + (ctx.runSince ? Date.now() - ctx.runSince : 0);
+    const percent = (this.options.ventCheckPercent ?? 0) > 0 ? this.options.ventCheckPercent! : 30;
+    const over = recordOverrun(ctx, ms / 60_000, percent);
     this.forgetDry();
     const minutes = ms / 60_000;
+    if (over) {
+      // Log only for now: how far each dry runs past its first estimate, to judge it on real dries
+      const pct = (n: number) => `${n > 0 ? '+' : ''}${n}%`;
+      this.deps.log.info(`[${name}] Estimate check (log only): dried ${Math.round(minutes)} min, first estimate ${over.estimate} min`
+        + `${over.largest > over.estimate ? `, largest ${over.largest} min` : ''}: ${pct(over.overrun)}. `
+        + `Last ${over.recent.length}: ${over.recent.map(pct).join(', ')}`
+        + ` (would ${over.wouldWarn ? 'turn on' : 'leave off'} Check Vent at ${percent}%).`);
+    }
     const r = recordDry(ctx, minutes, this.ventSensor ? this.options.ventCheckPercent ?? 0 : 0);
     this.deps.log.debug(`[${name}] Dried for ${Math.round(minutes)} min (usual: ${r.usual !== undefined ? `${Math.round(r.usual)} min` : 'not known yet'}).`);
     if (this.ventSensor && r.changed && r.recent !== undefined && r.usual !== undefined) {

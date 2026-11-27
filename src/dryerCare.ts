@@ -22,6 +22,11 @@ export interface DryerCareContext {
   /** Drying time so far of the cycle under way (ms), and since when it has been running. */
   runMs?: number;
   runSince?: number;
+  /** The dry under way: its first estimate (minutes, a few minutes in), and the largest since. */
+  dryEstimate?: number;
+  dryEstimateMax?: number;
+  /** How far recent dries ran past their first estimate (%), oldest first. Log only, for now. */
+  overruns?: number[];
 }
 
 /** Dries shorter than this (minutes) aren't a sign of anything: a short timed dry or a stopped one. */
@@ -31,6 +36,54 @@ export const MIN_DRY_MINUTES = 15;
  * (cool-down after LG's "complete" takes minutes; wrinkle care doesn't count as running).
  */
 export const COUNTED_DRY_MS = 30 * 60_000;
+/**
+ * The first estimate is taken this far into a dry: a sensor dry's figure at the start is a rough
+ * guess the dryer corrects within its first minutes.
+ */
+export const ESTIMATE_AFTER_MS = 5 * 60_000;
+/** Overruns kept. */
+const KEEP_OVERRUNS = 10;
+/** Of the newest OVERRUN_OF dries, this many past the limit would turn the vent check on. */
+const OVERRUN_NEEDED = 2;
+const OVERRUN_OF = 3;
+
+/**
+ * Notes the dry's estimate (drying so far + time left) while it runs: the first one from
+ * ESTIMATE_AFTER_MS in, and the largest one seen (the dryer extending a sensor dry).
+ */
+export function noteEstimate(ctx: DryerCareContext, elapsedMs: number, remainingS: number): void {
+  if (elapsedMs < ESTIMATE_AFTER_MS || remainingS <= 0) { return; }
+  const minutes = Math.round((elapsedMs / 1000 + remainingS) / 60);
+  if (ctx.dryEstimate === undefined) { ctx.dryEstimate = minutes; }
+  ctx.dryEstimateMax = Math.max(ctx.dryEstimateMax ?? 0, minutes);
+}
+
+export interface OverrunResult {
+  /** This dry: % past its first estimate (negative: finished early). */
+  overrun: number;
+  estimate: number;
+  largest: number;
+  /** The newest overruns (up to OVERRUN_OF), oldest first. */
+  recent: number[];
+  /** What the estimate check would show: on when OVERRUN_NEEDED of them are at least `percent` %. */
+  wouldWarn: boolean;
+}
+
+/** Records how far a finished dry ran past its first estimate; undefined when it had none. */
+export function recordOverrun(ctx: DryerCareContext, minutes: number, percent: number): OverrunResult | undefined {
+  const estimate = ctx.dryEstimate;
+  const largest = ctx.dryEstimateMax ?? estimate;
+  ctx.dryEstimate = undefined;
+  ctx.dryEstimateMax = undefined;
+  if (estimate === undefined || estimate <= 0 || minutes < MIN_DRY_MINUTES) { return undefined; }
+  const overrun = Math.round((minutes / estimate - 1) * 100);
+  const list = [...(ctx.overruns || []), overrun].slice(-KEEP_OVERRUNS);
+  ctx.overruns = list;
+  const recent = list.slice(-OVERRUN_OF);
+  const wouldWarn = recent.length >= OVERRUN_NEEDED && recent.filter((o) => o >= percent).length >= OVERRUN_NEEDED;
+  return { overrun, estimate, largest: largest ?? estimate, recent, wouldWarn };
+}
+
 /** Dries kept for the comparison. */
 const KEEP = 20;
 /** The newest dries compared with the usual (their median, so one big load doesn't count). */
