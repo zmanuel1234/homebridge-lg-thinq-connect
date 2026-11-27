@@ -26,13 +26,13 @@ Each washer or dryer shows up as:
 - **The machine** (a valve tile): on while it runs, with the **minutes left** on the tile. While
   paused, it's off and keeps the time left. For the first minute or so of a wash the machine is
   still sensing the load and hasn't worked out the time, so none is shown yet.
-- **"Washer Done"** (occupancy sensor): detected when the cycle finishes. **Turn on
+- **"Washer Finished"** (occupancy sensor): detected when the cycle finishes. **Turn on
   notifications for it** in the Home app (choose "Occupancy Detected") to be told when the laundry
   is ready. Many washers switch themselves off shortly after finishing (the tested one after 30 s); "Done" then stays on, so
   you can see the laundry is waiting, until the machine is next switched on or started, for 2 hours
   at most (setting: *Keep "Done" on after the machine switches itself off*), also across a
   Homebridge restart. A dryer keeps it on through wrinkle care; switching it off there ends it.
-- **"Washer Problem"** (contact sensor): open while the machine reports an error (door, drain,
+- **"Washer Error"** (contact sensor): open while the machine reports an error (door, drain,
   water supply, unbalanced load and so on), or after LG's "drying failed" or "error during
   washing" alert, until the error is over (for example the door closed and the machine back to
   ready), the next cycle starts or the machine is switched off. The machine's tile
@@ -42,23 +42,23 @@ Each washer or dryer shows up as:
 - **Notifications that say which sensor**: for occupancy sensors, iOS's notifications only say
   "There is activity in Utility Room", the same for Done, Tub Clean, Lint Filter and the rest. Set
   *Done and reminder sensors show as* to **Contact sensors** (and *Problem sensors show as* too):
-  iOS then names the sensor ("Dryer Done opened"), so rename the sensors in the Home app to read
-  well, such as "Dryer finished" or "Clean the lint filter". Changing it replaces those sensors: turn
+  iOS then names the sensor ("Dryer Finished opened"; the default names are written to read well
+  in notifications, and you can rename them in the Home app). Changing it replaces those sensors: turn
   their notifications on again.
 - **Phase sensors** (optional): a sensor that's on during a phase you choose, such as
   *Spinning* or *Drying*, for automations like "turn on the fan while the washer spins".
-- **"Washer Tub Clean"** (optional, washers that count their cycles): detected once LG's cycle
+- **"Washer Tub Clean Due"** (optional, washers that count their cycles): detected once LG's cycle
   count reaches the number you set (LG suggests a Tub Clean about every 30 washes). Turn on
   notifications for it as a reminder. The count is LG's own, and starts again after a Tub Clean
   (checked on the tested washer: 23 → 0 at its end; the log says so).
-- **"Dryer Lint Filter"** (optional, dryers): detected after the number of dries you set, with a
+- **"Dryer Clean Lint Filter"** (optional, dryers): detected after the number of dries you set, with a
   **"Dryer Lint Filter Cleaned"** button (a switch that turns itself off) that starts the count
   again. LG's API doesn't report the filter, so the plugin counts the finished dries itself (a dry
   stopped half way doesn't count), and keeps the count across Homebridge restarts. Or, as a simple
   reminder without the button, turn on **Lint filter reminder goes off when the dryer starts
   again**: with the reminder after 1 dry, it comes on after every dry and goes off when you start
   the next one.
-- **"Dryer Vent Check"** (optional, dryers): detected when recent dries take clearly longer than
+- **"Dryer Check Vent"** (optional, dryers): detected when recent dries take clearly longer than
   this dryer usually needs, a common sign of a clogged lint filter or a blocked vent. LG's dryers
   warn about restricted airflow only on their display, not through LG's API, so the plugin times
   each finished dry (pauses and wrinkle care left out) and compares: it learns the usual time from
@@ -66,7 +66,7 @@ Each washer or dryer shows up as:
   (30 % is a good start). One big or wet load doesn't set it off; it goes off again once dries are
   back to usual, for example after the vent is cleaned. It's an estimate, not a reading from the
   dryer, so check the vent when it comes on rather than trusting it blindly.
-- **"Washer Remote Start"** (occupancy sensor, with *Allow starting and pausing* on, for
+- **"Washer Ready To Start"** (occupancy sensor, with *Allow starting and pausing* on, for
   machines that report it; dishwashers and Stylers too): detected while Remote Start is on and the
   machine is waiting to be started, so an automation or a notification can tell you it's ready
   to be started from the Home app. It isn't detected during a cycle, while paused, or after it
@@ -76,7 +76,7 @@ Each washer or dryer shows up as:
 The log also notes LG's cycle count when it goes up, for machines that keep one, and when a Tub
 Clean starts it again. With debug logging on, it notes each dry's time and the usual one.
 
-The names follow your machines' names in the ThinQ app, in title case ("Washer Done"). Renaming a
+The names follow your machines' names in the ThinQ app, in title case ("Washer Finished", "Dryer Clean Lint Filter"). Renaming a
 tile in the Home app is kept.
 
 **Tips for the Home app.** You get one notification per finish. The Home app's notification names

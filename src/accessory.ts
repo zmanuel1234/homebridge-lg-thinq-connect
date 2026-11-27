@@ -31,6 +31,20 @@ import { type LaundryStatus, type LaundryUnit, operationPayload, ovenStartPayloa
 import { limit, problemSensor, showProblem } from './appliances/base';
 import { COUNTED_DRY_MS, type DryerCareContext, recordDry, usualDryMinutes } from './dryerCare';
 
+/**
+ * Sensors whose default names changed in 1.0.20, by subtype: their earlier default (before the
+ * appliance's name is title-cased). A sensor still showing it gets the new name; one renamed in
+ * the Home app keeps its name.
+ */
+const PREVIOUS_NAMES: Record<string, (appliance: string) => string> = {
+  done: (n) => `${n} done`,
+  problem: (n) => `${n} problem`,
+  'tub-clean': (n) => `${n} tub clean`,
+  'lint-filter': (n) => `${n} lint filter`,
+  'vent-check': (n) => `${n} vent check`,
+  'remote-start': (n) => `${n} remote start`,
+};
+
 export interface LaundryContext extends DryerCareContext {
   deviceId?: string;
   location?: string;
@@ -179,9 +193,9 @@ export class LaundryAccessory {
     this.valve.getCharacteristic(C.Active).onSet((value) => this.setActive(value));
     this.valve.getCharacteristic(C.StatusFault);
 
-    this.doneSensor = this.notifySensor(true, `${name} done`, 'done')!;
+    this.doneSensor = this.notifySensor(true, `${name} finished`, 'done')!;
     this.problemSensor = problemSensor(accessory, deps.api.hap, !!options.problemAsOccupancy,
-      (type, n, subtype) => this.service(type as typeof S.Valve, n, subtype), `${name} problem`);
+      (type, n, subtype) => this.service(type as typeof S.Valve, n, subtype), `${name} error`);
 
     // Phase sensors the machine can report; ones no longer wanted are removed
     const phases = options.phaseSensors.filter((p) => unit.states.includes(p));
@@ -200,20 +214,20 @@ export class LaundryAccessory {
 
     // Tub-clean reminder: washers that report a cycle count, when the setting is on
     this.tubCleanSensor = this.notifySensor(options.tubCleanAfter > 0 && unit.kind === 'washer' && unit.countsCycles,
-      `${name} tub clean`, 'tub-clean');
+      `${name} tub clean due`, 'tub-clean');
 
     // Dryer care: lint filter reminder with its button, and the vent check
     const dryer = unit.kind === 'dryer';
     const lint = dryer && (options.lintFilterAfter ?? 0) > 0;
-    this.lintSensor = this.notifySensor(lint, `${name} lint filter`, 'lint-filter');
+    this.lintSensor = this.notifySensor(lint, `${name} clean lint filter`, 'lint-filter');
     this.lintButton = this.optional(lint && !options.lintFilterAutoClear, S.Switch, `${name} lint filter cleaned`, 'lint-filter-cleaned');
     this.lintButton?.getCharacteristic(C.On).onSet((value) => this.lintCleaned(!!value));
-    this.ventSensor = this.notifySensor(dryer && (options.ventCheckPercent ?? 0) > 0, `${name} vent check`, 'vent-check');
+    this.ventSensor = this.notifySensor(dryer && (options.ventCheckPercent ?? 0) > 0, `${name} check vent`, 'vent-check');
 
     // Remote Start on at the machine: only useful when the Home app may start it
     this.remoteStartSensor = this.optional(unit.reportsRemoteStart && options.allowControl && unit.kind !== 'oven'
       && options.remoteStartSensor !== false,
-      S.OccupancySensor, `${name} remote start`, 'remote-start');
+      S.OccupancySensor, `${name} ready to start`, 'remote-start');
 
     // Oven temperature, when the oven accepts one
     this.ovenThermostat = this.optional(!!unit.oven, S.Thermostat, `${name} temperature`, 'oven-temperature');
@@ -264,12 +278,13 @@ export class LaundryAccessory {
   private service(type: typeof Service.Valve, raw: string, subtype: string): Service {
     const { Characteristic: C } = this.deps.api.hap;
     const name = displayName(this.options.name, raw);
+    const before = PREVIOUS_NAMES[subtype];
     const svc = this.accessory.getServiceById(type, subtype) || this.accessory.addService(type, name, subtype);
     svc.setCharacteristic(C.Name, name);
     if (!svc.testCharacteristic(C.ConfiguredName)) { svc.addOptionalCharacteristic(C.ConfiguredName); }
     // Set once: a name changed in the Home app wins after that
     const configured = svc.getCharacteristic(C.ConfiguredName);
-    const shown = keepOrUpdate(configured.value, name);
+    const shown = keepOrUpdate(configured.value, name, before ? [displayName(this.options.name, before(this.options.name))] : []);
     if (shown) { configured.updateValue(shown); }
     return svc;
   }
