@@ -3,9 +3,12 @@
 ## 2.0.2 - 2026-11-27
 
 ### Fixed
-- Settings screen: *Options per appliance* starts empty. It used to show a blank row that was saved
-  with the settings (with its switches as off) even when untouched; such a row has no appliance
-  name, so it never applied to anything, and can be deleted. The list's fields are unchanged.
+- Settings screen: *Options per appliance* no longer saves a blank row you never touched. The
+  screen always shows one row there, and its on/off switches were saved as "off". They're now
+  drop-downs that start at "None" ("Extra switches": the general setting; "Room temperature sensor":
+  not added; "Remote Start sensor": kept), so an untouched row holds nothing and isn't saved.
+  Settings already saved keep working as they are. A saved blank row has no appliance name, so it
+  never applied to anything; it can be deleted.
 
 ## 2.0.1 - 2026-11-27
 
