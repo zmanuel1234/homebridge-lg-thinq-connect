@@ -4,8 +4,10 @@
 
 # homebridge-lg-thinq-connect
 
-[![npm](https://badgen.net/npm/v/homebridge-lg-thinq-connect)](https://www.npmjs.com/package/homebridge-lg-thinq-connect)
-[![license](https://badgen.net/github/license/zmanuel1234/homebridge-lg-thinq-connect)](LICENSE)
+[![npm](https://img.shields.io/npm/v/homebridge-lg-thinq-connect)](https://www.npmjs.com/package/homebridge-lg-thinq-connect)
+[![npm downloads](https://img.shields.io/npm/dt/homebridge-lg-thinq-connect)](https://www.npmjs.com/package/homebridge-lg-thinq-connect)
+[![CI](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/actions/workflows/ci.yml/badge.svg)](https://github.com/zmanuel1234/homebridge-lg-thinq-connect/actions/workflows/ci.yml)
+[![license](https://img.shields.io/github/license/zmanuel1234/homebridge-lg-thinq-connect)](LICENSE)
 [![Sponsor](https://img.shields.io/badge/Sponsor-zmanuel1234-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/zmanuel1234)
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-zmanuel-FFDD00?logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/zmanuel)
 

@@ -2,7 +2,7 @@
   "name": "homebridge-lg-thinq-connect",
   "displayName": "LG ThinQ Connect",
   "version": "3.1.1",
-  "description": "LG ThinQ appliances in Apple Home through LG's official ThinQ Connect API: washer and dryer time left, cycle-done and error alerts, sign-in with a personal access token.",
+  "description": "LG ThinQ appliances in Apple Home through LG's official ThinQ Connect API: washers and dryers (time left, cycle-done and error alerts), air conditioners, dehumidifiers and range hoods; sign-in with a personal access token.",
   "author": "Manuel Zamfir",
   "license": "MIT",
   "homepage": "https://github.com/zmanuel1234/homebridge-lg-thinq-connect#readme",
@@ -58,7 +58,12 @@
     "thinq-connect",
     "washer",
     "dryer",
-    "laundry"
+    "laundry",
+    "air-conditioner",
+    "dehumidifier",
+    "range-hood",
+    "appliances",
+    "smartthinq"
   ],
   "engines": {
     "node": "^22.19.0 || ^24.0.0 || ^26.0.0",
