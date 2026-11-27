@@ -351,14 +351,7 @@
           "key": "appliances",
           "type": "array",
           "buttonText": "Add appliance",
-          "items": [
-            "appliances[].name",
-            "appliances[].extraControls",
-            "appliances[].acModes",
-            "appliances[].acSwing",
-            "appliances[].temperatureSensor",
-            "appliances[].hideRemoteStart"
-          ]
+          "listItems": 0
         },
         {
           "key": "pollInterval",
