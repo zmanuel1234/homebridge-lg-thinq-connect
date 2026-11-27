@@ -46,7 +46,16 @@
     // existing one: start one, or the token and every setting below would be missing
     try {
       const blocks = await homebridge.getPluginConfig();
-      if (!blocks.length) { await homebridge.updatePluginConfig([{ name: 'LG ThinQ' }]); }
+      if (!blocks.length) {
+        await homebridge.updatePluginConfig([{ name: 'LG ThinQ' }]);
+      } else {
+        // Settings from 2.x are flat: shown, and saved, in 3.0's groups (the plugin reads both)
+        const answer = await homebridge.request('/migrate', { config: blocks[0] });
+        if (answer && answer.changed) {
+          config = answer.config;
+          await homebridge.updatePluginConfig([config, ...blocks.slice(1)]);
+        }
+      }
     } catch (e) { /* the form shows what the UI has */ }
     // The form below changes the config before it's saved: always check what's typed now
     homebridge.addEventListener('configChanged', (event) => { config = (event.data && event.data[0]) || {}; });
@@ -57,6 +66,14 @@
       const p = document.createElement('div');
       p.textContent = message;
       result.appendChild(p);
+      if (appliances && appliances.length && ok) {
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'btn btn-outline-primary btn-sm m-0 mt-2';
+        add.textContent = 'Add my appliances to Options per appliance';
+        add.addEventListener('click', () => addAppliances(appliances));
+        result.appendChild(add);
+      }
       if (appliances && appliances.length) {
         const ul = document.createElement('ul');
         ul.className = 'mb-0 mt-2';
@@ -68,6 +85,30 @@
         result.appendChild(ul);
       }
       result.style.display = 'block';
+    }
+
+    // The account's appliances as rows under Advanced -> Options per appliance, each with its type,
+    // so the form shows the options for it; rows already there keep their settings (and get a type)
+    async function addAppliances(appliances) {
+      const rows = (Array.isArray(config.appliances) ? config.appliances : []).filter((r) => r && r.name);
+      const byName = new Map(rows.map((r) => [String(r.name).trim().toLowerCase(), r]));
+      let added = 0;
+      for (const a of appliances) {
+        const row = byName.get(a.name.trim().toLowerCase());
+        if (row) {
+          if (!row.type) { row.type = a.kind; }
+        } else {
+          rows.push({ name: a.name, type: a.kind });
+          added++;
+        }
+      }
+      config.appliances = rows;
+      await homebridge.updatePluginConfig([config]);
+      const note = document.createElement('div');
+      note.className = 'small mt-2';
+      note.textContent = (added ? 'Added ' + added + ' under Advanced \u2192 Options per appliance. ' : 'Already there. ')
+        + 'Each one shows the options for its type; leave one at None to use the general setting. Press Save when you\'re done.';
+      result.appendChild(note);
     }
 
     const diagBox = document.getElementById('lg-diag-box');

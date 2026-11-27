@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.0.0 - 2026-11-27
+
+### Changed
+- **Settings, grouped.** `config.json` now keeps them the way the settings screen shows them:
+  `general` (allowControl, liveUpdates, energy, sensorType, experimental, extraControls),
+  `laundry` (phaseSensors, doneHoldMinutes), `washer` (tubCleanAfter), `dryer` (lintFilterAfter,
+  lintFilterAutoClear, ventCheckPercent) and `polling` (idle, running; were pollInterval and
+  runningPollInterval).
+
+### Added
+- **Everything per appliance.** Under Advanced → Options per appliance, each appliance can have its
+  own sensor type, energy, phase sensors, "Done" hold, Remote Start sensor, starting and pausing,
+  tub clean and lint reminders, and vent check, besides the air conditioner options and extra
+  switches. A row has a type and shows only the options for it; anything left at None uses the
+  general setting.
+- **Add my appliances.** After Check token, one button adds a row for every appliance on your LG
+  account, with its name and type.
+
+### Migrating from 2.x
+- Nothing to do. Your 2.x settings keep working as they are (the plugin reads both shapes, with
+  the same result), and the settings screen converts them to the groups when you open it: press
+  Save to keep that. A row under Options per appliance with no name (2.x's screen could save one)
+  applied to nothing and is dropped.
+- No tile, sensor, switch or identifier changes: scenes, automations and notifications stay.
+- If you edit `config.json` by hand or keep it in a backup, use the new names from then on.
+
 ## 2.0.3 - 2026-11-27
 
 ### Fixed

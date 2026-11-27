@@ -55,6 +55,10 @@ export function showProblem(svc: Service, hap: API['hap'], problem: boolean): vo
 
 /** Options for one appliance, from the "Options per appliance" setting. */
 export interface ApplianceOptions {
+  /** Washers, dryers and other cycle appliances: overrides "Allow starting and pausing". */
+  allowControl?: boolean;
+  /** Overrides the general energy setting for this appliance. */
+  energy?: boolean;
   /** Overrides the global "extra controls" setting for this appliance. */
   extraControls?: boolean;
   /** Air conditioners: the modes on the tile (cooling only, heating only, or all it has). */
@@ -65,6 +69,23 @@ export interface ApplianceOptions {
   temperatureSensor?: boolean;
   /** Washers, dryers and other cycle appliances: leave out the Remote Start sensor. */
   hideRemoteStart?: boolean;
+  /** What it is (from LG's device type), for the options the settings screen shows for it. */
+  type?: string;
+  // The settings below override the general ones for this appliance; unset, the general one applies
+  /** Finished, error and reminder sensors as contact or occupancy sensors. */
+  sensorType?: 'contact' | 'occupancy';
+  /** Washers, dryers and other cycle appliances: phase sensors. */
+  phaseSensors?: string[];
+  /** Minutes "done" stays on after the machine switches itself off. */
+  doneHoldMinutes?: number;
+  /** Washers: LG's cycle count at which the tub-clean reminder turns on; 0 = off. */
+  tubCleanAfter?: number;
+  /** Dryers: dries after which the lint-filter reminder turns on; 0 = off. */
+  lintFilterAfter?: number;
+  /** Dryers: the lint-filter reminder goes off when the next dry starts. */
+  lintFilterAutoClear?: boolean;
+  /** Dryers: % longer than usual for the vent check; 0 = off. */
+  ventCheckPercent?: number;
 }
 
 /** One appliance (or one part of one) in the Home app, kept up to date from LG's state. */

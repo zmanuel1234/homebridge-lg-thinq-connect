@@ -5,6 +5,7 @@ import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { type Device, ThinQClient, ThinQError, clientIdFor } from './api';
 import { alertFor, alertKind, isCycleAppliance, isLaundry, laundryStatus, laundryUnits, mergeState, stateLabel } from './laundry';
 import { keepOrUpdate } from './names';
+import { migrateConfig } from './configShape';
 import { consumptionService, ENERGY_SUBTYPE, mainService, thisMonth, totalConsumption } from './energy';
 import { supportLevel } from './support';
 import { type ApplianceContext, type ApplianceOptions, type Part, categoryOf, mappingFor } from './appliances';
@@ -64,6 +65,20 @@ export interface Settings {
   energy: boolean;
 }
 
+const clamp = (v: unknown, min: number, max: number, fallback: number): number => {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : fallback;
+};
+/** A number within limits, or undefined when it isn't set (a per-appliance setting left at "None"). */
+const maybe = (v: unknown, min: number, max: number): number | undefined =>
+  (v === undefined || v === null || v === '' ? undefined : clamp(v, min, max, min));
+const strings = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string' && !!s.trim()).map((s) => s.trim()) : [];
+const group = (c: Record<string, unknown>, key: string): Record<string, unknown> => {
+  const g = c[key];
+  return g && typeof g === 'object' && !Array.isArray(g) ? g as Record<string, unknown> : {};
+};
+
 /** The "Options per appliance" list: by ThinQ name, only the options this plugin knows. */
 function applianceOptions(v: unknown): Map<string, ApplianceOptions> {
   const out = new Map<string, ApplianceOptions>();
@@ -75,45 +90,57 @@ function applianceOptions(v: unknown): Map<string, ApplianceOptions> {
     // A row without a name (the settings screen used to save a blank one) applies to nothing
     if (!name) { continue; }
     const opts: ApplianceOptions = {};
+    if (typeof o.type === 'string' && o.type) { opts.type = o.type; }
     if (typeof o.extraControls === 'boolean') { opts.extraControls = o.extraControls; }
     if (o.acModes === 'all' || o.acModes === 'cool' || o.acModes === 'heat') { opts.acModes = o.acModes; }
     if (o.acSwing === 'up-down' || o.acSwing === 'left-right' || o.acSwing === 'both') { opts.acSwing = o.acSwing; }
     if (typeof o.temperatureSensor === 'boolean') { opts.temperatureSensor = o.temperatureSensor; }
     if (typeof o.hideRemoteStart === 'boolean') { opts.hideRemoteStart = o.hideRemoteStart; }
+    if (o.sensorType === 'contact' || o.sensorType === 'occupancy') { opts.sensorType = o.sensorType; }
+    if (Array.isArray(o.phaseSensors)) { opts.phaseSensors = strings(o.phaseSensors); }
+    const n = (k: 'doneHoldMinutes' | 'tubCleanAfter' | 'lintFilterAfter' | 'ventCheckPercent', min: number, max: number) => {
+      const x = maybe(o[k], min, max);
+      if (x !== undefined) { opts[k] = x; }
+    };
+    n('doneHoldMinutes', 0, 1440);
+    n('tubCleanAfter', 0, 200);
+    n('lintFilterAfter', 0, 100);
+    n('ventCheckPercent', 0, 200);
+    if (typeof o.lintFilterAutoClear === 'boolean') { opts.lintFilterAutoClear = o.lintFilterAutoClear; }
+    if (typeof o.allowControl === 'boolean') { opts.allowControl = o.allowControl; }
+    if (typeof o.energy === 'boolean') { opts.energy = o.energy; }
     out.set(name, opts);
   }
   return out;
 }
 
-const clamp = (v: unknown, min: number, max: number, fallback: number): number => {
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : fallback;
-};
-const strings = (v: unknown): string[] =>
-  Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string' && !!s.trim()).map((s) => s.trim()) : [];
-
-export function readSettings(config: PlatformConfig): Settings {
+/** The settings, from config.json in either shape (3.0's groups, or 2.x's flat list: see configShape). */
+export function readSettings(raw: PlatformConfig): Settings {
+  const config = migrateConfig(raw as Record<string, unknown>);
+  const general = group(config, 'general');
+  const laundry = group(config, 'laundry');
+  const washer = group(config, 'washer');
+  const dryer = group(config, 'dryer');
+  const polling = group(config, 'polling');
   return {
     token: typeof config.token === 'string' ? config.token.trim() : '',
     country: typeof config.country === 'string' && config.country.trim() ? config.country.trim().toUpperCase() : 'US',
-    pollInterval: clamp(config.pollInterval, 30, 3600, 60),
-    runningPollInterval: clamp(config.runningPollInterval, 15, 600, 30),
-    allowControl: config.allowControl === true,
-    liveUpdates: config.liveUpdates !== false,
-    phaseSensors: strings(config.phaseSensors),
-    tubCleanAfter: clamp(config.tubCleanAfter, 0, 200, 0),
-    lintFilterAfter: clamp(config.lintFilterAfter, 0, 100, 0),
-    lintFilterAutoClear: config.lintFilterAutoClear === true,
-    ventCheckPercent: clamp(config.ventCheckPercent, 0, 200, 0),
-    doneHoldMinutes: clamp(config.doneHoldMinutes, 0, 1440, 120),
-    experimental: config.experimental === true,
-    extraControls: config.extraControls !== false,
-    // "Sensors show as"; before 2.0, "Problem sensors show as" (occupancy was a choice, the
-    // default being contact) carries over when the new setting isn't set
-    sensorsAsOccupancy: (config.sensorType ?? (config.problemSensor === 'occupancy' ? 'occupancy' : 'contact')) === 'occupancy',
+    pollInterval: clamp(polling.idle, 30, 3600, 60),
+    runningPollInterval: clamp(polling.running, 15, 600, 30),
+    allowControl: general.allowControl === true,
+    liveUpdates: general.liveUpdates !== false,
+    phaseSensors: strings(laundry.phaseSensors),
+    tubCleanAfter: clamp(washer.tubCleanAfter, 0, 200, 0),
+    lintFilterAfter: clamp(dryer.lintFilterAfter, 0, 100, 0),
+    lintFilterAutoClear: dryer.lintFilterAutoClear === true,
+    ventCheckPercent: clamp(dryer.ventCheckPercent, 0, 200, 0),
+    doneHoldMinutes: clamp(laundry.doneHoldMinutes, 0, 1440, 120),
+    experimental: general.experimental === true,
+    extraControls: general.extraControls !== false,
+    sensorsAsOccupancy: general.sensorType === 'occupancy',
     ignore: strings(config.ignore).map((s) => s.toLowerCase()),
     appliances: applianceOptions(config.appliances),
-    energy: config.energy !== false,
+    energy: general.energy !== false,
   };
 }
 
@@ -427,6 +454,8 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
     }
 
     const machine: Machine = { device, units: [], parts: [], failures: 0 };
+    // This appliance's own settings, where set; the general ones otherwise
+    const own = this.settings.appliances.get(alias.trim().toLowerCase()) || {};
     for (const unit of units) {
       const name = units.length > 1 ? `${alias} ${stateLabel(unit.location)}` : alias;
       const uuid = this.api.hap.uuid.generate(`${PLUGIN_NAME}:${device.deviceId}:${unit.location}`);
@@ -441,12 +470,15 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       const renamedFrom = this.renamed(accessory, name);
       const serial = createHash('sha256').update(`${device.deviceId}:${unit.location}`).digest('hex').slice(0, 12).toUpperCase();
       const laundry = new LaundryAccessory(this, accessory, unit,
-        { name, model: modelName, serial, allowControl: this.settings.allowControl,
-          phaseSensors: this.settings.phaseSensors, tubCleanAfter: this.settings.tubCleanAfter,
-          lintFilterAfter: this.settings.lintFilterAfter, lintFilterAutoClear: this.settings.lintFilterAutoClear,
-          ventCheckPercent: this.settings.ventCheckPercent,
-          doneHoldMinutes: this.settings.doneHoldMinutes, sensorsAsOccupancy: this.settings.sensorsAsOccupancy,
-          remoteStartSensor: this.settings.appliances.get(alias.trim().toLowerCase())?.hideRemoteStart !== true },
+        { name, model: modelName, serial, allowControl: own.allowControl ?? this.settings.allowControl,
+          phaseSensors: own.phaseSensors ?? this.settings.phaseSensors,
+          tubCleanAfter: own.tubCleanAfter ?? this.settings.tubCleanAfter,
+          lintFilterAfter: own.lintFilterAfter ?? this.settings.lintFilterAfter,
+          lintFilterAutoClear: own.lintFilterAutoClear ?? this.settings.lintFilterAutoClear,
+          ventCheckPercent: own.ventCheckPercent ?? this.settings.ventCheckPercent,
+          doneHoldMinutes: own.doneHoldMinutes ?? this.settings.doneHoldMinutes,
+          sensorsAsOccupancy: own.sensorType ? own.sensorType === 'occupancy' : this.settings.sensorsAsOccupancy,
+          remoteStartSensor: own.hideRemoteStart !== true },
         (payload) => this.client!.control(device.deviceId, payload),
         () => this.schedule(machine, 3));
       machine.units.push(laundry);
@@ -500,8 +532,11 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       send: (payload) => this.client!.control(device.deviceId, payload),
       refreshSoon: () => this.schedule(machine, 3),
       extraControls: this.settings.extraControls,
-      sensorsAsOccupancy: this.settings.sensorsAsOccupancy,
       options: this.settings.appliances.get(alias.trim().toLowerCase()),
+      sensorsAsOccupancy: (() => {
+        const own = this.settings.appliances.get(alias.trim().toLowerCase())?.sensorType;
+        return own ? own === 'occupancy' : this.settings.sensorsAsOccupancy;
+      })(),
     };
     machine.parts.push(mapping.create(ctx, profile));
     this.named(accessory, alias, renamedFrom);
@@ -546,8 +581,9 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
         if (svc) { part.accessory.removeService(svc); }
       }
     };
-    if (!this.settings.energy) { clear(machine.parts); return; }
     const { device } = machine;
+    const own = this.settings.appliances.get(device.deviceInfo.alias.trim().toLowerCase());
+    if (!(own?.energy ?? this.settings.energy)) { clear(machine.parts); return; }
     const retryLater = () => {
       if (this.stopped) { return; }
       machine.energyTimer = setTimeout(() => { this.background(this.setupEnergy(machine), 'Setting up energy use'); }, ENERGY_RETRY * 1000);

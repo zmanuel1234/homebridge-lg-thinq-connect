@@ -1,4 +1,5 @@
 import { ThinQClient, ThinQError, type ClientOptions } from '../api';
+import { kindOf } from '../configShape';
 import { isCycleAppliance, isLaundry } from '../laundry';
 import { MAPPED_TYPES } from '../appliances';
 import { supportLevel } from '../support';
@@ -16,7 +17,7 @@ export interface CheckResult {
   ok: boolean;
   /** One line for the person: what was found, or what went wrong and what to do. */
   message: string;
-  appliances: { name: string; type: string; support: Support }[];
+  appliances: { name: string; type: string; kind: string; support: Support }[];
 }
 
 /** How well this plugin supports an LG appliance type. */
@@ -64,6 +65,7 @@ export async function checkToken(
   const appliances = devices.map((d) => ({
     name: d.deviceInfo.alias || typeName(d.deviceInfo.deviceType),
     type: d.deviceInfo.deviceType,
+    kind: kindOf(d.deviceInfo.deviceType),
     support: supportOf(d.deviceInfo.deviceType),
   }));
   const message = appliances.length
