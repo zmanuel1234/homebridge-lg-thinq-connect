@@ -5,8 +5,8 @@
 ### Fixed
 - Settings screen: *Options per appliance* no longer saves a blank row you never touched. The
   screen always shows one row there, and its on/off switches were saved as "off". They're now
-  drop-downs with a blank default ("Extra switches": blank = the general setting; "Room temperature
-  sensor": blank = none; "Remote Start sensor": blank = kept), so an untouched row holds nothing.
+  drop-downs that start at "None" ("Extra switches": the general setting; "Room temperature sensor":
+  not added; "Remote Start sensor": kept), so an untouched row holds nothing and isn't saved.
   Settings already saved keep working as they are. A saved blank row has no appliance name, so it
   never applied to anything; it can be deleted.
 

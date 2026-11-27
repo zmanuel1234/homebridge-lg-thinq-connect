@@ -229,7 +229,7 @@
                   ]
                 }
               ],
-              "description": "Blank: the general setting above. Or on or off for this appliance only."
+              "description": "None: the general setting above. Or on or off for this appliance only."
             },
             "acModes": {
               "type": "string",
@@ -290,13 +290,13 @@
                   ]
                 },
                 {
-                  "title": "None",
+                  "title": "Don't add it",
                   "enum": [
                     false
                   ]
                 }
               ],
-              "description": "Blank: none. The room temperature as a sensor of its own, for automations."
+              "description": "None: not added. The room temperature as a sensor of its own, for automations."
             },
             "hideRemoteStart": {
               "type": "boolean",
@@ -315,7 +315,7 @@
                   ]
                 }
               ],
-              "description": "Blank: kept. For this appliance only; the others keep theirs."
+              "description": "None: kept. For this appliance only; the others keep theirs."
             }
           }
         }
