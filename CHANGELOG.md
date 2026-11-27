@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.3 - 2026-11-27
+
+### Fixed
+- Settings screen on a new install: it showed only the sign-in steps, with no fields (no token box,
+  no settings), because the Homebridge UI shows the form only for settings that already exist. It
+  now starts them, so everything can be set from the first visit.
+- Settings screen: **Phase sensors** showed a heading with nothing under it, so none could be
+  chosen there. Each phase is now a checkbox: tick to add its sensor, untick to remove it.
+
 ## 2.0.2 - 2026-11-27
 
 ### Fixed

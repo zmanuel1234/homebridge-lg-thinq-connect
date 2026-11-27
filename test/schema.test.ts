@@ -77,6 +77,10 @@ test('settings screen: every setting is in the layout, and intervals are number 
       assert.ok(keys.includes(`${k}[].${sub}`), `${k}[].${sub} missing from the layout`);
     }
   }
+  // A pick-any list of fixed choices (phase sensors) as checkboxes: laid out by its key alone it
+  // gets no "Add" button on the settings screen, so nothing could be chosen
+  const phases = flat.find((i) => typeof i === 'object' && i.key === 'phaseSensors');
+  assert.equal(typeof phases === 'object' && phases.type, 'checkboxes');
   // The settings screen always shows one row in a list that names its fields (it needs that for
   // its "Add" button), and saves it: so nothing in a row may have a value until it's chosen. The
   // on/off options are drop-downs with a blank default rather than checkboxes (saved as false)

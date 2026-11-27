@@ -42,6 +42,12 @@
 
     let config = {};
     try { [config = {}] = await homebridge.getPluginConfig(); } catch (e) { /* new install */ }
+    // A new install has no settings block yet, and the Homebridge UI only shows the form for an
+    // existing one: start one, or the token and every setting below would be missing
+    try {
+      const blocks = await homebridge.getPluginConfig();
+      if (!blocks.length) { await homebridge.updatePluginConfig([{ name: 'LG ThinQ' }]); }
+    } catch (e) { /* the form shows what the UI has */ }
     // The form below changes the config before it's saved: always check what's typed now
     homebridge.addEventListener('configChanged', (event) => { config = (event.data && event.data[0]) || {}; });
 
