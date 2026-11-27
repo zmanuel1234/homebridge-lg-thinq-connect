@@ -64,6 +64,10 @@ Each washer or dryer shows up as:
   (30 % is a good start). One big or wet load doesn't set it off; it goes off again once dries are
   back to usual, for example after the vent is cleaned. It's an estimate, not a reading from the
   dryer, so check the vent when it comes on rather than trusting it blindly.
+  A second check is being tried out, in the log only for now: how far each dry runs past the
+  dryer's own first estimate (taken 5 minutes in), which doesn't depend on the program or load.
+  After each dry the log shows a line starting "Estimate check (log only)"; it doesn't change the
+  sensor yet.
 - **"Washer Ready To Start"** (occupancy sensor, with *Allow starting and pausing* on, for
   machines that report it; dishwashers and Stylers too): detected while Remote Start is on and the
   machine is waiting to be started, so an automation or a notification can tell you it's ready

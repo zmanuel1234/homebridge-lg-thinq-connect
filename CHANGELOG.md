@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.1.1 - 2026-11-27
+
+### Added
+- Dryers, log only for now: how far each dry ran past the dryer's own first estimate (taken 5
+  minutes in), and whether 2 of the latest 3 ran past the vent check's percentage. A sign of a
+  restricted vent that doesn't depend on the program (Normal, Bedding, Towels…) or the load. The
+  "Dryer Check Vent" sensor isn't affected; once it's been checked on real dries, it can count too.
+
 ## 3.1.0 - 2026-11-27
 
 ### Added

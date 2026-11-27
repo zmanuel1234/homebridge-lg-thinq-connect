@@ -591,6 +591,34 @@ function defineTests(hap: Hap): void {
     });
   });
 
+  test('estimate check (log only): how far a dry ran past its first estimate; the Check Vent sensor is left alone', async () => {
+    const { acc, laundry, lines } = dryerSetup({ ventCheckPercent: 30 });
+    await withClock(() => {
+      laundry.update(status({ state: 'INITIAL' }));
+      laundry.update(running({ remaining: 45 * 60 }));
+      mock.timers.tick(6 * 60_000);
+      laundry.update(running({ remaining: 34 * 60 }));
+      mock.timers.tick(20 * 60_000);
+      laundry.update(running({ remaining: 25 * 60 }));
+      mock.timers.tick(21 * 60_000);
+      laundry.update(running({ state: 'COOLING', remaining: 5 * 60 }));
+      mock.timers.tick(5 * 60_000);
+      laundry.update(status({ state: 'END', done: true }));
+      assert.ok(lines.includes('info: [Dryer] Estimate check (log only): dried 52 min, first estimate 40 min, largest 51 min: +30%. '
+        + 'Last 1: +30% (would leave off Check Vent at 30%).'), lines.join('\n'));
+      assert.deepEqual(acc.context.overruns, [30]);
+      assert.equal(acc.context.dryEstimate, undefined);
+      assert.equal(on(laundry.ventSensor!), C.ContactSensorState.CONTACT_DETECTED, 'log only: the sensor stays off');
+      // A dry already under way when Homebridge started has no estimate: nothing logged
+      const again = dryerSetup({ ventCheckPercent: 30 }, acc);
+      again.laundry.update(running({ remaining: 30 * 60 }));
+      mock.timers.tick(40 * 60_000);
+      again.laundry.update(running({ remaining: 10 * 60 }));
+      again.laundry.update(status({ state: 'END', done: true }));
+      assert.equal(again.lines.filter((l) => l.includes('Estimate check')).length, 0);
+    });
+  });
+
   test('vent check: times each dry without its pauses; on when dries get 30 % longer, off when back to usual', async () => {
     const { acc, laundry, lines } = dryerSetup({ ventCheckPercent: 30 });
     await withClock(() => {
