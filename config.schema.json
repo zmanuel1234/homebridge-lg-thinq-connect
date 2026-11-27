@@ -150,6 +150,12 @@
         "maximum": 100,
         "description": "Adds a \"lint filter\" sensor to dryers, on after this many finished dries, and a \"lint filter cleaned\" button that starts the count again (LG's API doesn't report the filter, so the plugin counts the dries). Turn on notifications for the sensor. 0 = no reminder."
       },
+      "lintFilterAutoClear": {
+        "title": "Lint filter reminder goes off when the dryer starts again",
+        "type": "boolean",
+        "default": false,
+        "description": "No \"lint filter cleaned\" button: the reminder goes off by itself when the next dry starts, as a simple reminder. With the reminder after 1 dry, it comes on after every dry."
+      },
       "ventCheckPercent": {
         "title": "Dryer vent check: warn when drying takes longer by (%)",
         "type": "integer",
@@ -311,6 +317,12 @@
     {
       "key": "lintFilterAfter",
       "type": "number"
+    },
+    {
+      "key": "lintFilterAutoClear",
+      "condition": {
+        "functionBody": "return model.lintFilterAfter > 0;"
+      }
     },
     {
       "key": "ventCheckPercent",

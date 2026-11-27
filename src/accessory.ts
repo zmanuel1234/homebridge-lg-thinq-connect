@@ -12,8 +12,9 @@
 //    (as LG counts it) reaches the setting, as a reminder to run Tub Clean;
 //  - dryers, optionally: "<name> lint filter", an occupancy sensor on after the dries you set,
 //    with a "<name> lint filter cleaned" button (a switch that turns itself off) to start counting
-//    again; and "<name> vent check", an occupancy sensor on while recent dries take clearly longer
-//    than usual (a sign of a blocked vent; see dryerCare.ts);
+//    again (or, with lintFilterAutoClear, no button: it goes off when the next dry starts); and
+//    "<name> vent check", an occupancy sensor on while recent dries take clearly longer than usual
+//    (a sign of a blocked vent; see dryerCare.ts);
 //  - "<name> remote start", an occupancy sensor: on while Remote Start is on and the machine waits to
 //    be started, for a notification or an automation that starts it (machines that report it, when
 //    control is allowed);
@@ -62,6 +63,8 @@ export interface LaundryOptions {
   tubCleanAfter: number;
   /** Dryers: dries after which the lint-filter reminder turns on; 0 = no reminder. */
   lintFilterAfter?: number;
+  /** Dryers: the lint-filter reminder goes off when the next dry starts, instead of with a button. */
+  lintFilterAutoClear?: boolean;
   /** Dryers: how much longer (%) recent dries must take than usual for the vent check; 0 = off. */
   ventCheckPercent?: number;
   /** Minutes "done" stays on after the machine switches itself off straight from finished (default 120). */
@@ -201,7 +204,7 @@ export class LaundryAccessory {
     const dryer = unit.kind === 'dryer';
     const lint = dryer && (options.lintFilterAfter ?? 0) > 0;
     this.lintSensor = this.optional(lint, S.OccupancySensor, `${name} lint filter`, 'lint-filter');
-    this.lintButton = this.optional(lint, S.Switch, `${name} lint filter cleaned`, 'lint-filter-cleaned');
+    this.lintButton = this.optional(lint && !options.lintFilterAutoClear, S.Switch, `${name} lint filter cleaned`, 'lint-filter-cleaned');
     this.lintButton?.getCharacteristic(C.On).onSet((value) => this.lintCleaned(!!value));
     this.ventSensor = this.optional(dryer && (options.ventCheckPercent ?? 0) > 0, S.OccupancySensor, `${name} vent check`, 'vent-check');
 
@@ -360,6 +363,7 @@ export class LaundryAccessory {
       // was kept about the last one no longer applies. One already running at a restart is untimed.
       ctx.dryCountedAt = undefined;
       this.untimedDry = !prev;
+      this.lintAutoClear();
       ctx.runMs = this.untimedDry ? undefined : 0;
       ctx.runSince = undefined;
     }
@@ -422,6 +426,15 @@ export class LaundryAccessory {
       }
     }
     this.render();
+  }
+
+  /** With the reminder clearing itself: a new dry after the reminder came on means the filter was seen to. */
+  private lintAutoClear(): void {
+    const after = this.options.lintFilterAfter ?? 0;
+    const ctx = this.accessory.context;
+    if (!this.lintSensor || !this.options.lintFilterAutoClear || after <= 0 || (ctx.lintDries || 0) < after) { return; }
+    ctx.lintDries = 0;
+    this.deps.log.info(`[${this.options.name}] Lint filter reminder off: the dryer started again.`);
   }
 
   /** The "lint filter cleaned" button: counting starts again, and the button turns itself off. */

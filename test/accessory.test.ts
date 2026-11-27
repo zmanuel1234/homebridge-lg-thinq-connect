@@ -603,6 +603,40 @@ function defineTests(hap: Hap): void {
     });
   });
 
+  test('lint filter clearing itself: no button; on after the dries set, off when the next dry starts', async () => {
+    const { acc, laundry, lines } = dryerSetup({ lintFilterAfter: 1, lintFilterAutoClear: true });
+    assert.equal(laundry.lintButton, undefined);
+    assert.equal(acc.getServiceById(S.Switch, 'lint-filter-cleaned'), undefined);
+    await withClock(() => {
+      dry(laundry, 50);
+      assert.equal(detected(laundry.lintSensor), true, 'after every dry');
+      assert.ok(lines.includes('info: [Dryer] Time to clean the lint filter: 1 dry since it was last cleaned.'));
+      // Opening the door, pressing buttons: not a new dry yet
+      laundry.update(status({ state: 'INITIAL' }));
+      assert.equal(detected(laundry.lintSensor), true);
+      laundry.update(running());
+      assert.equal(detected(laundry.lintSensor), false, 'the next dry started');
+      assert.ok(lines.includes('info: [Dryer] Lint filter reminder off: the dryer started again.'));
+      mock.timers.tick(50 * 60_000);
+      laundry.update(status({ state: 'END', done: true }));
+      assert.equal(detected(laundry.lintSensor), true, 'and on again after it');
+    });
+    // With more dries set, starting the dryer before the reminder doesn't reset the count
+    const three = dryerSetup({ lintFilterAfter: 3, lintFilterAutoClear: true });
+    await withClock(() => {
+      dry(three.laundry, 50);
+      dry(three.laundry, 50);
+      assert.equal(three.acc.context.lintDries, 2);
+      dry(three.laundry, 50);
+      assert.equal(detected(three.laundry.lintSensor), true);
+      three.laundry.update(running());
+      assert.equal(three.acc.context.lintDries, 0);
+    });
+    // Turning it off brings the button back
+    const back = dryerSetup({ lintFilterAfter: 1 }, acc);
+    assert.ok(back.laundry.lintButton);
+  });
+
   test('lint filter: LG\'s "drying complete" during cool-down and then END count as one dry, also across a restart', async () => {
     const { acc, laundry } = dryerSetup({ lintFilterAfter: 5, ventCheckPercent: 30 });
     await withClock(() => {
