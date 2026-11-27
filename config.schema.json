@@ -215,7 +215,21 @@
             "extraControls": {
               "type": "boolean",
               "title": "Extra switches",
-              "description": "Overrides the setting above for this appliance."
+              "oneOf": [
+                {
+                  "title": "On",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "title": "Off",
+                  "enum": [
+                    false
+                  ]
+                }
+              ],
+              "description": "Blank: the general setting above. Or on or off for this appliance only."
             },
             "acModes": {
               "type": "string",
@@ -268,12 +282,40 @@
             "temperatureSensor": {
               "type": "boolean",
               "title": "Air conditioner: room temperature sensor",
-              "description": "The room temperature as a sensor of its own, for automations."
+              "oneOf": [
+                {
+                  "title": "Add it",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "title": "None",
+                  "enum": [
+                    false
+                  ]
+                }
+              ],
+              "description": "Blank: none. The room temperature as a sensor of its own, for automations."
             },
             "hideRemoteStart": {
               "type": "boolean",
-              "title": "Washer, dryer: leave out the Remote Start sensor",
-              "description": "For this appliance only; the others keep theirs."
+              "title": "Washer, dryer: Remote Start sensor",
+              "oneOf": [
+                {
+                  "title": "Leave it out",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "title": "Keep it",
+                  "enum": [
+                    false
+                  ]
+                }
+              ],
+              "description": "Blank: kept. For this appliance only; the others keep theirs."
             }
           }
         }
@@ -351,7 +393,23 @@
           "key": "appliances",
           "type": "array",
           "buttonText": "Add appliance",
-          "listItems": 0
+          "items": [
+            "appliances[].name",
+            {
+              "key": "appliances[].extraControls",
+              "type": "select"
+            },
+            "appliances[].acModes",
+            "appliances[].acSwing",
+            {
+              "key": "appliances[].temperatureSensor",
+              "type": "select"
+            },
+            {
+              "key": "appliances[].hideRemoteStart",
+              "type": "select"
+            }
+          ]
         },
         {
           "key": "pollInterval",

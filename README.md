@@ -300,15 +300,16 @@ tiles show. LG's API can't choose wash programs on any appliance.
 ### Options per appliance
 
 Under **Advanced → Options per appliance**, add an appliance by its name exactly as in the ThinQ
-app, then choose:
+app, then choose (left blank, an option keeps its usual behaviour; the screen shows one empty row,
+which is saved only once you fill it in):
 
 | Option | For | What it does |
 |---|---|---|
-| Extra switches | Any | Overrides the "Extra switches" setting for this one |
+| Extra switches | Any | On or off for this one; blank: the "Extra switches" setting |
 | Modes on the tile | Air conditioner | All it has, cooling only, or heating only (for a unit used one way) |
 | The tile's swing moves | Air conditioner | Up and down (default), left and right, or both; the other direction gets a switch |
-| Room temperature sensor | Air conditioner | The room temperature as a sensor of its own, for automations |
-| Leave out the Remote Start sensor | Washer, dryer (and other cycle appliances) | No Remote Start sensor for this one; the others keep theirs |
+| Room temperature sensor | Air conditioner | Add it: the room temperature as a sensor of its own, for automations; blank: none |
+| Remote Start sensor | Washer, dryer (and other cycle appliances) | Leave it out for this one (the others keep theirs); blank: kept |
 
 ### Energy use
 

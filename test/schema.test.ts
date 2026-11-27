@@ -77,11 +77,18 @@ test('settings screen: every setting is in the layout, and intervals are number 
       assert.ok(keys.includes(`${k}[].${sub}`), `${k}[].${sub} missing from the layout`);
     }
   }
-  // Options per appliance starts empty: a list that names its fields always shows one blank row,
-  // which the settings screen then saves (with its checkboxes as false)
-  const appliances = flat.find((i) => typeof i === 'object' && i.key === 'appliances') as LayoutItem & { listItems?: number };
-  assert.equal(typeof appliances === 'object' && appliances.items, undefined, 'laid out by its key alone');
-  assert.equal(typeof appliances === 'object' && appliances.listItems, 0);
+  // The settings screen always shows one row in a list that names its fields (it needs that for
+  // its "Add" button), and saves it: so nothing in a row may have a value until it's chosen. The
+  // on/off options are drop-downs with a blank default rather than checkboxes (saved as false)
+  const items = (props.appliances as { items: { properties: Record<string, { type?: string; default?: unknown; oneOf?: unknown[] }> } }).items.properties;
+  for (const [k, p] of Object.entries(items)) {
+    assert.equal(p.default, undefined, `appliances[].${k}: no default`);
+    if (p.type === 'boolean') {
+      assert.equal(p.oneOf?.length, 2, `appliances[].${k}: a choice of true or false`);
+      const entry = flat.find((i) => typeof i === 'object' && i.key === `appliances[].${k}`);
+      assert.equal(typeof entry === 'object' && entry.type, 'select', `appliances[].${k}: a drop-down, not a checkbox`);
+    }
+  }
   for (const k of ['pollInterval', 'runningPollInterval', 'tubCleanAfter', 'lintFilterAfter', 'ventCheckPercent']) {
     const item = flat.find((i) => typeof i === 'object' && i.key === k);
     assert.ok(typeof item === 'object' && item.type === 'number', `${k} should be a number box`);
