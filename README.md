@@ -26,9 +26,9 @@ Each washer or dryer shows up as:
 - **The machine** (a valve tile): on while it runs, with the **minutes left** on the tile. While
   paused, it's off and keeps the time left. For the first minute or so of a wash the machine is
   still sensing the load and hasn't worked out the time, so none is shown yet.
-- **"Washer Finished"** (occupancy sensor): detected when the cycle finishes. **Turn on
-  notifications for it** in the Home app (choose "Occupancy Detected") to be told when the laundry
-  is ready. Many washers switch themselves off shortly after finishing (the tested one after 30 s); "Done" then stays on, so
+- **"Washer Finished"** (contact sensor): open when the cycle finishes. **Turn on
+  notifications for it** in the Home app (choose "Opened") to be told when the laundry is ready.
+  iOS names it in the notification ("Washer Finished opened"). Many washers switch themselves off shortly after finishing (the tested one after 30 s); "Done" then stays on, so
   you can see the laundry is waiting, until the machine is next switched on or started, for 2 hours
   at most (setting: *Keep "Done" on after the machine switches itself off*), also across a
   Homebridge restart. A dryer keeps it on through wrinkle care; switching it off there ends it.
@@ -36,29 +36,27 @@ Each washer or dryer shows up as:
   water supply, unbalanced load and so on), or after LG's "drying failed" or "error during
   washing" alert, until the error is over (for example the door closed and the machine back to
   ready), the next cycle starts or the machine is switched off. The machine's tile
-  also shows a fault. In Eve a contact sensor reads backwards ("Contact: Yes" means closed: no
-  problem); the setting *Problem sensors show as* can make it an occupancy sensor instead
-  ("Detected" = a problem), like the other sensors.
-- **Notifications that say which sensor**: for occupancy sensors, iOS's notifications only say
-  "There is activity in Utility Room", the same for Done, Tub Clean, Lint Filter and the rest. Set
-  *Done and reminder sensors show as* to **Contact sensors** (and *Problem sensors show as* too):
-  iOS then names the sensor ("Dryer Finished opened"; the default names are written to read well
-  in notifications, and you can rename them in the Home app). Changing it replaces those sensors: turn
-  their notifications on again.
+  also shows a fault.
+- **Contact or occupancy sensors**: the Finished, Error and reminder sensors (below) are contact
+  sensors, open = on, because iOS names those in its notifications. For occupancy sensors it only
+  says "There is activity in Utility Room", the same for each. In Eve a contact sensor reads
+  backwards ("Contact: No" = open = finished, an error or due); if you mostly look at them in Eve,
+  set *Sensors show as* to occupancy sensors ("Detected"). Changing it replaces these sensors: turn
+  their notifications on again, and check automations that used them.
 - **Phase sensors** (optional): a sensor that's on during a phase you choose, such as
   *Spinning* or *Drying*, for automations like "turn on the fan while the washer spins".
-- **"Washer Tub Clean Due"** (optional, washers that count their cycles): detected once LG's cycle
+- **"Washer Tub Clean Due"** (optional, washers that count their cycles): on once LG's cycle
   count reaches the number you set (LG suggests a Tub Clean about every 30 washes). Turn on
   notifications for it as a reminder. The count is LG's own, and starts again after a Tub Clean
   (checked on the tested washer: 23 → 0 at its end; the log says so).
-- **"Dryer Clean Lint Filter"** (optional, dryers): detected after the number of dries you set, with a
+- **"Dryer Clean Lint Filter"** (optional, dryers): on after the number of dries you set, with a
   **"Dryer Lint Filter Cleaned"** button (a switch that turns itself off) that starts the count
   again. LG's API doesn't report the filter, so the plugin counts the finished dries itself (a dry
   stopped half way doesn't count), and keeps the count across Homebridge restarts. Or, as a simple
   reminder without the button, turn on **Lint filter reminder goes off when the dryer starts
   again**: with the reminder after 1 dry, it comes on after every dry and goes off when you start
   the next one.
-- **"Dryer Check Vent"** (optional, dryers): detected when recent dries take clearly longer than
+- **"Dryer Check Vent"** (optional, dryers): on when recent dries take clearly longer than
   this dryer usually needs, a common sign of a clogged lint filter or a blocked vent. LG's dryers
   warn about restricted airflow only on their display, not through LG's API, so the plugin times
   each finished dry (pauses and wrinkle care left out) and compares: it learns the usual time from
@@ -188,8 +186,7 @@ What LG's error codes in the log mean:
 | Lint filter reminder goes off when the dryer starts again | Off | No "cleaned" button: the reminder goes off when the next dry starts |
 | Dryer vent check | 0 (off) | How much longer (%) recent dries must take than usual for the vent check sensor; 30 is a good start |
 | Keep "Done" on after the machine switches itself off | 120 min | How long at most "Done" stays on after a machine switches itself off straight from finished (until it's next switched on or started); 0 = off together with the machine |
-| Done and reminder sensors show as | Occupancy sensors | Occupancy or contact sensors (open = done / due) for Done, Tub Clean, Lint Filter, Vent Check and Rinse Aid; contact sensors are named in iOS's notifications. Changing it replaces those sensors: set their notifications and automations again |
-| Problem sensors show as | Contact sensors | Contact sensors (open = a problem) or occupancy sensors (detected = a problem, like the Done sensors). Changing it replaces each Problem sensor: set its notifications and automations again |
+| Sensors show as | Contact sensors | Contact sensors (open = on; named in iOS's notifications) or occupancy sensors (detected = on; read better in Eve) for the Finished, Error and reminder sensors. Changing it replaces them: set their notifications and automations again |
 | Leave out these appliances | None | Names, as in the ThinQ app, to keep out of the Home app |
 | Options per appliance | None | Air conditioner modes, swing direction and room sensor, and extra switches, for one appliance (see [Options per appliance](#options-per-appliance)) |
 | Check every (idle) | 60 s | How often to ask LG while nothing runs (at least 10 min while live updates work) |
@@ -352,7 +349,7 @@ run into most.
 
 | What you see | What to do |
 |---|---|
-| Every notification says "There is activity in <room>" | Set *Done and reminder sensors show as* to Contact sensors, so iOS names the sensor; then turn their notifications on again |
+| Every notification says "There is activity in <room>" | Those are occupancy sensors: set *Sensors show as* to Contact sensors (the default since 2.0), so iOS names the sensor; then turn their notifications on again |
 | "LG error 1103", "1218" or "1302" (often with HTTP 401) | The token isn't valid: create a new one, with every permission ticked (see [Signing in](#signing-in)) |
 | No appliances found, or not all of them | The token is on a different LG account than the ThinQ app's: sign in to the token page with the QR code. Check the country |
 | "LG error 1307 / 1309" | The country doesn't match the LG account: set the one the account was created in |
@@ -388,12 +385,15 @@ only copies it to your clipboard. Look it over before pasting. Never paste your 
 
 ## Updates and compatibility
 
-Your scenes and automations are built on the tiles and sensors this plugin adds, so from 1.0 on:
+Your scenes and automations are built on the tiles and sensors this plugin adds, so within a
+major version (now 2.x):
 
-- **1.x updates never rename or remove** a tile, sensor or switch, or a setting. They may add new
-  ones (often off by default, or behind a setting).
-- Anything that would break that waits for a **2.0**, with a migration note in the CHANGELOG.
-- **Betas** (versions like `1.1.0-beta.1`) are published under npm's `beta` tag, so you only get
+- **Updates never rename or remove** a tile, sensor or switch, or a setting. They may add new ones
+  (often off by default, or behind a setting).
+- Anything that would break that waits for the next major version (**3.0**), with a migration
+  note in the CHANGELOG. 2.0's is there: the Finished, Error and reminder sensors became contact
+  sensors, under one setting.
+- **Betas** (versions like `2.1.0-beta.1`) are published under npm's `beta` tag, so you only get
   them if you ask for them; the Homebridge UI's normal update installs stable versions only.
 
 The plugin's tests hold every appliance's tiles and settings to a recorded list

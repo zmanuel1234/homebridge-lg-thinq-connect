@@ -51,9 +51,11 @@ export interface Settings {
   /** Extra switches for experimental appliances (air conditioner modes, purifier sleep mode…). */
   extraControls: boolean;
   /** Problem sensors as occupancy sensors instead of contact sensors. */
-  problemAsOccupancy: boolean;
-  /** Done and reminder sensors as contact sensors, so iOS names them in notifications. */
-  notifyAsContact: boolean;
+  /**
+   * Finished, error and reminder sensors as occupancy sensors instead of contact sensors (the
+   * default since 2.0, as iOS names contact sensors in its notifications).
+   */
+  sensorsAsOccupancy: boolean;
   /** Appliance names (as in the ThinQ app) to leave out of the Home app. */
   ignore: string[];
   /** Options for single appliances, by name as in the ThinQ app (lower case). */
@@ -105,8 +107,9 @@ export function readSettings(config: PlatformConfig): Settings {
     doneHoldMinutes: clamp(config.doneHoldMinutes, 0, 1440, 120),
     experimental: config.experimental === true,
     extraControls: config.extraControls !== false,
-    problemAsOccupancy: config.problemSensor === 'occupancy',
-    notifyAsContact: config.notificationSensors === 'contact',
+    // "Sensors show as"; before 2.0, "Problem sensors show as" (occupancy was a choice, the
+    // default being contact) carries over when the new setting isn't set
+    sensorsAsOccupancy: (config.sensorType ?? (config.problemSensor === 'occupancy' ? 'occupancy' : 'contact')) === 'occupancy',
     ignore: strings(config.ignore).map((s) => s.toLowerCase()),
     appliances: applianceOptions(config.appliances),
     energy: config.energy !== false,
@@ -440,8 +443,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
           phaseSensors: this.settings.phaseSensors, tubCleanAfter: this.settings.tubCleanAfter,
           lintFilterAfter: this.settings.lintFilterAfter, lintFilterAutoClear: this.settings.lintFilterAutoClear,
           ventCheckPercent: this.settings.ventCheckPercent,
-          doneHoldMinutes: this.settings.doneHoldMinutes, problemAsOccupancy: this.settings.problemAsOccupancy,
-          notifyAsContact: this.settings.notifyAsContact,
+          doneHoldMinutes: this.settings.doneHoldMinutes, sensorsAsOccupancy: this.settings.sensorsAsOccupancy,
           remoteStartSensor: this.settings.appliances.get(alias.trim().toLowerCase())?.hideRemoteStart !== true },
         (payload) => this.client!.control(device.deviceId, payload),
         () => this.schedule(machine, 3));
@@ -494,7 +496,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
       send: (payload) => this.client!.control(device.deviceId, payload),
       refreshSoon: () => this.schedule(machine, 3),
       extraControls: this.settings.extraControls,
-      problemAsOccupancy: this.settings.problemAsOccupancy,
+      sensorsAsOccupancy: this.settings.sensorsAsOccupancy,
       options: this.settings.appliances.get(alias.trim().toLowerCase()),
     };
     machine.parts.push(mapping.create(ctx, profile));

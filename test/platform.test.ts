@@ -28,15 +28,24 @@ try {
 
 test('settings: defaults, limits and clean-up', () => {
   const s = readSettings({ platform: 'LGThinQConnect' } as PlatformConfig);
-  assert.deepEqual(s, { token: '', country: 'US', pollInterval: 60, runningPollInterval: 30, allowControl: false, liveUpdates: true, phaseSensors: [], tubCleanAfter: 0, lintFilterAfter: 0, lintFilterAutoClear: false, ventCheckPercent: 0, doneHoldMinutes: 120, experimental: false, extraControls: true, problemAsOccupancy: false, notifyAsContact: false, ignore: [], appliances: new Map(), energy: true });
+  assert.deepEqual(s, { token: '', country: 'US', pollInterval: 60, runningPollInterval: 30, allowControl: false, liveUpdates: true, phaseSensors: [], tubCleanAfter: 0, lintFilterAfter: 0, lintFilterAutoClear: false, ventCheckPercent: 0, doneHoldMinutes: 120, experimental: false, extraControls: true, sensorsAsOccupancy: false, ignore: [], appliances: new Map(), energy: true });
   const t = readSettings({
     platform: 'LGThinQConnect', token: ' abc ', country: 'gb', pollInterval: 5, runningPollInterval: '9999',
-    allowControl: 'yes', liveUpdates: false, phaseSensors: ['SPINNING', '', 3], tubCleanAfter: 500, lintFilterAfter: 500, lintFilterAutoClear: 'yes', ventCheckPercent: -5, doneHoldMinutes: 99999, experimental: 'yes', extraControls: false, problemSensor: 'occupancy', notificationSensors: 'contact', ignore: [' Dryer '], energy: false,
+    allowControl: 'yes', liveUpdates: false, phaseSensors: ['SPINNING', '', 3], tubCleanAfter: 500, lintFilterAfter: 500, lintFilterAutoClear: 'yes', ventCheckPercent: -5, doneHoldMinutes: 99999, experimental: 'yes', extraControls: false, sensorType: 'occupancy', problemSensor: 'contact', ignore: [' Dryer '], energy: false,
     appliances: [{ name: ' Living Room AC ', acModes: 'cool', acSwing: 'both', temperatureSensor: true, extraControls: false, hideRemoteStart: true, odd: 1 },
       { name: '', acModes: 'cool' }, { name: 'Purifier', acModes: 'sideways', acSwing: 7 }, 'junk'],
   } as unknown as PlatformConfig);
-  assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, liveUpdates: false, phaseSensors: ['SPINNING'], tubCleanAfter: 200, lintFilterAfter: 100, lintFilterAutoClear: false, ventCheckPercent: 0, doneHoldMinutes: 1440, experimental: false, extraControls: false, problemAsOccupancy: true, notifyAsContact: true, ignore: ['dryer'], energy: false,
+  assert.deepEqual(t, { token: 'abc', country: 'GB', pollInterval: 30, runningPollInterval: 600, allowControl: false, liveUpdates: false, phaseSensors: ['SPINNING'], tubCleanAfter: 200, lintFilterAfter: 100, lintFilterAutoClear: false, ventCheckPercent: 0, doneHoldMinutes: 1440, experimental: false, extraControls: false, sensorsAsOccupancy: true, ignore: ['dryer'], energy: false,
     appliances: new Map([['living room ac', { acModes: 'cool', acSwing: 'both', temperatureSensor: true, extraControls: false, hideRemoteStart: true }], ['purifier', {}]]) });
+});
+
+test('settings: "Sensors show as" is contact by default; an earlier "Problem sensors show as: Occupancy" carries over', () => {
+  const read = (c: Record<string, unknown>) => readSettings({ platform: 'LGThinQConnect', ...c } as PlatformConfig).sensorsAsOccupancy;
+  assert.equal(read({}), false);
+  assert.equal(read({ problemSensor: 'contact', notificationSensors: 'occupancy' }), false, 'the old defaults, as the settings screen saved them');
+  assert.equal(read({ problemSensor: 'occupancy' }), true, 'occupancy chosen before');
+  assert.equal(read({ problemSensor: 'occupancy', sensorType: 'contact' }), false, 'the new setting wins');
+  assert.equal(read({ sensorType: 'occupancy' }), true);
 });
 
 if (!hap) {
@@ -328,7 +337,7 @@ function defineTests(hap: Hap): void {
     assert.equal(acc.valve.getCharacteristic(C.InUse).value, C.InUse.IN_USE);
     set('END', 0);
     await platform.poll(machine);
-    assert.equal(acc.doneSensor.getCharacteristic(C.OccupancyDetected).value, C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(acc.doneSensor.getCharacteristic(C.ContactSensorState).value, C.ContactSensorState.CONTACT_NOT_DETECTED, 'open: finished');
   });
 
   test('options per appliance: the Remote Start sensor left out for one machine, kept for the other', async (t) => {
@@ -404,7 +413,7 @@ function defineTests(hap: Hap): void {
     assert.equal(dryer.problemSensor.getCharacteristic(C.ContactSensorState).value, C.ContactSensorState.CONTACT_NOT_DETECTED);
     broker.publish(topic, { deviceId: 'device-2', pushType: 'DEVICE_PUSH', pushCode: 'DRYING_IS_COMPLETE' });
     await until(() => dryer.done);
-    assert.equal(dryer.doneSensor.getCharacteristic(C.OccupancyDetected).value, C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(dryer.doneSensor.getCharacteristic(C.ContactSensorState).value, C.ContactSensorState.CONTACT_NOT_DETECTED, 'open: finished');
     assert.ok(hb.lines.includes('warn: [Dryer] LG alert: Drying failed.'));
     // Unknown appliances and types are ignored quietly
     // An alert for one of two drums of the same kind goes to the one in use

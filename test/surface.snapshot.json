@@ -141,90 +141,90 @@
     "TemperatureSensor/temp-temperature: Configured Name, Current Temperature, Name"
   ],
   "ours DEVICE_WASHER MAIN": [
+    "ContactSensor/done: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
-    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
+    "ContactSensor/tub-clean: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
-    "OccupancySensor/tub-clean: Configured Name, Name, Occupancy Detected",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "ours DEVICE_DRYER": [
+    "ContactSensor/done: Configured Name, Contact Sensor State, Name",
+    "ContactSensor/lint-filter: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
-    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
-    "OccupancySensor/lint-filter: Configured Name, Name, Occupancy Detected",
+    "ContactSensor/vent-check: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
-    "OccupancySensor/vent-check: Configured Name, Name, Occupancy Detected",
     "Switch/lint-filter-cleaned: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "ha washtower_dryer": [
+    "ContactSensor/done: Configured Name, Contact Sensor State, Name",
+    "ContactSensor/lint-filter: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
-    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
-    "OccupancySensor/lint-filter: Configured Name, Name, Occupancy Detected",
+    "ContactSensor/vent-check: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
-    "OccupancySensor/vent-check: Configured Name, Name, Occupancy Detected",
     "Switch/lint-filter-cleaned: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "washtower (one device) WASHER": [
+    "ContactSensor/done: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
-    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "washtower (one device) DRYER": [
+    "ContactSensor/done: Configured Name, Contact Sensor State, Name",
+    "ContactSensor/lint-filter: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
-    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
-    "OccupancySensor/lint-filter: Configured Name, Name, Occupancy Detected",
+    "ContactSensor/vent-check: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
-    "OccupancySensor/vent-check: Configured Name, Name, Occupancy Detected",
     "Switch/lint-filter-cleaned: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "washtower washer MAIN": [
+    "ContactSensor/done: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
-    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "washcombo main MAIN": [
+    "ContactSensor/done: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
-    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "washcombo mini MAIN": [
+    "ContactSensor/done: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
-    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "styler": [
+    "ContactSensor/done: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
-    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "dishwasher": [
+    "ContactSensor/done: Configured Name, Contact Sensor State, Name",
     "ContactSensor/door: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
-    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
-    "OccupancySensor/rinse-aid: Configured Name, Name, Occupancy Detected",
+    "ContactSensor/rinse-aid: Configured Name, Contact Sensor State, Name",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "oven (two cavities) UPPER": [
+    "ContactSensor/done: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
-    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
     "Thermostat/oven-temperature: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "oven (two cavities) LOWER": [
+    "ContactSensor/done: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
-    "OccupancySensor/done: Configured Name, Name, Occupancy Detected",
     "Thermostat/oven-temperature: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
@@ -240,11 +240,10 @@
     "(read) lintFilterAfter",
     "(read) lintFilterAutoClear",
     "(read) liveUpdates",
-    "(read) notifyAsContact",
     "(read) phaseSensors",
     "(read) pollInterval",
-    "(read) problemAsOccupancy",
     "(read) runningPollInterval",
+    "(read) sensorsAsOccupancy",
     "(read) token",
     "(read) tubCleanAfter",
     "(read) ventCheckPercent",
@@ -266,11 +265,10 @@
     "lintFilterAutoClear",
     "liveUpdates",
     "name",
-    "notificationSensors",
     "phaseSensors",
     "pollInterval",
-    "problemSensor",
     "runningPollInterval",
+    "sensorType",
     "token",
     "tubCleanAfter",
     "ventCheckPercent"

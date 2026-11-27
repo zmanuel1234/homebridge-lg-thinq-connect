@@ -172,45 +172,25 @@
         "maximum": 1440,
         "description": "Many washers switch themselves off a minute after finishing, which would turn \"Done\" off with them. \"Done\" then stays on until the machine is next switched on or started, for at most this long, so you can see the laundry is waiting. Switching a dryer off from wrinkle care ends it at once. 0 = off together with the machine."
       },
-      "problemSensor": {
-        "title": "Problem sensors show as",
+      "sensorType": {
+        "title": "Sensors show as",
         "type": "string",
         "default": "contact",
         "oneOf": [
           {
-            "title": "Contact sensors (open = a problem)",
+            "title": "Contact sensors (open = finished, an error or due): notifications name the sensor",
             "enum": [
               "contact"
             ]
           },
           {
-            "title": "Occupancy sensors (detected = a problem, like the Done sensors)",
+            "title": "Occupancy sensors (detected = finished, an error or due): read better in Eve",
             "enum": [
               "occupancy"
             ]
           }
         ],
-        "description": "How each appliance's \"Problem\" sensor appears in the Home app. Changing it replaces the sensor: set its notifications and automations again."
-      },
-      "notificationSensors": {
-        "title": "Done and reminder sensors show as",
-        "type": "string",
-        "default": "occupancy",
-        "oneOf": [
-          {
-            "title": "Occupancy sensors (detected = done / due)",
-            "enum": [
-              "occupancy"
-            ]
-          },
-          {
-            "title": "Contact sensors (open = done / due): notifications name the sensor",
-            "enum": [
-              "contact"
-            ]
-          }
-        ],
-        "description": "The Done, Tub Clean, Lint Filter, Vent Check and Rinse Aid sensors. For occupancy sensors iOS's notifications only say \"There is activity in <room>\", the same for each; for contact sensors they name the sensor (\"Dryer Finished opened\"). Changing it replaces these sensors: set their notifications and automations again."
+        "description": "The Finished, Error and reminder sensors (Tub Clean Due, Clean Lint Filter, Check Vent, Rinse Aid Low). iOS's notifications name a contact sensor (\"Dryer Finished opened\"); for occupancy sensors they only say \"There is activity in <room>\", the same for each. Eve shows contact sensors the other way round (\"Contact: No\" = open). Changing it replaces these sensors: turn their notifications on again, and check automations that used them."
       },
       "ignore": {
         "title": "Leave out these appliances",
@@ -352,8 +332,7 @@
       "key": "doneHoldMinutes",
       "type": "number"
     },
-    "problemSensor",
-    "notificationSensors",
+    "sensorType",
     {
       "type": "fieldset",
       "title": "Advanced",

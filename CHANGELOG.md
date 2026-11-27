@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.0.0 - 2026-11-27
+
+One setting for how the Finished, Error and reminder sensors show, and contact sensors by default,
+so iOS's notifications name them. The only change that needs anything from you is below.
+
+### Migration from 1.x
+- The Finished (was Done), Tub Clean Due, Clean Lint Filter, Check Vent and Rinse Aid Low sensors
+  are now **contact sensors** (open = on), like the Error sensor already was, unless you choose
+  otherwise. Each is replaced on the first start of 2.0 (the log says which), keeping its name:
+  **turn its notifications on again** in the Home app, and **check automations** that used it
+  ("Opened" instead of "Occupancy Detected").
+- Prefer occupancy sensors (they read better in Eve)? Set **Sensors show as** to occupancy before
+  updating, or after (the sensors are then replaced once more). A 1.x choice of occupancy for
+  "Problem sensors show as" carries over.
+
+### Changed
+- **Sensors show as** (one setting) replaces "Problem sensors show as" and "Done and reminder
+  sensors show as": contact sensors (the default) or occupancy sensors, for the Finished, Error
+  and reminder sensors together. For occupancy sensors iOS's notifications only say "There is
+  activity in <room>"; contact sensors are named ("Dryer Finished opened").
+- Within 2.x, as within 1.x, updates don't rename or remove tiles, sensors or settings.
+
 ## 1.0.20 - 2026-11-27
 
 ### Changed

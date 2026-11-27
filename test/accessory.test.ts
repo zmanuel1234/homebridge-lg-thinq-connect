@@ -1,7 +1,7 @@
 import test, { mock } from 'node:test';
 import { ThinQError } from '../src/api';
 import assert from 'node:assert/strict';
-import type { API, Characteristic, Logging, PlatformAccessory } from 'homebridge';
+import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service } from 'homebridge';
 import type * as HapNodejs from '@homebridge/hap-nodejs';
 import { LaundryAccessory, type LaundryContext, type LaundryOptions } from '../src/accessory';
 import { type LaundryStatus, laundryStatus, laundryUnits } from '../src/laundry';
@@ -59,6 +59,13 @@ function defineTests(hap: Hap): void {
   }
 
   const value = (ch: Characteristic) => ch.value;
+  /** An on/off sensor of either kind (contact: open = on), as OccupancyDetected values. */
+  function on(svc: Service): CharacteristicValue | null {
+    if (svc.UUID === S.ContactSensor.UUID) {
+      return svc.getCharacteristic(C.ContactSensorState).value === C.ContactSensorState.CONTACT_NOT_DETECTED ? 1 : 0;
+    }
+    return svc.getCharacteristic(C.OccupancyDetected).value;
+  }
   /** What Home gets when it writes a characteristic: undefined, or the HAP error status. */
   async function write(ch: Characteristic, v: number): Promise<unknown> {
     try {
@@ -90,7 +97,7 @@ function defineTests(hap: Hap): void {
     assert.equal(value(laundry.valve.getCharacteristic(C.InUse)), C.InUse.IN_USE);
     assert.equal(value(laundry.valve.getCharacteristic(C.RemainingDuration)), 95 * 60);
     assert.equal(value(laundry.valve.getCharacteristic(C.SetDuration)), 120 * 60);
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
   });
 
   test('paused: off, so a tap resumes it; the time left is kept', () => {
@@ -105,20 +112,20 @@ function defineTests(hap: Hap): void {
     const { laundry, lines } = setup();
     laundry.update(running());
     laundry.update(status({ state: 'END', done: true }));
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
     assert.equal(value(laundry.valve.getCharacteristic(C.Active)), C.Active.INACTIVE);
     assert.ok(lines.includes('info: [Washer] Finished.'));
     // The washer switches itself off 30 s later (seen): the laundry is still waiting, so done stays on
     laundry.update(status());
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
     // Switched on for the next load: done ends
     laundry.update(status({ state: 'INITIAL' }));
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     laundry.stop();
   });
 
   test('done after the machine switches itself off: ends when it\'s started again, or after the set time; 0 = with the machine', () => {
-    const done = (l: LaundryAccessory) => value(l.doneSensor.getCharacteristic(C.OccupancyDetected));
+    const done = (l: LaundryAccessory) => on(l.doneSensor);
     const started = setup();
     started.laundry.update(running());
     started.laundry.update(status({ state: 'END', done: true }));
@@ -154,16 +161,16 @@ function defineTests(hap: Hap): void {
     assert.ok((first.acc.context as LaundryContext).doneUntil! > Date.now(), 'kept with the accessory');
     // Homebridge restarts: same accessory, no state from LG yet, then LG says off
     const again = setup({}, first.acc);
-    assert.equal(value(again.laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(again.laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
     again.laundry.update(status());
-    assert.equal(value(again.laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(again.laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
     again.laundry.update(status({ state: 'INITIAL' }));
-    assert.equal(value(again.laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(again.laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     assert.equal((again.acc.context as LaundryContext).doneUntil, undefined, 'forgotten once used');
     // A hold that ran out while Homebridge was down isn't brought back
     (again.acc.context as LaundryContext).doneUntil = Date.now() - 1000;
     const late = setup({}, again.acc);
-    assert.equal(value(late.laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(late.laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     late.laundry.stop();
   });
 
@@ -174,9 +181,9 @@ function defineTests(hap: Hap): void {
       laundry.update(running({ remaining: 60 }));
       // Stopped in its last minute, the machine still on: done briefly, as before
       laundry.update(status({ state: 'INITIAL' }));
-      assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+      assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
       mock.timers.tick(61_000);
-      assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+      assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     } finally {
       mock.timers.reset();
     }
@@ -188,7 +195,7 @@ function defineTests(hap: Hap): void {
     laundry.update(running({ state: 'COOKING_IN_PROGRESS' }));
     laundry.update(status({ state: 'DONE', done: true }));
     laundry.update(status());
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
   });
 
   test('done after a dryer\'s wrinkle care: switched off there, it ends at once (someone is at the machine)', () => {
@@ -196,18 +203,18 @@ function defineTests(hap: Hap): void {
     laundry.update(running());
     laundry.update(status({ state: 'END', done: true }));
     laundry.update(status({ state: 'WRINKLE_CARE', done: true, remoteControl: true }));
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
     laundry.update(status());
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
   });
 
   test('a finish missed between two checks (straight to off near the end) still triggers done, briefly', () => {
     const { laundry } = setup();
     laundry.update(running({ remaining: 60 }));
     laundry.update(status());
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
     laundry.update(running());
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     laundry.stop();
   });
 
@@ -323,17 +330,17 @@ function defineTests(hap: Hap): void {
     const { laundry } = setup();
     laundry.update(running({ state: 'DETECTING', remaining: 0, total: 0 }));
     laundry.update(status());
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     laundry.update(running({ state: 'RUNNING', remaining: 0, total: 0 }));
     laundry.update(status());
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
   });
 
   test('a cycle cancelled with plenty of time left is not a finish', () => {
     const { laundry } = setup();
     laundry.update(running({ remaining: 40 * 60 }));
     laundry.update(status());
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
   });
 
   test('an error: the problem sensor opens, the tile shows a fault, the log names it', () => {
@@ -364,9 +371,9 @@ function defineTests(hap: Hap): void {
     const spin = acc.getServiceById(S.OccupancySensor, 'phase-SPINNING')!;
     assert.equal(value(spin.getCharacteristic(C.ConfiguredName)), 'Washer Spinning');
     laundry.update(running({ state: 'SPINNING' }));
-    assert.equal(value(spin.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(spin), C.OccupancyDetected.OCCUPANCY_DETECTED);
     laundry.update(running({ state: 'RINSING' }));
-    assert.equal(value(spin.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(spin), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
   });
 
   test('phase sensors taken out of the settings are removed from a cached accessory', () => {
@@ -388,19 +395,19 @@ function defineTests(hap: Hap): void {
     const { laundry, lines } = setup();
     laundry.update(running({ remaining: 60 }));
     laundry.alert('finished', 'WASHING_IS_COMPLETE');
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
     assert.ok(lines.includes('info: [Washer] LG says the cycle is finished.'));
     laundry.update(status({ state: 'END', done: true }));
     laundry.update(status());
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED, 'still waiting');
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_DETECTED, 'still waiting');
     laundry.update(status({ state: 'INITIAL' }));
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     laundry.stop();
   });
 
   test('LG\'s "finished" alert while weighing the load is ignored; with lots of time shown, the next state decides', () => {
     const { laundry, lines } = setup();
-    const done = () => value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected));
+    const done = () => on(laundry.doneSensor);
     laundry.update(running({ state: 'DETECTING', remaining: 0, total: 0 }));
     laundry.alert('finished', 'WASHING_IS_COMPLETE');
     assert.equal(done(), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
@@ -416,14 +423,14 @@ function defineTests(hap: Hap): void {
     dryer.laundry.update(running({ remaining: 20 * 60 }));
     dryer.laundry.alert('finished', 'DRYING_IS_COMPLETE');
     dryer.laundry.update(status({ state: 'END', done: false }));
-    assert.equal(value(dryer.laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(dryer.laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
     assert.ok(dryer.lines.includes('info: [Washer] LG says the cycle is finished.'));
     // …or straight to off
     const off = setup();
     off.laundry.update(running({ remaining: 20 * 60 }));
     off.laundry.alert('finished', 'DRYING_IS_COMPLETE');
     off.laundry.update(status());
-    assert.equal(value(off.laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(off.laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
     off.laundry.stop();
   });
 
@@ -431,7 +438,7 @@ function defineTests(hap: Hap): void {
     const { laundry } = setup();
     laundry.update(status());
     laundry.alert('finished', 'DRYING_IS_COMPLETE');
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(laundry.doneSensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
     laundry.stop();
   });
 
@@ -457,18 +464,18 @@ function defineTests(hap: Hap): void {
 
   test('tub-clean reminder: on once LG\'s cycle count reaches the setting, logged once', () => {
     const { acc, laundry, lines } = setup({ tubCleanAfter: 30 });
-    const sensor = acc.getServiceById(S.OccupancySensor, 'tub-clean')!;
+    const sensor = acc.getServiceById(S.ContactSensor, 'tub-clean')!;
     assert.equal(value(sensor.getCharacteristic(C.ConfiguredName)), 'Washer Tub Clean Due');
     laundry.update(status({ cycleCount: 29 }));
-    assert.equal(value(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(sensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     laundry.update(status({ cycleCount: 30 }));
     laundry.update(status({ cycleCount: 31 }));
-    assert.equal(value(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(sensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
     assert.equal(lines.filter((l) => l.includes('Time for a Tub Clean')).length, 1);
     assert.ok(lines.includes('info: [Washer] Time for a Tub Clean: LG counts 30 cycles (reminder set at 30).'));
     // Switched on: LG briefly says 0, then the real count again (seen: 16 → 0 → 16): no flicker
     laundry.update(status({ state: 'INITIAL', cycleCount: 0 }));
-    assert.equal(value(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(on(sensor), C.OccupancyDetected.OCCUPANCY_DETECTED);
     laundry.update(status({ state: 'INITIAL', cycleCount: 31 }));
     assert.equal(lines.filter((l) => l.includes('Time for a Tub Clean')).length, 1, 'not logged again');
     assert.equal(lines.filter((l) => l.includes('LG now counts 31')).length, 1, 'the blip isn\'t a new count');
@@ -481,7 +488,7 @@ function defineTests(hap: Hap): void {
     } finally {
       mock.timers.reset();
     }
-    assert.equal(value(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
+    assert.equal(on(sensor), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     assert.deepEqual(lines.filter((l) => l.includes('restarted')),
       ['info: [Washer] LG\'s count restarted at 0 (was 31): Tub Clean done, the reminder is off.'], 'logged once');
     // The next wash counts from 1 again, logged like any other
@@ -509,22 +516,21 @@ function defineTests(hap: Hap): void {
   });
 
   test('tub-clean reminder: none when off, for a dryer, or for a washer that doesn\'t count; removed when turned off', () => {
-    assert.equal(setup().acc.getServiceById(S.OccupancySensor, 'tub-clean'), undefined, 'off by default');
+    assert.equal(setup().acc.getServiceById(S.ContactSensor, 'tub-clean'), undefined, 'off by default');
     const [, dryerDevice] = realDevices();
     const dryerUnit = laundryUnits('DEVICE_DRYER', dryerDevice.profile)[0];
     assert.equal(dryerUnit.countsCycles, false);
     assert.equal(unit.countsCycles, true, 'our washer counts its cycles');
     const on = setup({ tubCleanAfter: 30 });
     const off = setup({ tubCleanAfter: 0 }, on.acc);
-    assert.equal(off.acc.getServiceById(S.OccupancySensor, 'tub-clean'), undefined);
+    assert.equal(off.acc.getServiceById(S.ContactSensor, 'tub-clean'), undefined);
   });
 
   // Dryer care: the lint filter reminder and the vent check
   const [, dryerDevice] = realDevices();
   const dryerUnit = laundryUnits('DEVICE_DRYER', dryerDevice.profile)[0];
   const dryerSetup = (options: Partial<LaundryOptions> = {}, accessory?: Acc) => setup({ name: 'Dryer', ...options }, accessory, dryerUnit);
-  const detected = (svc: { getCharacteristic: (c: typeof C.OccupancyDetected) => Characteristic } | undefined) =>
-    value(svc!.getCharacteristic(C.OccupancyDetected)) === C.OccupancyDetected.OCCUPANCY_DETECTED;
+  const detected = (svc: Service | undefined) => on(svc!) === C.OccupancyDetected.OCCUPANCY_DETECTED;
   /** One dry: idle → running for `minutes` (with a pause that doesn't count) → END → off. */
   function dry(laundry: LaundryAccessory, minutes: number): void {
     laundry.update(status({ state: 'INITIAL' }));
@@ -554,9 +560,9 @@ function defineTests(hap: Hap): void {
     assert.equal(acc.getServiceById(S.Switch, 'lint-filter-cleaned'), laundry.lintButton);
     // Turned off again: removed
     const off = dryerSetup({}, acc);
-    assert.equal(acc.getServiceById(S.OccupancySensor, 'lint-filter'), undefined);
+    assert.equal(acc.getServiceById(S.ContactSensor, 'lint-filter'), undefined);
     assert.equal(acc.getServiceById(S.Switch, 'lint-filter-cleaned'), undefined);
-    assert.equal(acc.getServiceById(S.OccupancySensor, 'vent-check'), undefined);
+    assert.equal(acc.getServiceById(S.ContactSensor, 'vent-check'), undefined);
     assert.equal(off.laundry.lintSensor, undefined);
   });
 
@@ -818,26 +824,6 @@ function defineTests(hap: Hap): void {
     assert.ok(!kept.lines.some((l) => l.includes('cycle time changed')));
   });
 
-  test('problem sensor as an occupancy sensor (setting): detected while there\'s a problem; the contact sensor it replaces is removed', () => {
-    const first = setup();
-    assert.ok(first.acc.getServiceById(S.ContactSensor, 'problem'), 'contact sensor by default (1.x)');
-    const { acc, laundry } = setup({ problemAsOccupancy: true }, first.acc);
-    assert.equal(acc.getServiceById(S.ContactSensor, 'problem'), undefined, 'the old one is gone');
-    const sensor = acc.getServiceById(S.OccupancySensor, 'problem')!;
-    assert.equal(value(sensor.getCharacteristic(C.ConfiguredName)), 'Washer Error', 'same name');
-    const shown = () => value(sensor.getCharacteristic(C.OccupancyDetected));
-    laundry.update(status({ state: 'INITIAL' }));
-    assert.equal(shown(), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
-    laundry.update(status({ state: 'ERROR', error: true, errorName: 'DOOR_OPEN_ERROR' }));
-    assert.equal(shown(), C.OccupancyDetected.OCCUPANCY_DETECTED);
-    laundry.update(status());
-    assert.equal(shown(), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
-    // And back
-    const back = setup({ problemAsOccupancy: false }, acc);
-    assert.equal(back.acc.getServiceById(S.OccupancySensor, 'problem'), undefined);
-    assert.ok(back.acc.getServiceById(S.ContactSensor, 'problem'));
-  });
-
   test('problem alert: cleared once the error is over (door closed, back to ready), not only by the next cycle', () => {
     const { laundry } = setup();
     const open = () => laundry.problem;
@@ -861,33 +847,43 @@ function defineTests(hap: Hap): void {
     assert.equal(open(), false);
   });
 
-  test('done and reminder sensors as contact sensors (setting): open = on; the occupancy sensors they replace are removed', () => {
+  test('"Sensors show as": contact sensors by default (open = on, named in notifications); occupancy by setting, replacing them (logged)', () => {
     const first = setup({ tubCleanAfter: 30 });
-    assert.ok(first.acc.getServiceById(S.OccupancySensor, 'done'), 'occupancy by default');
-    const { acc, laundry } = setup({ tubCleanAfter: 30, notifyAsContact: true }, first.acc);
-    assert.equal(acc.getServiceById(S.OccupancySensor, 'done'), undefined);
-    assert.equal(acc.getServiceById(S.OccupancySensor, 'tub-clean'), undefined);
-    const done = acc.getServiceById(S.ContactSensor, 'done')!;
-    const tub = acc.getServiceById(S.ContactSensor, 'tub-clean')!;
-    assert.equal(laundry.doneSensor, done);
-    assert.equal(value(done.getCharacteristic(C.ConfiguredName)), 'Washer Finished', 'same name');
-    assert.equal(value(tub.getCharacteristic(C.ConfiguredName)), 'Washer Tub Clean Due');
-    const state = (svc: typeof done) => value(svc.getCharacteristic(C.ContactSensorState));
-    laundry.update(status({ state: 'END', done: true, cycleCount: 31 }));
-    assert.equal(state(done), C.ContactSensorState.CONTACT_NOT_DETECTED, 'open: done');
-    assert.equal(state(tub), C.ContactSensorState.CONTACT_NOT_DETECTED, 'open: tub clean due');
-    laundry.update(running({ cycleCount: 31 }));
-    assert.equal(state(done), C.ContactSensorState.CONTACT_DETECTED, 'closed');
-    // Tub clean turned off: removed whichever kind it was; and back to occupancy
-    const off = setup({ notifyAsContact: true }, acc);
-    assert.equal(off.acc.getServiceById(S.ContactSensor, 'tub-clean'), undefined);
+    for (const sub of ['done', 'problem', 'tub-clean']) {
+      assert.ok(first.acc.getServiceById(S.ContactSensor, sub), `${sub}: a contact sensor by default`);
+      assert.equal(first.acc.getServiceById(S.OccupancySensor, sub), undefined);
+    }
+    const done = first.acc.getServiceById(S.ContactSensor, 'done')!;
+    first.laundry.update(status({ state: 'END', done: true, cycleCount: 31 }));
+    assert.equal(value(done.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_NOT_DETECTED, 'open: finished');
+    assert.equal(value(first.acc.getServiceById(S.ContactSensor, 'tub-clean')!.getCharacteristic(C.ContactSensorState)),
+      C.ContactSensorState.CONTACT_NOT_DETECTED, 'open: tub clean due');
+    first.laundry.update(running({ cycleCount: 31 }));
+    assert.equal(value(done.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_DETECTED, 'closed');
+    // Occupancy: each replaced, with the same name, and a note in the log
+    const { acc, laundry, lines } = setup({ tubCleanAfter: 30, sensorsAsOccupancy: true }, first.acc);
+    for (const sub of ['done', 'problem', 'tub-clean']) {
+      assert.ok(acc.getServiceById(S.OccupancySensor, sub), `${sub}: occupancy`);
+      assert.equal(acc.getServiceById(S.ContactSensor, sub), undefined, `${sub}: the contact sensor is gone`);
+    }
+    assert.equal(value(laundry.doneSensor.getCharacteristic(C.ConfiguredName)), 'Washer Finished', 'same name');
+    assert.ok(lines.includes('info: [Washer] "Washer Finished" is now an occupancy sensor (the setting "Sensors show as"): '
+      + 'turn its notifications on again in the Home app, and check automations that used it.'));
+    laundry.update(status({ state: 'ERROR', error: true, errorName: 'DOOR_OPEN_ERROR' }));
+    assert.equal(value(laundry.problemSensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    // A reminder turned off goes, whichever kind it was; and back to contact
+    const off = setup({ sensorsAsOccupancy: true }, acc);
+    assert.equal(off.acc.getServiceById(S.OccupancySensor, 'tub-clean'), undefined);
     const back = setup({}, acc);
-    assert.equal(back.acc.getServiceById(S.ContactSensor, 'done'), undefined);
-    assert.ok(back.acc.getServiceById(S.OccupancySensor, 'done'));
+    assert.equal(back.acc.getServiceById(S.OccupancySensor, 'done'), undefined);
+    assert.ok(back.acc.getServiceById(S.ContactSensor, 'done'));
+    assert.equal(back.lines.filter((l) => l.includes('is now a contact sensor')).length, 2, 'finished and error');
     // Dryer reminders too
-    const dryer = dryerSetup({ lintFilterAfter: 1, ventCheckPercent: 30, notifyAsContact: true });
+    const dryer = dryerSetup({ lintFilterAfter: 1, ventCheckPercent: 30 });
     assert.ok(dryer.acc.getServiceById(S.ContactSensor, 'lint-filter'));
     assert.ok(dryer.acc.getServiceById(S.ContactSensor, 'vent-check'));
+    const occ = dryerSetup({ lintFilterAfter: 1, ventCheckPercent: 30, sensorsAsOccupancy: true });
+    assert.ok(occ.acc.getServiceById(S.OccupancySensor, 'lint-filter'));
   });
 
   test('remote start sensor: on while Remote Start is on, only when control is allowed', () => {
@@ -896,7 +892,7 @@ function defineTests(hap: Hap): void {
     const { acc, laundry } = setup({ allowControl: true });
     const sensor = acc.getServiceById(S.OccupancySensor, 'remote-start')!;
     assert.equal(value(sensor.getCharacteristic(C.ConfiguredName)), 'Washer Ready To Start');
-    const shown = () => value(sensor.getCharacteristic(C.OccupancyDetected));
+    const shown = () => on(sensor);
     laundry.update(status({ state: 'INITIAL', remoteControl: true }));
     assert.equal(shown(), C.OccupancyDetected.OCCUPANCY_DETECTED, 'waiting to be started');
     // LG keeps Remote Start on during the cycle (seen): not waiting any more
@@ -943,8 +939,8 @@ function defineTests(hap: Hap): void {
     laundry.update(status({ state: 'END', done: true, doorOpen: true, rinseAidLow: true }));
     assert.equal(value(acc.getServiceById(S.ContactSensor, 'door')!.getCharacteristic(C.ConfiguredName)), 'Dishwasher Door');
     assert.equal(value(acc.getServiceById(S.ContactSensor, 'door')!.getCharacteristic(C.ContactSensorState)), C.ContactSensorState.CONTACT_NOT_DETECTED);
-    assert.equal(value(acc.getServiceById(S.OccupancySensor, 'rinse-aid')!.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_DETECTED);
-    assert.equal(acc.getServiceById(S.OccupancySensor, 'tub-clean'), undefined, 'the tub-clean reminder is for washers');
+    assert.equal(on(acc.getServiceById(S.ContactSensor, 'rinse-aid')!), C.OccupancyDetected.OCCUPANCY_DETECTED);
+    assert.equal(acc.getServiceById(S.ContactSensor, 'tub-clean'), undefined, 'the tub-clean reminder is for washers');
     assert.equal(value(acc.getService(S.AccessoryInformation)!.getCharacteristic(C.Model)), 'Dishwasher');
     // Our washer reports neither: no such sensors
     assert.equal(setup().acc.getServiceById(S.ContactSensor, 'door'), undefined);
