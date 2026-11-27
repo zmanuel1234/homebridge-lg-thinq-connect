@@ -126,6 +126,27 @@ function defineTests(hap: Hap): void {
     assert.equal(hb.calls.unregistered.length, 0);
   });
 
+  test('3.0 settings: each appliance\'s own settings, the general ones for the rest', async (t) => {
+    const hb = await homebridge(t, {
+      general: { sensorType: 'contact' }, washer: { tubCleanAfter: 30 }, dryer: { lintFilterAfter: 1, ventCheckPercent: 30 },
+      laundry: { phaseSensors: ['SPINNING'] },
+      appliances: [{ name: 'Dryer', type: 'dryer', sensorType: 'occupancy', lintFilterAfter: 0, phaseSensors: ['COOLING'] }],
+    });
+    await hb.start();
+    const [washer, dryer] = ['device-1', 'device-2'].map((id) => hb.calls.registered.find((a) => a.context.deviceId === id)!);
+    const S = hap!.Service;
+    const has = (a: typeof washer, type: typeof S.ContactSensor, sub: string) => !!a.services.find((s) => s.UUID === type.UUID && s.subtype === sub);
+    // The washer: the general settings
+    assert.ok(has(washer, S.ContactSensor, 'done'), 'contact sensors');
+    assert.ok(has(washer, S.ContactSensor, 'tub-clean'), 'tub clean after 30');
+    assert.ok(has(washer, S.OccupancySensor, 'phase-SPINNING'));
+    // The dryer: its own
+    assert.ok(has(dryer, S.OccupancySensor, 'done'), 'occupancy sensors, its own choice');
+    assert.ok(!has(dryer, S.OccupancySensor, 'lint-filter') && !has(dryer, S.ContactSensor, 'lint-filter'), 'lint reminder off for it');
+    assert.ok(has(dryer, S.OccupancySensor, 'vent-check'), 'vent check: the general 30 %');
+    assert.ok(has(dryer, S.OccupancySensor, 'phase-COOLING') && !has(dryer, S.OccupancySensor, 'phase-SPINNING'), 'its own phases');
+  });
+
   test('an appliance renamed in the ThinQ app: its tiles and sensors follow, except names changed in the Home app', async (t) => {
     const hb = await homebridge(t);
     await hb.start();

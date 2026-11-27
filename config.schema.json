@@ -27,170 +27,216 @@
         "pattern": "^[A-Za-z]{2}$",
         "description": "Two-letter code, such as US, CA, GB or DE. LG keeps accounts on a server per region."
       },
-      "allowControl": {
-        "title": "Allow starting and pausing from the Home app",
-        "type": "boolean",
-        "default": false,
-        "description": "Tapping the machine's tile starts, pauses or resumes it. LG only accepts this after Remote Start is pressed on the machine, and a start may run the machine's default program rather than the one on the dial (LG's API can't choose one). Off: the tile only shows the cycle."
-      },
-      "experimental": {
-        "title": "Experimental appliances",
-        "type": "boolean",
-        "default": false,
-        "description": "Also add LG appliance types that are still experimental: fridges, dishwashers, air purifiers, humidifiers, ovens and more (see the README). Washers, dryers, air conditioners, dehumidifiers and range hoods are always added. If you try one, please report how it works on GitHub."
-      },
-      "extraControls": {
-        "title": "Extra switches",
-        "type": "boolean",
-        "default": true,
-        "description": "Switches for what an appliance offers beyond its main tile: air conditioner air purify, energy saving, display light, the other swing direction, jet, dry and fan modes, airflow styles; air purifier sleep mode and turbo; AeroTower warm mode, UV nano and display light; humidifier auto, sleep, hygiene dry, warm mist, mood lamp and display light; water heater modes; cooktop \"all burners off\". Turn off for a tidier Home app. (Fridge and wine cellar settings such as express modes, power saving and the light are always added.)"
-      },
-      "liveUpdates": {
-        "title": "Live updates from LG",
-        "type": "boolean",
-        "default": true,
-        "description": "LG sends changes and alerts (cycle complete, drying failed) the moment they happen. Scheduled checks continue as a backup. Turn off only if live updates cause problems."
-      },
-      "energy": {
-        "title": "Energy use in the Eve app",
-        "type": "boolean",
-        "default": true,
-        "description": "This month's energy use, for appliances LG reports it for, shown in the Eve app (Apple's Home app doesn't show energy). LG updates it with a delay, often a day."
-      },
-      "phaseSensors": {
-        "title": "Phase sensors",
-        "type": "array",
-        "uniqueItems": true,
-        "description": "Adds a sensor that is on during the chosen phase, for automations (for example, turn on a fan while spinning). Only phases a machine reports are added.",
-        "items": {
-          "type": "string",
-          "oneOf": [
-            {
-              "title": "Detecting load",
-              "enum": [
-                "DETECTING"
-              ]
-            },
-            {
-              "title": "Prewash",
-              "enum": [
-                "PREWASH"
-              ]
-            },
-            {
-              "title": "Main phase (washing, or drying on a dryer)",
-              "enum": [
-                "RUNNING"
-              ]
-            },
-            {
-              "title": "Rinsing",
-              "enum": [
-                "RINSING"
-              ]
-            },
-            {
-              "title": "Spinning",
-              "enum": [
-                "SPINNING"
-              ]
-            },
-            {
-              "title": "Drying (washer-dryer combos)",
-              "enum": [
-                "DRYING"
-              ]
-            },
-            {
-              "title": "Cooling (dryer)",
-              "enum": [
-                "COOLING"
-              ]
-            },
-            {
-              "title": "Wrinkle care (dryer)",
-              "enum": [
-                "WRINKLE_CARE"
-              ]
-            },
-            {
-              "title": "Rinse hold",
-              "enum": [
-                "RINSE_HOLD"
-              ]
-            },
-            {
-              "title": "Paused",
-              "enum": [
-                "PAUSE"
-              ]
-            },
-            {
-              "title": "Delayed start waiting",
-              "enum": [
-                "RESERVED"
-              ]
-            }
-          ]
+      "general": {
+        "title": "General",
+        "type": "object",
+        "properties": {
+          "allowControl": {
+            "title": "Allow starting and pausing from the Home app",
+            "type": "boolean",
+            "default": false,
+            "description": "Tapping the machine's tile starts, pauses or resumes it. LG only accepts this after Remote Start is pressed on the machine, and a start may run the machine's default program rather than the one on the dial (LG's API can't choose one). Off: the tile only shows the cycle."
+          },
+          "liveUpdates": {
+            "title": "Live updates from LG",
+            "type": "boolean",
+            "default": true,
+            "description": "LG sends changes and alerts (cycle complete, drying failed) the moment they happen. Scheduled checks continue as a backup. Turn off only if live updates cause problems."
+          },
+          "energy": {
+            "title": "Energy use in the Eve app",
+            "type": "boolean",
+            "default": true,
+            "description": "This month's energy use, for appliances LG reports it for, shown in the Eve app (Apple's Home app doesn't show energy). LG updates it with a delay, often a day."
+          },
+          "sensorType": {
+            "title": "Sensors show as",
+            "type": "string",
+            "default": "contact",
+            "oneOf": [
+              {
+                "title": "Contact sensors (open = finished, an error or due): notifications name the sensor",
+                "enum": [
+                  "contact"
+                ]
+              },
+              {
+                "title": "Occupancy sensors (detected = finished, an error or due): read better in Eve",
+                "enum": [
+                  "occupancy"
+                ]
+              }
+            ],
+            "description": "The Finished, Error and reminder sensors (Tub Clean Due, Clean Lint Filter, Check Vent, Rinse Aid Low). iOS's notifications name a contact sensor (\"Dryer Finished opened\"); for occupancy sensors they only say \"There is activity in <room>\", the same for each. Eve shows contact sensors the other way round (\"Contact: No\" = open). Changing it replaces these sensors: turn their notifications on again, and check automations that used them."
+          },
+          "experimental": {
+            "title": "Experimental appliances",
+            "type": "boolean",
+            "default": false,
+            "description": "Also add LG appliance types that are still experimental: fridges, dishwashers, air purifiers, humidifiers, ovens and more (see the README). Washers, dryers, air conditioners, dehumidifiers and range hoods are always added. If you try one, please report how it works on GitHub."
+          },
+          "extraControls": {
+            "title": "Extra switches",
+            "type": "boolean",
+            "default": true,
+            "description": "Switches for what an appliance offers beyond its main tile: air conditioner air purify, energy saving, display light, the other swing direction, jet, dry and fan modes, airflow styles; air purifier sleep mode and turbo; AeroTower warm mode, UV nano and display light; humidifier auto, sleep, hygiene dry, warm mist, mood lamp and display light; water heater modes; cooktop \"all burners off\". Turn off for a tidier Home app. (Fridge and wine cellar settings such as express modes, power saving and the light are always added.)"
+          }
         }
       },
-      "tubCleanAfter": {
-        "title": "Tub clean reminder after (cycles)",
-        "type": "integer",
-        "default": 0,
-        "minimum": 0,
-        "maximum": 200,
-        "description": "Adds a \"tub clean\" sensor to washers that count their cycles. It turns on when LG's count reaches this number (LG suggests a Tub Clean about every 30 washes); turn on notifications for it. 0 = no reminder."
-      },
-      "lintFilterAfter": {
-        "title": "Lint filter reminder after (dries)",
-        "type": "integer",
-        "default": 0,
-        "minimum": 0,
-        "maximum": 100,
-        "description": "Adds a \"lint filter\" sensor to dryers, on after this many finished dries, and a \"lint filter cleaned\" button that starts the count again (LG's API doesn't report the filter, so the plugin counts the dries). Turn on notifications for the sensor. 0 = no reminder."
-      },
-      "lintFilterAutoClear": {
-        "title": "Lint filter reminder goes off when the dryer starts again",
-        "type": "boolean",
-        "default": false,
-        "description": "No \"lint filter cleaned\" button: the reminder goes off by itself when the next dry starts, as a simple reminder. With the reminder after 1 dry, it comes on after every dry."
-      },
-      "ventCheckPercent": {
-        "title": "Dryer vent check: warn when drying takes longer by (%)",
-        "type": "integer",
-        "default": 0,
-        "minimum": 0,
-        "maximum": 200,
-        "description": "Adds a \"vent check\" sensor to dryers. The plugin times each finished dry and turns it on when recent dries take this much longer than usual, a common sign of a blocked lint filter or vent (LG reports airflow only on the dryer's display). It learns the usual time from the first 8 dries, and is an estimate: big or wet loads take longer too. 30 is a good start. 0 = off."
-      },
-      "doneHoldMinutes": {
-        "title": "Keep \"Done\" on after the machine switches itself off (minutes)",
-        "type": "integer",
-        "default": 120,
-        "minimum": 0,
-        "maximum": 1440,
-        "description": "Many washers switch themselves off a minute after finishing, which would turn \"Done\" off with them. \"Done\" then stays on until the machine is next switched on or started, for at most this long, so you can see the laundry is waiting. Switching a dryer off from wrinkle care ends it at once. 0 = off together with the machine."
-      },
-      "sensorType": {
-        "title": "Sensors show as",
-        "type": "string",
-        "default": "contact",
-        "oneOf": [
-          {
-            "title": "Contact sensors (open = finished, an error or due): notifications name the sensor",
-            "enum": [
-              "contact"
-            ]
+      "laundry": {
+        "title": "Washers, dryers and other cycle appliances",
+        "type": "object",
+        "properties": {
+          "phaseSensors": {
+            "title": "Phase sensors",
+            "type": "array",
+            "uniqueItems": true,
+            "description": "Adds a sensor that is on during the chosen phase, for automations (for example, turn on a fan while spinning). Only phases a machine reports are added.",
+            "items": {
+              "type": "string",
+              "oneOf": [
+                {
+                  "title": "Detecting load",
+                  "enum": [
+                    "DETECTING"
+                  ]
+                },
+                {
+                  "title": "Prewash",
+                  "enum": [
+                    "PREWASH"
+                  ]
+                },
+                {
+                  "title": "Main phase (washing, or drying on a dryer)",
+                  "enum": [
+                    "RUNNING"
+                  ]
+                },
+                {
+                  "title": "Rinsing",
+                  "enum": [
+                    "RINSING"
+                  ]
+                },
+                {
+                  "title": "Spinning",
+                  "enum": [
+                    "SPINNING"
+                  ]
+                },
+                {
+                  "title": "Drying (washer-dryer combos)",
+                  "enum": [
+                    "DRYING"
+                  ]
+                },
+                {
+                  "title": "Cooling (dryer)",
+                  "enum": [
+                    "COOLING"
+                  ]
+                },
+                {
+                  "title": "Wrinkle care (dryer)",
+                  "enum": [
+                    "WRINKLE_CARE"
+                  ]
+                },
+                {
+                  "title": "Rinse hold",
+                  "enum": [
+                    "RINSE_HOLD"
+                  ]
+                },
+                {
+                  "title": "Paused",
+                  "enum": [
+                    "PAUSE"
+                  ]
+                },
+                {
+                  "title": "Delayed start waiting",
+                  "enum": [
+                    "RESERVED"
+                  ]
+                }
+              ]
+            }
           },
-          {
-            "title": "Occupancy sensors (detected = finished, an error or due): read better in Eve",
-            "enum": [
-              "occupancy"
-            ]
+          "doneHoldMinutes": {
+            "title": "Keep \"Done\" on after the machine switches itself off (minutes)",
+            "type": "integer",
+            "default": 120,
+            "minimum": 0,
+            "maximum": 1440,
+            "description": "Many washers switch themselves off a minute after finishing, which would turn \"Done\" off with them. \"Done\" then stays on until the machine is next switched on or started, for at most this long, so you can see the laundry is waiting. Switching a dryer off from wrinkle care ends it at once. 0 = off together with the machine."
           }
-        ],
-        "description": "The Finished, Error and reminder sensors (Tub Clean Due, Clean Lint Filter, Check Vent, Rinse Aid Low). iOS's notifications name a contact sensor (\"Dryer Finished opened\"); for occupancy sensors they only say \"There is activity in <room>\", the same for each. Eve shows contact sensors the other way round (\"Contact: No\" = open). Changing it replaces these sensors: turn their notifications on again, and check automations that used them."
+        }
+      },
+      "washer": {
+        "title": "Washers",
+        "type": "object",
+        "properties": {
+          "tubCleanAfter": {
+            "title": "Tub clean reminder after (cycles)",
+            "type": "integer",
+            "default": 0,
+            "minimum": 0,
+            "maximum": 200,
+            "description": "Adds a \"tub clean\" sensor to washers that count their cycles. It turns on when LG's count reaches this number (LG suggests a Tub Clean about every 30 washes); turn on notifications for it. 0 = no reminder."
+          }
+        }
+      },
+      "dryer": {
+        "title": "Dryers",
+        "type": "object",
+        "properties": {
+          "lintFilterAfter": {
+            "title": "Lint filter reminder after (dries)",
+            "type": "integer",
+            "default": 0,
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Adds a \"lint filter\" sensor to dryers, on after this many finished dries, and a \"lint filter cleaned\" button that starts the count again (LG's API doesn't report the filter, so the plugin counts the dries). Turn on notifications for the sensor. 0 = no reminder."
+          },
+          "lintFilterAutoClear": {
+            "title": "Lint filter reminder goes off when the dryer starts again",
+            "type": "boolean",
+            "default": false,
+            "description": "No \"lint filter cleaned\" button: the reminder goes off by itself when the next dry starts, as a simple reminder. With the reminder after 1 dry, it comes on after every dry."
+          },
+          "ventCheckPercent": {
+            "title": "Dryer vent check: warn when drying takes longer by (%)",
+            "type": "integer",
+            "default": 0,
+            "minimum": 0,
+            "maximum": 200,
+            "description": "Adds a \"vent check\" sensor to dryers. The plugin times each finished dry and turns it on when recent dries take this much longer than usual, a common sign of a blocked lint filter or vent (LG reports airflow only on the dryer's display). It learns the usual time from the first 8 dries, and is an estimate: big or wet loads take longer too. 30 is a good start. 0 = off."
+          }
+        }
+      },
+      "polling": {
+        "title": "Checking with LG",
+        "type": "object",
+        "properties": {
+          "idle": {
+            "title": "Check every (seconds, idle)",
+            "type": "integer",
+            "default": 60,
+            "minimum": 30,
+            "maximum": 3600,
+            "description": "How often to ask LG for each appliance's state while nothing is running."
+          },
+          "running": {
+            "title": "Check every (seconds, during a cycle)",
+            "type": "integer",
+            "default": 30,
+            "minimum": 15,
+            "maximum": 600,
+            "description": "How often to ask during a cycle, so time left and the end are up to date."
+          }
+        }
       },
       "ignore": {
         "title": "Leave out these appliances",
@@ -211,6 +257,261 @@
             "name": {
               "type": "string",
               "title": "Appliance name"
+            },
+            "type": {
+              "title": "Type",
+              "type": "string",
+              "oneOf": [
+                {
+                  "title": "Washer (also a washer-dryer combo, or a WashTower's washer)",
+                  "enum": [
+                    "washer"
+                  ]
+                },
+                {
+                  "title": "Dryer (also a WashTower's dryer)",
+                  "enum": [
+                    "dryer"
+                  ]
+                },
+                {
+                  "title": "WashTower as one appliance (washer and dryer)",
+                  "enum": [
+                    "washtower"
+                  ]
+                },
+                {
+                  "title": "Dishwasher",
+                  "enum": [
+                    "dishwasher"
+                  ]
+                },
+                {
+                  "title": "Styler",
+                  "enum": [
+                    "styler"
+                  ]
+                },
+                {
+                  "title": "Oven",
+                  "enum": [
+                    "oven"
+                  ]
+                },
+                {
+                  "title": "Air conditioner",
+                  "enum": [
+                    "air_conditioner"
+                  ]
+                },
+                {
+                  "title": "Something else",
+                  "enum": [
+                    "other"
+                  ]
+                }
+              ],
+              "description": "Shows the options for this kind of appliance. Filled in for you by \"Add my appliances\" after Check token."
+            },
+            "sensorType": {
+              "title": "Sensors show as",
+              "type": "string",
+              "oneOf": [
+                {
+                  "title": "Contact sensors (open = finished, an error or due): notifications name the sensor",
+                  "enum": [
+                    "contact"
+                  ]
+                },
+                {
+                  "title": "Occupancy sensors (detected = finished, an error or due): read better in Eve",
+                  "enum": [
+                    "occupancy"
+                  ]
+                }
+              ],
+              "description": "None: the general setting."
+            },
+            "energy": {
+              "type": "boolean",
+              "title": "Energy use in the Eve app",
+              "oneOf": [
+                {
+                  "title": "Yes",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "title": "No",
+                  "enum": [
+                    false
+                  ]
+                }
+              ],
+              "description": "None: the general setting."
+            },
+            "phaseSensors": {
+              "title": "Phase sensors",
+              "type": "array",
+              "uniqueItems": true,
+              "description": "None ticked: the general phase sensors. Ticked: this appliance's own.",
+              "items": {
+                "type": "string",
+                "oneOf": [
+                  {
+                    "title": "Detecting load",
+                    "enum": [
+                      "DETECTING"
+                    ]
+                  },
+                  {
+                    "title": "Prewash",
+                    "enum": [
+                      "PREWASH"
+                    ]
+                  },
+                  {
+                    "title": "Main phase (washing, or drying on a dryer)",
+                    "enum": [
+                      "RUNNING"
+                    ]
+                  },
+                  {
+                    "title": "Rinsing",
+                    "enum": [
+                      "RINSING"
+                    ]
+                  },
+                  {
+                    "title": "Spinning",
+                    "enum": [
+                      "SPINNING"
+                    ]
+                  },
+                  {
+                    "title": "Drying (washer-dryer combos)",
+                    "enum": [
+                      "DRYING"
+                    ]
+                  },
+                  {
+                    "title": "Cooling (dryer)",
+                    "enum": [
+                      "COOLING"
+                    ]
+                  },
+                  {
+                    "title": "Wrinkle care (dryer)",
+                    "enum": [
+                      "WRINKLE_CARE"
+                    ]
+                  },
+                  {
+                    "title": "Rinse hold",
+                    "enum": [
+                      "RINSE_HOLD"
+                    ]
+                  },
+                  {
+                    "title": "Paused",
+                    "enum": [
+                      "PAUSE"
+                    ]
+                  },
+                  {
+                    "title": "Delayed start waiting",
+                    "enum": [
+                      "RESERVED"
+                    ]
+                  }
+                ]
+              }
+            },
+            "doneHoldMinutes": {
+              "title": "Keep \"Done\" on after the machine switches itself off (minutes)",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1440,
+              "description": "Empty: the general setting."
+            },
+            "hideRemoteStart": {
+              "type": "boolean",
+              "title": "Remote Start sensor",
+              "oneOf": [
+                {
+                  "title": "Leave it out",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "title": "Keep it",
+                  "enum": [
+                    false
+                  ]
+                }
+              ],
+              "description": "None: kept. For this appliance only; the others keep theirs."
+            },
+            "allowControl": {
+              "type": "boolean",
+              "title": "Allow starting and pausing from the Home app",
+              "oneOf": [
+                {
+                  "title": "Yes",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "title": "No",
+                  "enum": [
+                    false
+                  ]
+                }
+              ],
+              "description": "None: the general setting."
+            },
+            "tubCleanAfter": {
+              "title": "Tub clean reminder after (cycles)",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 200,
+              "description": "Empty: the general setting. 0: no reminder for this washer."
+            },
+            "lintFilterAfter": {
+              "title": "Lint filter reminder after (dries)",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Empty: the general setting. 0: no reminder for this dryer."
+            },
+            "lintFilterAutoClear": {
+              "type": "boolean",
+              "title": "Lint filter reminder goes off when the dryer starts again",
+              "oneOf": [
+                {
+                  "title": "Yes",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "title": "No",
+                  "enum": [
+                    false
+                  ]
+                }
+              ],
+              "description": "None: the general setting."
+            },
+            "ventCheckPercent": {
+              "title": "Dryer vent check: warn when drying takes longer by (%)",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 200,
+              "description": "Empty: the general setting. 0: no vent check for this dryer."
             },
             "extraControls": {
               "type": "boolean",
@@ -297,93 +598,183 @@
                 }
               ],
               "description": "None: not added. The room temperature as a sensor of its own, for automations."
-            },
-            "hideRemoteStart": {
-              "type": "boolean",
-              "title": "Washer, dryer: Remote Start sensor",
-              "oneOf": [
-                {
-                  "title": "Leave it out",
-                  "enum": [
-                    true
-                  ]
-                },
-                {
-                  "title": "Keep it",
-                  "enum": [
-                    false
-                  ]
-                }
-              ],
-              "description": "None: kept. For this appliance only; the others keep theirs."
             }
           }
         }
-      },
-      "pollInterval": {
-        "title": "Check every (seconds, idle)",
-        "type": "integer",
-        "default": 60,
-        "minimum": 30,
-        "maximum": 3600,
-        "description": "How often to ask LG for each appliance's state while nothing is running."
-      },
-      "runningPollInterval": {
-        "title": "Check every (seconds, during a cycle)",
-        "type": "integer",
-        "default": 30,
-        "minimum": 15,
-        "maximum": 600,
-        "description": "How often to ask during a cycle, so time left and the end are up to date."
       }
     }
   },
   "layout": [
     "token",
     "country",
-    "allowControl",
-    "experimental",
     {
-      "key": "extraControls",
-      "condition": {
-        "functionBody": "return model.experimental === true;"
-      }
-    },
-    "liveUpdates",
-    "energy",
-    {
-      "key": "phaseSensors",
-      "type": "checkboxes"
-    },
-    {
-      "key": "tubCleanAfter",
-      "type": "number"
-    },
-    {
-      "key": "lintFilterAfter",
-      "type": "number"
+      "type": "fieldset",
+      "title": "General",
+      "items": [
+        "general.allowControl",
+        "general.liveUpdates",
+        "general.energy",
+        "general.sensorType",
+        "general.experimental",
+        {
+          "key": "general.extraControls",
+          "condition": {
+            "functionBody": "return !!(model.general && model.general.experimental);"
+          }
+        }
+      ]
     },
     {
-      "key": "lintFilterAutoClear",
-      "condition": {
-        "functionBody": "return model.lintFilterAfter > 0;"
-      }
+      "type": "fieldset",
+      "title": "Washers, dryers and other cycle appliances",
+      "items": [
+        {
+          "key": "laundry.phaseSensors",
+          "type": "checkboxes"
+        },
+        {
+          "key": "laundry.doneHoldMinutes",
+          "type": "number"
+        }
+      ]
     },
     {
-      "key": "ventCheckPercent",
-      "type": "number"
+      "type": "fieldset",
+      "title": "Washers",
+      "items": [
+        {
+          "key": "washer.tubCleanAfter",
+          "type": "number"
+        }
+      ]
     },
     {
-      "key": "doneHoldMinutes",
-      "type": "number"
+      "type": "fieldset",
+      "title": "Dryers",
+      "items": [
+        {
+          "key": "dryer.lintFilterAfter",
+          "type": "number"
+        },
+        {
+          "key": "dryer.lintFilterAutoClear",
+          "condition": {
+            "functionBody": "return !!(model.dryer && model.dryer.lintFilterAfter > 0);"
+          }
+        },
+        {
+          "key": "dryer.ventCheckPercent",
+          "type": "number"
+        }
+      ]
     },
-    "sensorType",
     {
       "type": "fieldset",
       "title": "Advanced",
       "expandable": true,
       "items": [
-        "name",
+        {
+          "key": "appliances",
+          "type": "array",
+          "buttonText": "Add appliance",
+          "items": [
+            "appliances[].name",
+            {
+              "key": "appliances[].type",
+              "type": "select"
+            },
+            {
+              "key": "appliances[].sensorType",
+              "type": "select"
+            },
+            {
+              "key": "appliances[].energy",
+              "type": "select"
+            },
+            {
+              "key": "appliances[].phaseSensors",
+              "type": "checkboxes",
+              "condition": {
+                "functionBody": "const a = (model.appliances || [])[arrayIndices] || {}; return !a.type || [\"washer\", \"dryer\", \"washtower\", \"dishwasher\", \"styler\", \"oven\"].includes(a.type);"
+              }
+            },
+            {
+              "key": "appliances[].doneHoldMinutes",
+              "type": "number",
+              "condition": {
+                "functionBody": "const a = (model.appliances || [])[arrayIndices] || {}; return !a.type || [\"washer\", \"dryer\", \"washtower\", \"dishwasher\", \"styler\", \"oven\"].includes(a.type);"
+              }
+            },
+            {
+              "key": "appliances[].hideRemoteStart",
+              "type": "select",
+              "condition": {
+                "functionBody": "const a = (model.appliances || [])[arrayIndices] || {}; return !a.type || [\"washer\", \"dryer\", \"washtower\", \"dishwasher\", \"styler\", \"oven\"].includes(a.type);"
+              }
+            },
+            {
+              "key": "appliances[].allowControl",
+              "type": "select",
+              "condition": {
+                "functionBody": "const a = (model.appliances || [])[arrayIndices] || {}; return !a.type || [\"washer\", \"dryer\", \"washtower\", \"dishwasher\", \"styler\", \"oven\"].includes(a.type);"
+              }
+            },
+            {
+              "key": "appliances[].tubCleanAfter",
+              "type": "number",
+              "condition": {
+                "functionBody": "const a = (model.appliances || [])[arrayIndices] || {}; return !a.type || [\"washer\", \"washtower\"].includes(a.type);"
+              }
+            },
+            {
+              "key": "appliances[].lintFilterAfter",
+              "type": "number",
+              "condition": {
+                "functionBody": "const a = (model.appliances || [])[arrayIndices] || {}; return !a.type || [\"dryer\", \"washtower\"].includes(a.type);"
+              }
+            },
+            {
+              "key": "appliances[].lintFilterAutoClear",
+              "type": "select",
+              "condition": {
+                "functionBody": "const a = (model.appliances || [])[arrayIndices] || {}; return !a.type || [\"dryer\", \"washtower\"].includes(a.type);"
+              }
+            },
+            {
+              "key": "appliances[].ventCheckPercent",
+              "type": "number",
+              "condition": {
+                "functionBody": "const a = (model.appliances || [])[arrayIndices] || {}; return !a.type || [\"dryer\", \"washtower\"].includes(a.type);"
+              }
+            },
+            {
+              "key": "appliances[].acModes",
+              "condition": {
+                "functionBody": "const a = (model.appliances || [])[arrayIndices] || {}; return !a.type || [\"air_conditioner\"].includes(a.type);"
+              }
+            },
+            {
+              "key": "appliances[].acSwing",
+              "condition": {
+                "functionBody": "const a = (model.appliances || [])[arrayIndices] || {}; return !a.type || [\"air_conditioner\"].includes(a.type);"
+              }
+            },
+            {
+              "key": "appliances[].temperatureSensor",
+              "type": "select",
+              "condition": {
+                "functionBody": "const a = (model.appliances || [])[arrayIndices] || {}; return !a.type || [\"air_conditioner\"].includes(a.type);"
+              }
+            },
+            {
+              "key": "appliances[].extraControls",
+              "type": "select",
+              "condition": {
+                "functionBody": "const a = (model.appliances || [])[arrayIndices] || {}; return !a.type || [\"air_conditioner\", \"other\"].includes(a.type);"
+              }
+            }
+          ]
+        },
         {
           "key": "ignore",
           "type": "array",
@@ -393,35 +784,14 @@
           ]
         },
         {
-          "key": "appliances",
-          "type": "array",
-          "buttonText": "Add appliance",
-          "items": [
-            "appliances[].name",
-            {
-              "key": "appliances[].extraControls",
-              "type": "select"
-            },
-            "appliances[].acModes",
-            "appliances[].acSwing",
-            {
-              "key": "appliances[].temperatureSensor",
-              "type": "select"
-            },
-            {
-              "key": "appliances[].hideRemoteStart",
-              "type": "select"
-            }
-          ]
-        },
-        {
-          "key": "pollInterval",
+          "key": "polling.idle",
           "type": "number"
         },
         {
-          "key": "runningPollInterval",
+          "key": "polling.running",
           "type": "number"
-        }
+        },
+        "name"
       ]
     }
   ]

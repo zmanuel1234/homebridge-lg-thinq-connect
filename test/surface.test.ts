@@ -203,7 +203,7 @@ function defineTests(hap: Hap): void {
     for (const [name, entries] of Object.entries(saved)) {
       assert.ok(surface[name], `"${name}" disappeared from the HomeKit surface`);
       const missing = entries.filter((e) => !surface[name].includes(e));
-      assert.deepEqual(missing, [], `"${name}": changed or removed (renames and removals wait for 2.0; additions: UPDATE_SURFACE=1 npm test)`);
+      assert.deepEqual(missing, [], `"${name}": changed or removed (renames and removals wait for the next major version; additions: UPDATE_SURFACE=1 npm test)`);
     }
     assert.deepEqual(Object.keys(surface).filter((k) => !saved[k]), [], 'new entries: record them with UPDATE_SURFACE=1 npm test');
     for (const name of Object.keys(saved)) {
@@ -220,6 +220,8 @@ function settingKeys(): string[] {
       keys.add(`${prefix}${k}`);
       const items = (v as { items?: { properties?: Record<string, unknown> } }).items;
       if (items?.properties) { walk(items.properties, `${prefix}${k}[].`); }
+      const group = (v as { properties?: Record<string, unknown> }).properties;
+      if (group) { walk(group, `${prefix}${k}.`); }
     }
   };
   walk((schema as { schema: { properties: Record<string, unknown> } }).schema.properties, '');

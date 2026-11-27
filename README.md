@@ -174,26 +174,58 @@ What LG's error codes in the log mean:
 
 ### Settings
 
+The settings screen groups them the way they're saved in `config.json` (shown in brackets):
+
 | Setting | Default | What it does |
 |---|---|---|
-| Personal access token | | Your token from connect-pat.lgthinq.com |
-| Country | US | The country of your LG account (two letters) |
-| Allow starting and pausing | Off | Tapping a machine's tile starts, pauses or resumes it (needs Remote Start on the machine) |
-| Experimental appliances | Off | Also add the appliance types that are still experimental (see [Other appliances](#other-appliances)). Air conditioners, dehumidifiers and range hoods are added without it |
-| Extra switches | On | Air conditioner, air purifier and cooktop switches; turn off for a tidier Home app |
-| Live updates from LG | On | Changes and alerts arrive the moment they happen; scheduled checks continue as a backup |
-| Energy use in the Eve app | On | This month's energy use for appliances LG reports it for, shown in the Eve app (see [Energy use](#energy-use)) |
-| Phase sensors | None | Extra sensors that are on during a chosen phase |
-| Tub clean reminder after | 0 (off) | Cycles counted by LG at which the washer's tub-clean sensor turns on |
-| Lint filter reminder after | 0 (off) | Dries after which the dryer's lint filter sensor turns on; its "cleaned" button starts the count again |
-| Lint filter reminder goes off when the dryer starts again | Off | No "cleaned" button: the reminder goes off when the next dry starts |
-| Dryer vent check | 0 (off) | How much longer (%) recent dries must take than usual for the vent check sensor; 30 is a good start |
-| Keep "Done" on after the machine switches itself off | 120 min | How long at most "Done" stays on after a machine switches itself off straight from finished (until it's next switched on or started); 0 = off together with the machine |
-| Sensors show as | Contact sensors | Contact sensors (open = on; named in iOS's notifications) or occupancy sensors (detected = on; read better in Eve) for the Finished, Error and reminder sensors. Changing it replaces them: set their notifications and automations again |
-| Leave out these appliances | None | Names, as in the ThinQ app, to keep out of the Home app |
-| Options per appliance | None | Air conditioner modes, swing direction and room sensor, and extra switches, for one appliance (see [Options per appliance](#options-per-appliance)) |
-| Check every (idle) | 60 s | How often to ask LG while nothing runs (at least 10 min while live updates work) |
-| Check every (during a cycle) | 30 s | How often to ask while a cycle runs (at least 2 min while live updates work) |
+| Personal access token (`token`) | | Your token from connect-pat.lgthinq.com |
+| Country (`country`) | US | The country of your LG account (two letters) |
+| **General** (`general`) | | |
+| Allow starting and pausing (`allowControl`) | Off | Tapping a machine's tile starts, pauses or resumes it (needs Remote Start on the machine) |
+| Live updates from LG (`liveUpdates`) | On | Changes and alerts arrive the moment they happen; scheduled checks continue as a backup |
+| Energy use in the Eve app (`energy`) | On | This month's energy use for appliances LG reports it for, shown in the Eve app (see [Energy use](#energy-use)) |
+| Sensors show as (`sensorType`) | Contact sensors | Contact sensors (open = on; named in iOS's notifications) or occupancy sensors (detected = on; read better in Eve) for the Finished, Error and reminder sensors. Changing it replaces them: set their notifications and automations again |
+| Experimental appliances (`experimental`) | Off | Also add the appliance types that are still experimental (see [Other appliances](#other-appliances)). Air conditioners, dehumidifiers and range hoods are added without it |
+| Extra switches (`extraControls`) | On | Air conditioner, air purifier and cooktop switches; turn off for a tidier Home app |
+| **Washers, dryers and other cycle appliances** (`laundry`) | | |
+| Phase sensors (`phaseSensors`) | None | Extra sensors that are on during a chosen phase |
+| Keep "Done" on after the machine switches itself off (`doneHoldMinutes`) | 120 min | How long at most "Done" stays on after a machine switches itself off straight from finished (until it's next switched on or started); 0 = off together with the machine |
+| **Washers** (`washer`) | | |
+| Tub clean reminder after (`tubCleanAfter`) | 0 (off) | Cycles counted by LG at which the washer's tub-clean sensor turns on |
+| **Dryers** (`dryer`) | | |
+| Lint filter reminder after (`lintFilterAfter`) | 0 (off) | Dries after which the dryer's lint filter sensor turns on; its "cleaned" button starts the count again |
+| Lint filter reminder goes off when the dryer starts again (`lintFilterAutoClear`) | Off | No "cleaned" button: the reminder goes off when the next dry starts |
+| Dryer vent check (`ventCheckPercent`) | 0 (off) | How much longer (%) recent dries must take than usual for the vent check sensor; 30 is a good start |
+| **Advanced** | | |
+| Options per appliance (`appliances`) | None | Any of the settings above, and more, for one appliance (see [Options per appliance](#options-per-appliance)) |
+| Leave out these appliances (`ignore`) | None | Names, as in the ThinQ app, to keep out of the Home app |
+| Check every, idle (`polling.idle`) | 60 s | How often to ask LG while nothing runs (at least 10 min while live updates work) |
+| Check every, during a cycle (`polling.running`) | 30 s | How often to ask while a cycle runs (at least 2 min while live updates work) |
+
+<details><summary>config.json example</summary>
+
+```json
+{
+  "platform": "LGThinQConnect",
+  "name": "LG ThinQ",
+  "token": "thinqpat_…",
+  "country": "US",
+  "general": { "allowControl": true, "sensorType": "contact" },
+  "laundry": { "phaseSensors": ["SPINNING"], "doneHoldMinutes": 120 },
+  "washer": { "tubCleanAfter": 30 },
+  "dryer": { "lintFilterAfter": 1, "lintFilterAutoClear": true, "ventCheckPercent": 30 },
+  "polling": { "idle": 60, "running": 30 },
+  "appliances": [
+    { "name": "Washer", "type": "washer", "phaseSensors": ["SPINNING", "RINSING"] },
+    { "name": "Dryer", "type": "dryer", "sensorType": "occupancy", "lintFilterAfter": 0 }
+  ]
+}
+```
+
+</details>
+
+Settings from 2.x (all at the top level) still work: the plugin reads them the same way, and the
+settings screen converts them to the groups the next time you open it (save to keep that).
 
 ## How it works
 
@@ -299,17 +331,31 @@ tiles show. LG's API can't choose wash programs on any appliance.
 
 ### Options per appliance
 
-Under **Advanced → Options per appliance**, add an appliance by its name exactly as in the ThinQ
-app, then choose (left at "None", an option keeps its usual behaviour; the screen always shows one row, which
-is saved only once you fill it in):
+Under **Advanced → Options per appliance**, each appliance can have its own settings. The easy way:
+press **Check token**, then **Add my appliances to Options per appliance**: every appliance on your
+LG account gets a row with its name and type filled in (rows already there keep their settings).
+Or add a row by hand, with the appliance's name exactly as in the ThinQ app and its type.
+
+Each row shows only the options for its type. An option left at None (or empty) uses the general
+setting; set, it applies to that appliance only:
 
 | Option | For | What it does |
 |---|---|---|
-| Extra switches | Any | On or off for this one; None: the "Extra switches" setting |
+| Sensors show as | Any | Contact or occupancy sensors for this one |
+| Energy use in the Eve app | Any | On or off for this one |
+| Phase sensors | Washer, dryer, WashTower, dishwasher, Styler, oven | This one's phase sensors instead of the general ones |
+| Keep "Done" on (minutes) | Same | For this one |
+| Remote Start sensor | Same | Leave it out for this one; None: kept |
+| Allow starting and pausing | Same | On or off for this one |
+| Tub clean reminder after | Washer, WashTower | For this washer; 0: no reminder for it |
+| Lint filter reminder after, goes off when the dryer starts again | Dryer, WashTower | For this dryer; 0: no reminder for it |
+| Dryer vent check | Dryer, WashTower | For this dryer; 0: no vent check for it |
 | Modes on the tile | Air conditioner | All it has, cooling only, or heating only (for a unit used one way) |
 | The tile's swing moves | Air conditioner | Up and down (default), left and right, or both; the other direction gets a switch |
 | Room temperature sensor | Air conditioner | Add it: the room temperature as a sensor of its own, for automations; None: not added |
-| Remote Start sensor | Washer, dryer (and other cycle appliances) | Leave it out for this one (the others keep theirs); None: kept |
+| Extra switches | Air conditioner, anything else | On or off for this one |
+
+A row without a name applies to nothing and isn't kept.
 
 ### Energy use
 
@@ -390,14 +436,15 @@ only copies it to your clipboard. Look it over before pasting. Never paste your 
 ## Updates and compatibility
 
 Your scenes and automations are built on the tiles and sensors this plugin adds, so within a
-major version (now 2.x):
+major version (now 3.x):
 
 - **Updates never rename or remove** a tile, sensor or switch, or a setting. They may add new ones
   (often off by default, or behind a setting).
-- Anything that would break that waits for the next major version (**3.0**), with a migration
-  note in the CHANGELOG. 2.0's is there: the Finished, Error and reminder sensors became contact
-  sensors, under one setting.
-- **Betas** (versions like `2.1.0-beta.1`) are published under npm's `beta` tag, so you only get
+- Anything that would break that waits for the next major version (**4.0**), with a migration
+  note in the CHANGELOG. 3.0's is there: the settings moved into groups (converted for you, and
+  2.x's still read); no tile or sensor changed. 2.0's too: the Finished, Error and reminder
+  sensors became contact sensors, under one setting.
+- **Betas** (versions like `3.1.0-beta.1`) are published under npm's `beta` tag, so you only get
   them if you ask for them; the Homebridge UI's normal update installs stable versions only.
 
 The plugin's tests hold every appliance's tiles and settings to a recorded list
