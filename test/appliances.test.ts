@@ -90,7 +90,7 @@ function defineTests(hap: Hap): void {
       refreshSoon: () => { refreshes++; },
       extraControls,
       options,
-      problemAsOccupancy,
+      sensorsAsOccupancy: problemAsOccupancy,
     };
     const part = mappingFor(deviceType, profile)!.create(ctx, profile);
     return { part, accessory, lines, sent, refreshes: () => refreshes, failNext: (e: Error) => { fail = e; } };

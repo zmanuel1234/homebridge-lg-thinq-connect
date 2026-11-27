@@ -23,12 +23,12 @@ export interface ApplianceContext {
   extraControls?: boolean;
   /** This appliance's own options from the settings (matched by its ThinQ name). */
   options?: ApplianceOptions;
-  /** The problem sensor as an occupancy sensor ("detected" = a problem) instead of a contact sensor. */
-  problemAsOccupancy?: boolean;
+  /** Problem (and other notification) sensors as occupancy sensors instead of contact sensors. */
+  sensorsAsOccupancy?: boolean;
 }
 
 /**
- * The problem sensor: a contact sensor (open = a problem; the 1.x default) or, by setting, an
+ * The problem sensor: a contact sensor (open = a problem; the default) or, by setting, an
  * occupancy sensor (detected = a problem), like the other sensors. The one of the other kind, left
  * from before the setting changed, is removed.
  */
@@ -164,7 +164,7 @@ export abstract class Appliance implements Part {
 
   /** A "<name> problem" contact sensor: open after an LG problem alert until the state is fine. */
   protected addProblemSensor(): Service {
-    this.problemSensor = problemSensor(this.accessory, this.hap, !!this.ctx.problemAsOccupancy,
+    this.problemSensor = problemSensor(this.accessory, this.hap, !!this.ctx.sensorsAsOccupancy,
       (type, name, subtype) => this.service(type, name, subtype), `${this.ctx.name} problem`);
     return this.problemSensor;
   }

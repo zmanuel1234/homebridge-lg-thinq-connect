@@ -1,8 +1,8 @@
 // The HomeKit surface: every tile and sensor each appliance gets, with its identifier (subtype) and
-// characteristics, plus the setting names. People build automations and scenes on these, so 1.x
-// never renames or removes one by accident: any change fails this test until it's approved by
-// regenerating the snapshot (UPDATE_SURFACE=1 npm test) and noting it in the CHANGELOG. Additions
-// are fine in 1.x; renames and removals wait for 2.0.
+// characteristics, plus the setting names. People build automations and scenes on these, so a
+// major version (now 2.x) never renames or removes one by accident: any change fails this test
+// until it's approved by regenerating the snapshot (UPDATE_SURFACE=1 npm test) and noting it in the
+// CHANGELOG. Additions are fine within 2.x; renames and removals wait for 3.0.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';

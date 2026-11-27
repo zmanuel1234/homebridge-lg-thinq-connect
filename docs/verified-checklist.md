@@ -17,7 +17,7 @@ against this plugin. Last checked November 2026.
 | Keeps its files in Homebridge's storage folder | Yes: the live-update key and certificate, readable only by the Homebridge user |
 | No unhandled exceptions or rejections | Yes: every LG request is caught and logged, and every background task (timers, live updates, energy checks) goes through one catch that logs its error; tested for outages, rate limits and bad replies |
 | Doesn't log secrets | Yes: the token and certificate are never logged; Copy diagnostics removes them |
-| Accessories keep their identity across restarts | Yes: cached accessories are restored, and the HomeKit surface is frozen for 1.x |
+| Accessories keep their identity across restarts | Yes: cached accessories are restored, and the HomeKit surface is frozen within a major version (2.x) |
 
 **Real-hardware testing:** done on 1.0.8 with an LG washer (F3P2CYVAT) and dryer (RV13D4AMH):
 full cycles, Done and Problem sensors, Remote Start, start, pause and resume, restarts mid-cycle,

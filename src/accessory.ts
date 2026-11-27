@@ -28,7 +28,7 @@ import { ThinQError } from './api';
 import { displayName, keepOrUpdate } from './names';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service } from 'homebridge';
 import { type LaundryStatus, type LaundryUnit, operationPayload, ovenStartPayload, stateLabel } from './laundry';
-import { limit, problemSensor, showProblem } from './appliances/base';
+import { limit, showProblem } from './appliances/base';
 import { COUNTED_DRY_MS, type DryerCareContext, recordDry, usualDryMinutes } from './dryerCare';
 
 /**
@@ -83,14 +83,13 @@ export interface LaundryOptions {
   ventCheckPercent?: number;
   /** Minutes "done" stays on after the machine switches itself off straight from finished (default 120). */
   doneHoldMinutes?: number;
-  /** The problem sensor as an occupancy sensor (detected = a problem) instead of a contact sensor. */
-  problemAsOccupancy?: boolean;
   /**
-   * Done, tub clean, lint filter, vent check and rinse aid as contact sensors (open = on) instead of
-   * occupancy sensors: iOS names a contact sensor in its notification ("Dryer Done opened"), while
-   * for occupancy it only says "There is activity in <room>".
+   * Finished, error and reminder sensors (tub clean, lint filter, vent, rinse aid) as occupancy
+   * sensors (detected = on) instead of contact sensors (open = on). Contact sensors are named in
+   * iOS's notifications ("Dryer Finished opened"); for occupancy iOS only says "There is activity
+   * in <room>". Occupancy reads better in Eve.
    */
-  notifyAsContact?: boolean;
+  sensorsAsOccupancy?: boolean;
   /** The Remote Start sensor (when the machine reports it and control is allowed); default on. */
   remoteStartSensor?: boolean;
 }
@@ -194,8 +193,7 @@ export class LaundryAccessory {
     this.valve.getCharacteristic(C.StatusFault);
 
     this.doneSensor = this.notifySensor(true, `${name} finished`, 'done')!;
-    this.problemSensor = problemSensor(accessory, deps.api.hap, !!options.problemAsOccupancy,
-      (type, n, subtype) => this.service(type as typeof S.Valve, n, subtype), `${name} error`);
+    this.problemSensor = this.notifySensor(true, `${name} error`, 'problem')!;
 
     // Phase sensors the machine can report; ones no longer wanted are removed
     const phases = options.phaseSensors.filter((p) => unit.states.includes(p));
@@ -261,16 +259,23 @@ export class LaundryAccessory {
   }
 
   /**
-   * A sensor to be notified by: an occupancy sensor, or a contact sensor with notifyAsContact (iOS
-   * names those in its notifications). The one of the other kind, from before the setting
-   * changed, is removed, and both when the sensor isn't wanted.
+   * A sensor to be notified by: a contact sensor (iOS names those in its notifications), or an
+   * occupancy sensor with sensorsAsOccupancy. The one of the other kind, from before the setting
+   * changed, is removed (logged: its notifications need turning on again), and both when the
+   * sensor isn't wanted.
    */
   private notifySensor(wanted: boolean, name: string, subtype: string): Service | undefined {
     const { Service: S } = this.deps.api.hap;
-    const contact = !!this.options.notifyAsContact;
+    const contact = !this.options.sensorsAsOccupancy;
     const [type, other] = contact ? [S.ContactSensor, S.OccupancySensor] : [S.OccupancySensor, S.ContactSensor];
     const old = this.accessory.getServiceById(other, subtype);
-    if (old) { this.accessory.removeService(old); }
+    if (old) {
+      this.accessory.removeService(old);
+      if (wanted) {
+        this.deps.log.info(`[${this.options.name}] "${displayName(this.options.name, name)}" is now ${contact ? 'a contact' : 'an occupancy'} sensor `
+          + '(the setting "Sensors show as"): turn its notifications on again in the Home app, and check automations that used it.');
+      }
+    }
     return this.optional(wanted, type as typeof S.Valve, name, subtype);
   }
 
