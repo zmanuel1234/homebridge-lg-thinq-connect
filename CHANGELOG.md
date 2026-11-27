@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.1.2 - 2026-11-27
+
+### Changed
+- npm and Homebridge's plugin search: the description names all the supported appliances
+  (washers and dryers, air conditioners, dehumidifiers and range hoods), with keywords for them.
+  The README has CI and downloads badges.
+- An error from LG's API whose code or message isn't text is logged without "[object Object]";
+  the diagnostics tool lists appliances the same way. Nothing else changes.
+- Development only: CI and releases use the same shared workflows as the other plugins (cached
+  packages, release notes from this changelog); the linter checks for values that would show as
+  "[object Object]" (no-base-to-string).
+
 ## 3.1.1 - 2026-11-27
 
 ### Added
