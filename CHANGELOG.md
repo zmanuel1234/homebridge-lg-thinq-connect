@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.1.0 - 2026-11-27
+
+### Added
+- **Power switch** (optional: Washers, dryers and other cycle appliances → Power switch, or per
+  appliance): a "Washer Power" switch, on while the machine is on. Switching it off turns the
+  machine off. Not during a running cycle (pause it first), so a stray tap or scene can't end a
+  wash; LG's API can't turn a machine on. Needs "Allow starting and pausing". No existing tiles change.
+- README: washers and dryers compared side by side with homebridge-lg-thinq and Home Assistant.
+
 ## 3.0.0 - 2026-11-27
 
 ### Changed

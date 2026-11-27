@@ -47,6 +47,8 @@ export interface Settings {
   ventCheckPercent: number;
   /** Minutes "done" stays on after a machine switches itself off straight from finished. */
   doneHoldMinutes: number;
+  /** A power switch on washers, dryers and other cycle appliances (switching off only). */
+  powerSwitch: boolean;
   /** Add appliance types not yet confirmed on real hardware (everything but washers and dryers). */
   experimental: boolean;
   /** Extra switches for experimental appliances (air conditioner modes, purifier sleep mode…). */
@@ -108,6 +110,7 @@ function applianceOptions(v: unknown): Map<string, ApplianceOptions> {
     n('ventCheckPercent', 0, 200);
     if (typeof o.lintFilterAutoClear === 'boolean') { opts.lintFilterAutoClear = o.lintFilterAutoClear; }
     if (typeof o.allowControl === 'boolean') { opts.allowControl = o.allowControl; }
+    if (typeof o.powerSwitch === 'boolean') { opts.powerSwitch = o.powerSwitch; }
     if (typeof o.energy === 'boolean') { opts.energy = o.energy; }
     out.set(name, opts);
   }
@@ -135,6 +138,7 @@ export function readSettings(raw: PlatformConfig): Settings {
     lintFilterAutoClear: dryer.lintFilterAutoClear === true,
     ventCheckPercent: clamp(dryer.ventCheckPercent, 0, 200, 0),
     doneHoldMinutes: clamp(laundry.doneHoldMinutes, 0, 1440, 120),
+    powerSwitch: laundry.powerSwitch === true,
     experimental: general.experimental === true,
     extraControls: general.extraControls !== false,
     sensorsAsOccupancy: general.sensorType === 'occupancy',
@@ -477,6 +481,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
           lintFilterAutoClear: own.lintFilterAutoClear ?? this.settings.lintFilterAutoClear,
           ventCheckPercent: own.ventCheckPercent ?? this.settings.ventCheckPercent,
           doneHoldMinutes: own.doneHoldMinutes ?? this.settings.doneHoldMinutes,
+          powerSwitch: own.powerSwitch ?? this.settings.powerSwitch,
           sensorsAsOccupancy: own.sensorType ? own.sensorType === 'occupancy' : this.settings.sensorsAsOccupancy,
           remoteStartSensor: own.hideRemoteStart !== true },
         (payload) => this.client!.control(device.deviceId, payload),
