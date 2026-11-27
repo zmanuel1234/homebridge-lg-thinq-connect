@@ -47,7 +47,10 @@ Each washer or dryer shows up as:
 - **"Dryer Lint Filter"** (optional, dryers): detected after the number of dries you set, with a
   **"Dryer Lint Filter Cleaned"** button (a switch that turns itself off) that starts the count
   again. LG's API doesn't report the filter, so the plugin counts the finished dries itself (a dry
-  stopped half way doesn't count), and keeps the count across Homebridge restarts.
+  stopped half way doesn't count), and keeps the count across Homebridge restarts. Or, as a simple
+  reminder without the button, turn on **Lint filter reminder goes off when the dryer starts
+  again**: with the reminder after 1 dry, it comes on after every dry and goes off when you start
+  the next one.
 - **"Dryer Vent Check"** (optional, dryers): detected when recent dries take clearly longer than
   this dryer usually needs, a common sign of a clogged lint filter or a blocked vent. LG's dryers
   warn about restricted airflow only on their display, not through LG's API, so the plugin times
@@ -175,6 +178,7 @@ What LG's error codes in the log mean:
 | Phase sensors | None | Extra sensors that are on during a chosen phase |
 | Tub clean reminder after | 0 (off) | Cycles counted by LG at which the washer's tub-clean sensor turns on |
 | Lint filter reminder after | 0 (off) | Dries after which the dryer's lint filter sensor turns on; its "cleaned" button starts the count again |
+| Lint filter reminder goes off when the dryer starts again | Off | No "cleaned" button: the reminder goes off when the next dry starts |
 | Dryer vent check | 0 (off) | How much longer (%) recent dries must take than usual for the vent check sensor; 30 is a good start |
 | Keep "Done" on after the machine switches itself off | 120 min | How long at most "Done" stays on after a machine switches itself off straight from finished (until it's next switched on or started); 0 = off together with the machine |
 | Problem sensors show as | Contact sensors | Contact sensors (open = a problem) or occupancy sensors (detected = a problem, like the Done sensors). Changing it replaces each Problem sensor: set its notifications and automations again |

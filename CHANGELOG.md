@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.18 - 2026-11-27
+
+### Added
+- Dryers: **Lint filter reminder goes off when the dryer starts again** (off by default), a simple
+  reminder without the "Lint Filter Cleaned" button: the lint filter sensor comes on after the dries
+  you set and goes off when the next dry starts. With the reminder after 1 dry, it comes on after
+  every dry.
+
 ## 1.0.17 - 2026-11-26
 
 ### Fixed
