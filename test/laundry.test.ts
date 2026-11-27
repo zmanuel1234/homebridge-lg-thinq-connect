@@ -55,7 +55,7 @@ test('our machines as captured (both off): idle, no time left, even though the d
   assert.deepEqual(w, {
     state: 'POWER_OFF', running: false, paused: false, done: false, error: false, errorName: '',
     remaining: 0, total: 0, programTime: 0, remoteControl: false, cycleCount: 15, doorOpen: undefined, rinseAidLow: undefined,
-    course: undefined, startsIn: undefined,
+    course: undefined, startsIn: undefined, endsIn: undefined,
   });
   const d = laundryStatus(laundryUnits('DEVICE_DRYER', dryer.profile)[0], dryer.state);
   assert.equal(d.state, 'POWER_OFF');
@@ -188,6 +188,12 @@ test('LG alerts: finished or problem, and which machine', () => {
   assert.equal(alertKind('DRYING_FAILED'), 'problem');
   assert.equal(alertKind('ERROR_DURING_WASHING'), 'problem');
   assert.equal(alertKind('SOMETHING_NEW'), 'other');
+  // Codes Home Assistant lists for other appliances: a leak, a humidifier out of water
+  assert.equal(alertKind('WATER_LEAK_HAS_OCCURRED'), 'problem');
+  assert.equal(alertKind('LACK_OF_WATER'), 'problem');
+  assert.equal(alertKind('WATER_IS_FULL'), 'problem');
+  assert.equal(alertKind('TIME_TO_CHANGE_FILTER'), 'other');
+  assert.equal(alertKind('PREHEATING_IS_COMPLETE'), 'other');
   assert.equal(alertFor('WASHING_IS_COMPLETE'), 'washer');
   assert.equal(alertFor('ERROR_DURING_WASHING'), 'washer');
   assert.equal(alertFor('DRYING_FAILED'), 'dryer');
@@ -230,6 +236,10 @@ test('dishwasher: the course while running, and how long until a delayed start',
   const waiting = laundryStatus(unit, { runState: { currentState: 'RESERVED' }, timer: { relativeHourToStart: 3, relativeMinuteToStart: 15 } });
   assert.equal(waiting.startsIn, 3 * 3600 + 15 * 60);
   assert.equal(laundryStatus(unit, { runState: { currentState: 'RESERVED' } }).startsIn, undefined);
+  // Delay set by when it should finish (Home Assistant's "delayed end")
+  const byEnd = laundryStatus(unit, { runState: { currentState: 'RESERVED' }, timer: { relativeHourToStop: 6, relativeMinuteToStop: 0 } });
+  assert.equal(byEnd.endsIn, 6 * 3600);
+  assert.equal(byEnd.startsIn, undefined);
 });
 
 test('an oven reaching its temperature is not a finish', () => {

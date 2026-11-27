@@ -59,6 +59,8 @@ export interface ApplianceOptions {
   allowControl?: boolean;
   /** Overrides the general energy setting for this appliance. */
   energy?: boolean;
+  /** Washers, dryers and other cycle appliances (not ovens): overrides the power switch setting. */
+  powerSwitch?: boolean;
   /** Overrides the global "extra controls" setting for this appliance. */
   extraControls?: boolean;
   /** Air conditioners: the modes on the tile (cooling only, heating only, or all it has). */

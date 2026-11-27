@@ -123,6 +123,8 @@
     "Thermostat/water: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units"
   ],
   "heat pump": [
+    "TemperatureSensor/flow-temperature: Configured Name, Current Temperature, Name",
+    "TemperatureSensor/return-temperature: Configured Name, Current Temperature, Name",
     "Thermostat/hot-water: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units",
     "Thermostat/room: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units"
   ],
@@ -146,6 +148,7 @@
     "ContactSensor/tub-clean: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "Switch/power: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "ours DEVICE_DRYER": [
@@ -155,6 +158,7 @@
     "ContactSensor/vent-check: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
     "Switch/lint-filter-cleaned: Configured Name, Name, On",
+    "Switch/power: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "ha washtower_dryer": [
@@ -164,6 +168,7 @@
     "ContactSensor/vent-check: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
     "Switch/lint-filter-cleaned: Configured Name, Name, On",
+    "Switch/power: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "washtower (one device) WASHER": [
@@ -171,6 +176,7 @@
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "Switch/power: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "washtower (one device) DRYER": [
@@ -180,6 +186,7 @@
     "ContactSensor/vent-check: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
     "Switch/lint-filter-cleaned: Configured Name, Name, On",
+    "Switch/power: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "washtower washer MAIN": [
@@ -187,6 +194,7 @@
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "Switch/power: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "washcombo main MAIN": [
@@ -194,6 +202,7 @@
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "Switch/power: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "washcombo mini MAIN": [
@@ -201,12 +210,14 @@
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/phase-SPINNING: Configured Name, Name, Occupancy Detected",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "Switch/power: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "styler": [
     "ContactSensor/done: Configured Name, Contact Sensor State, Name",
     "ContactSensor/problem: Configured Name, Contact Sensor State, Name",
     "OccupancySensor/remote-start: Configured Name, Name, Occupancy Detected",
+    "Switch/power: Configured Name, Name, On",
     "Valve/cycle: Active, Configured Name, In Use, Name, Remaining Duration, Set Duration, Status Fault, Valve Type"
   ],
   "dishwasher": [
@@ -242,6 +253,7 @@
     "(read) liveUpdates",
     "(read) phaseSensors",
     "(read) pollInterval",
+    "(read) powerSwitch",
     "(read) runningPollInterval",
     "(read) sensorsAsOccupancy",
     "(read) token",
@@ -259,6 +271,7 @@
     "appliances[].lintFilterAutoClear",
     "appliances[].name",
     "appliances[].phaseSensors",
+    "appliances[].powerSwitch",
     "appliances[].sensorType",
     "appliances[].temperatureSensor",
     "appliances[].tubCleanAfter",
@@ -280,6 +293,7 @@
     "laundry",
     "laundry.doneHoldMinutes",
     "laundry.phaseSensors",
+    "laundry.powerSwitch",
     "name",
     "polling",
     "polling.idle",

@@ -1,5 +1,26 @@
 # Changelog
 
+## 3.1.0 - 2026-11-27
+
+### Added
+- **Power switch** (optional: Washers, dryers and other cycle appliances → Power switch, or per
+  appliance): a "Washer Power" switch, on while the machine is on. Switching it off turns the
+  machine off. Not during a running cycle (pause it first), so a stray tap or scene can't end a
+  wash; LG's API can't turn a machine on. Needs "Allow starting and pausing". No existing tiles change.
+- Heat pumps: **flow and return temperature** sensors (the water leaving and coming back), when
+  the heat pump reports them, as Home Assistant shows them.
+- A delay set by its finish time (common on US washers): the log says when the cycle finishes, as
+  it already said when a delayed start begins.
+- README: washers and dryers compared side by side with homebridge-lg-thinq and Home Assistant,
+  and what Home Assistant shows that this plugin doesn't (checked against its code for every
+  appliance type), with the reason.
+
+### Fixed
+- LG's **water leak** alert, and a humidifier's "out of water" alert, now open the appliance's
+  problem sensor (where it has one) and are logged as warnings; before, they were only logged. A
+  humidifier whose alerts include "out of water" gets a problem sensor for it (off again once it's
+  switched off and on, as for a dehumidifier's full tank).
+
 ## 3.0.0 - 2026-11-27
 
 ### Changed

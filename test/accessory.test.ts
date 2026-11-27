@@ -988,6 +988,38 @@ function defineTests(hap: Hap): void {
     assert.ok(lines.includes('info: [Washer] Sent resume.'));
   });
 
+  test('power switch: only when set and control is allowed; on while the machine is on', () => {
+    assert.equal(setup({ allowControl: true }).laundry.powerSwitch, undefined, 'off by default');
+    assert.equal(setup({ powerSwitch: true }).laundry.powerSwitch, undefined, 'not without control');
+    const { laundry, acc } = setup({ allowControl: true, powerSwitch: true });
+    assert.equal(acc.getServiceById(S.Switch, 'power'), laundry.powerSwitch);
+    assert.equal(value(laundry.powerSwitch!.getCharacteristic(C.ConfiguredName)), 'Washer Power');
+    laundry.update(status());
+    assert.equal(value(laundry.powerSwitch!.getCharacteristic(C.On)), false);
+    laundry.update(status({ state: 'INITIAL' }));
+    assert.equal(value(laundry.powerSwitch!.getCharacteristic(C.On)), true);
+    // Turned off in the settings: removed
+    setup({ allowControl: true, powerSwitch: false }, acc);
+    assert.equal(acc.getServiceById(S.Switch, 'power'), undefined);
+  });
+
+  test('power switch: off sends POWER_OFF when idle, finished or paused; refused during a running cycle, and for on', async () => {
+    const { laundry, sent, lines } = setup({ allowControl: true, powerSwitch: true });
+    const power = laundry.powerSwitch!.getCharacteristic(C.On);
+    laundry.update(running());
+    assert.equal(await write(power, 0), hap.HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE);
+    assert.ok(lines.some((l) => l.includes('Not switched off during a cycle: pause it first.')));
+    assert.deepEqual(sent, []);
+    laundry.update(status({ state: 'END', done: true }));
+    assert.equal(await write(power, 0), undefined);
+    assert.deepEqual(sent, [{ operation: { washerOperationMode: 'POWER_OFF' }, location: { locationName: 'MAIN' } }]);
+    assert.ok(lines.includes('info: [Washer] Sent power off.'));
+    laundry.update(status());
+    assert.equal(await write(power, 1), hap.HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE);
+    assert.ok(lines.some((l) => l.includes("can't switch a machine on: press its power button")));
+    assert.equal(sent.length, 1);
+  });
+
   test('remote start: a tap on an idle machine with Remote Start pressed sends START', async () => {
     const { laundry, sent, lines } = setup({ allowControl: true });
     laundry.update(status({ state: 'INITIAL', remoteControl: true }));

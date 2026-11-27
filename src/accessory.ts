@@ -96,6 +96,8 @@ export interface LaundryOptions {
   sensorsAsOccupancy?: boolean;
   /** The Remote Start sensor (when the machine reports it and control is allowed); default on. */
   remoteStartSensor?: boolean;
+  /** A power switch: on while the machine is on; switching it off switches the machine off (with control allowed). */
+  powerSwitch?: boolean;
 }
 
 export interface Deps {
@@ -152,6 +154,7 @@ export class LaundryAccessory {
    */
   private pending: { on: boolean; until: number } | undefined;
   readonly remoteStartSensor: Service | undefined;
+  readonly powerSwitch: Service | undefined;
   /** The temperature to start the oven at (°C), from the Home app or the oven. */
   private ovenTarget = DEFAULT_OVEN_C;
   /** Until when the Home app's temperature wins over the oven's report. */
@@ -230,6 +233,11 @@ export class LaundryAccessory {
     this.remoteStartSensor = this.optional(unit.reportsRemoteStart && options.allowControl && unit.kind !== 'oven'
       && options.remoteStartSensor !== false,
       S.OccupancySensor, `${name} ready to start`, 'remote-start');
+
+    // Power: off from the Home app (LG's API can't switch a machine on); not ovens, which stop from their thermostat
+    this.powerSwitch = this.optional(!!options.powerSwitch && options.allowControl && unit.kind !== 'oven'
+      && unit.operations.includes('POWER_OFF'), S.Switch, `${name} power`, 'power');
+    this.powerSwitch?.getCharacteristic(C.On).onSet((value) => this.setPower(!!value));
 
     // Oven temperature, when the oven accepts one
     this.ovenThermostat = this.optional(!!unit.oven, S.Thermostat, `${name} temperature`, 'oven-temperature');
@@ -353,7 +361,7 @@ export class LaundryAccessory {
     if (next && prev && next.state !== prev.state) {
       const left = next.remaining ? `, ${Math.round(next.remaining / 60)} min left` : '';
       const course = next.course && (next.running || next.paused) ? ` (${stateLabel(next.course).toLowerCase()})` : '';
-      const wait = next.startsIn ? `, starts in ${duration(next.startsIn)}` : '';
+      const wait = next.startsIn ? `, starts in ${duration(next.startsIn)}` : next.endsIn ? `, finishes in ${duration(next.endsIn)}` : '';
       this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state, this.unit.kind)}${course}${left}${wait}.`);
       if (next.error) {
         this.deps.log.warn(`[${this.options.name}] The machine reports an error${next.errorName ? `: ${next.errorName}` : ''}.`);
@@ -646,6 +654,9 @@ export class LaundryAccessory {
     if (this.ventSensor) {
       showProblem(this.ventSensor, this.deps.api.hap, this.accessory.context.ventBaseline !== undefined);
     }
+    if (this.powerSwitch) {
+      set(this.powerSwitch.getCharacteristic(C.On), this.poweredOn);
+    }
     if (this.remoteStartSensor) {
       set(this.remoteStartSensor.getCharacteristic(C.OccupancyDetected),
         this.waitingForStart ? C.OccupancyDetected.OCCUPANCY_DETECTED : C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
@@ -771,6 +782,27 @@ export class LaundryAccessory {
     } finally {
       this.refreshSoon();
     }
+  }
+
+  /** The machine is on: it reports a state other than off. */
+  private get poweredOn(): boolean {
+    const state = this.status?.state;
+    return !!state && state !== 'POWER_OFF' && state !== 'UNKNOWN';
+  }
+
+  /**
+   * The power switch: off switches the machine off. Not during a running cycle (pause it first),
+   * so a stray tap or scene can't end a wash. On can't be sent: LG's API has no power-on.
+   */
+  private async setPower(on: boolean): Promise<void> {
+    if (on === this.poweredOn) { return; }
+    if (on) { this.refuse('LG\'s API can\'t switch a machine on: press its power button.'); }
+    if (!this.options.allowControl) {
+      this.refuse('Ignored the tap in the Home app: control is off in the plugin settings ("Allow starting and pausing").');
+    }
+    if (this.status?.running) { this.refuse('Not switched off during a cycle: pause it first.'); }
+    await this.sendOperation('POWER_OFF', 'Sent power off.');
+    this.render();
   }
 
   /** The valve tapped in the Home app: start or resume (on), pause (off). */

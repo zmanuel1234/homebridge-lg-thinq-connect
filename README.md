@@ -190,6 +190,7 @@ The settings screen groups them the way they're saved in `config.json` (shown in
 | **Washers, dryers and other cycle appliances** (`laundry`) | | |
 | Phase sensors (`phaseSensors`) | None | Extra sensors that are on during a chosen phase |
 | Keep "Done" on after the machine switches itself off (`doneHoldMinutes`) | 120 min | How long at most "Done" stays on after a machine switches itself off straight from finished (until it's next switched on or started); 0 = off together with the machine |
+| Power switch (`powerSwitch`) | Off | A "Power" switch: on while the machine is on; switch it off to turn the machine off (LG's API can't turn one on). Not during a running cycle: pause it first. Needs "Allow starting and pausing"; not for ovens |
 | **Washers** (`washer`) | | |
 | Tub clean reminder after (`tubCleanAfter`) | 0 (off) | Cycles counted by LG at which the washer's tub-clean sensor turns on |
 | **Dryers** (`dryer`) | | |
@@ -347,6 +348,7 @@ setting; set, it applies to that appliance only:
 | Keep "Done" on (minutes) | Same | For this one |
 | Remote Start sensor | Same | Leave it out for this one; None: kept |
 | Allow starting and pausing | Same | On or off for this one |
+| Power switch | Washer, dryer, WashTower, dishwasher, Styler | On or off for this one |
 | Tub clean reminder after | Washer, WashTower | For this washer; 0: no reminder for it |
 | Lint filter reminder after, goes off when the dryer starts again | Dryer, WashTower | For this dryer; 0: no reminder for it |
 | Dryer vent check | Dryer, WashTower | For this dryer; 0: no vent check for it |
@@ -506,6 +508,29 @@ password, and depend on that sign-in staying the same.
 | [homebridge-lg-thinqconnect-ac](https://www.npmjs.com/package/homebridge-lg-thinqconnect-ac) | Official | Air conditioners |
 | [homebridge-lg-thinq-system-boiler](https://www.npmjs.com/package/homebridge-lg-thinq-system-boiler) | Official | Heat pumps and hot water |
 
+### Washers and dryers, side by side
+
+Checked November 2026 against [homebridge-lg-thinq](https://github.com/nVuln/homebridge-lg-thinq)
+1.8.11 (its washer and dryer code) and Home Assistant's
+[LG ThinQ integration](https://www.home-assistant.io/integrations/lg_thinq/).
+
+| | This plugin | homebridge-lg-thinq | Home Assistant |
+|---|---|---|---|
+| LG sign-in | Official token | LG app password | Official token |
+| Time left on the tile | ✓ | ✓ | A sensor |
+| Start and pause from the Home app | ✓ (with Remote Start on) | – (taps are ignored) | ✓ |
+| Switch off | ✓ (optional Power switch) | – | ✓ |
+| Finished notification | Named sensor ("Washer Finished"), on until the laundry is taken out or the next cycle | Optional occupancy sensor ("activity in" the room), off after 10 min | An event |
+| Error notification | Named sensor, and LG's error in the log | A fault on the tile | An event |
+| Ready to start (Remote Start on) | ✓ | – | ✓ |
+| Phase sensors (spinning, rinsing…) | ✓ | – | A status sensor |
+| Tub clean reminder | At the count you choose; off after a Tub Clean | At 30 cycles | A cycle count |
+| Lint filter reminder, vent check | ✓ | – | – |
+| Energy use | This month, in Eve | – | This month, last month, yesterday |
+| Settings per appliance | All that apply to it | Finished sensor, door lock, tub clean | – |
+| Door lock | – (LG's official API doesn't report it) | ✓ (optional) | – |
+| Delayed start | Shown (a phase sensor) | – | Shown and set |
+
 ## Home Assistant parity
 
 Home Assistant's [LG ThinQ integration](https://www.home-assistant.io/integrations/lg_thinq/) is
@@ -524,6 +549,17 @@ the most used project on LG's official API, so this plugin keeps track of it:
   one). Some values have no Home app tile, such as the program name, filter dates or a fridge's
   door alarm history; these are in the log instead.
 - **Not covered yet.** The kimchi refrigerator shows nothing beyond its basic tile.
+- **Checked against Home Assistant's code** (27 November 2026, every appliance type). What Home
+  Assistant shows and this plugin doesn't, and why:
+  - On/off timers and sleep timers (air conditioners, purifiers, humidifiers, ventilators), and a
+    washer's delay setting: the Home app has no timer control. A delay already set is shown: the
+    "Delayed start waiting" phase, and the log says when the cycle starts or finishes.
+  - Odor level (purifiers, air conditioners): HomeKit's air quality has no odor value.
+  - Settings that LG keeps on the appliance: dishwasher rinse and softener levels, chime and
+    reminder preferences; purifier personalization and air monitoring; wine cellar light level.
+  - AeroTower wind angle and warm air temperature.
+  - A refrigerator's water filter state word: shown as the filter's level where LG reports it.
+  - Home brew and plant cultivator details (recipes, capsules, growth mode).
 
 Each week an automated check, run by the maintainer, looks at new Home Assistant changes and LG
 toolkit releases, and opens a "Parity check" issue here when something needs a look.
