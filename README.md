@@ -34,10 +34,17 @@ Each washer or dryer shows up as:
   Homebridge restart. A dryer keeps it on through wrinkle care; switching it off there ends it.
 - **"Washer Problem"** (contact sensor): open while the machine reports an error (door, drain,
   water supply, unbalanced load and so on), or after LG's "drying failed" or "error during
-  washing" alert, until the next cycle starts or the machine is switched off. The machine's tile
+  washing" alert, until the error is over (for example the door closed and the machine back to
+  ready), the next cycle starts or the machine is switched off. The machine's tile
   also shows a fault. In Eve a contact sensor reads backwards ("Contact: Yes" means closed: no
   problem); the setting *Problem sensors show as* can make it an occupancy sensor instead
   ("Detected" = a problem), like the other sensors.
+- **Notifications that say which sensor**: for occupancy sensors, iOS's notifications only say
+  "There is activity in Utility Room", the same for Done, Tub Clean, Lint Filter and the rest. Set
+  *Done and reminder sensors show as* to **Contact sensors** (and *Problem sensors show as* too):
+  iOS then names the sensor ("Dryer Done opened"), so rename the sensors in the Home app to read
+  well, such as "Dryer finished" or "Clean the lint filter". Changing it replaces those sensors: turn
+  their notifications on again.
 - **Phase sensors** (optional): a sensor that's on during a phase you choose, such as
   *Spinning* or *Drying*, for automations like "turn on the fan while the washer spins".
 - **"Washer Tub Clean"** (optional, washers that count their cycles): detected once LG's cycle
@@ -181,6 +188,7 @@ What LG's error codes in the log mean:
 | Lint filter reminder goes off when the dryer starts again | Off | No "cleaned" button: the reminder goes off when the next dry starts |
 | Dryer vent check | 0 (off) | How much longer (%) recent dries must take than usual for the vent check sensor; 30 is a good start |
 | Keep "Done" on after the machine switches itself off | 120 min | How long at most "Done" stays on after a machine switches itself off straight from finished (until it's next switched on or started); 0 = off together with the machine |
+| Done and reminder sensors show as | Occupancy sensors | Occupancy or contact sensors (open = done / due) for Done, Tub Clean, Lint Filter, Vent Check and Rinse Aid; contact sensors are named in iOS's notifications. Changing it replaces those sensors: set their notifications and automations again |
 | Problem sensors show as | Contact sensors | Contact sensors (open = a problem) or occupancy sensors (detected = a problem, like the Done sensors). Changing it replaces each Problem sensor: set its notifications and automations again |
 | Leave out these appliances | None | Names, as in the ThinQ app, to keep out of the Home app |
 | Options per appliance | None | Air conditioner modes, swing direction and room sensor, and extra switches, for one appliance (see [Options per appliance](#options-per-appliance)) |
@@ -344,6 +352,7 @@ run into most.
 
 | What you see | What to do |
 |---|---|
+| Every notification says "There is activity in <room>" | Set *Done and reminder sensors show as* to Contact sensors, so iOS names the sensor; then turn their notifications on again |
 | "LG error 1103", "1218" or "1302" (often with HTTP 401) | The token isn't valid: create a new one, with every permission ticked (see [Signing in](#signing-in)) |
 | No appliances found, or not all of them | The token is on a different LG account than the ThinQ app's: sign in to the token page with the QR code. Check the country |
 | "LG error 1307 / 1309" | The country doesn't match the LG account: set the one the account was created in |

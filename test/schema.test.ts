@@ -50,6 +50,7 @@ test('settings screen: every default matches its type and limits, and the code u
   assert.equal(s.tubCleanAfter, props.tubCleanAfter.default);
   assert.equal(s.lintFilterAfter, props.lintFilterAfter.default);
   assert.equal(s.lintFilterAutoClear, props.lintFilterAutoClear.default);
+  assert.equal(s.notifyAsContact, props.notificationSensors.default === 'contact');
   assert.equal(s.ventCheckPercent, props.ventCheckPercent.default);
   // The code's limits match the screen's
   assert.equal(readSettings({ platform: PLATFORM_NAME, pollInterval: 1 } as PlatformConfig).pollInterval, props.pollInterval.minimum);

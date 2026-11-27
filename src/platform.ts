@@ -52,6 +52,8 @@ export interface Settings {
   extraControls: boolean;
   /** Problem sensors as occupancy sensors instead of contact sensors. */
   problemAsOccupancy: boolean;
+  /** Done and reminder sensors as contact sensors, so iOS names them in notifications. */
+  notifyAsContact: boolean;
   /** Appliance names (as in the ThinQ app) to leave out of the Home app. */
   ignore: string[];
   /** Options for single appliances, by name as in the ThinQ app (lower case). */
@@ -104,6 +106,7 @@ export function readSettings(config: PlatformConfig): Settings {
     experimental: config.experimental === true,
     extraControls: config.extraControls !== false,
     problemAsOccupancy: config.problemSensor === 'occupancy',
+    notifyAsContact: config.notificationSensors === 'contact',
     ignore: strings(config.ignore).map((s) => s.toLowerCase()),
     appliances: applianceOptions(config.appliances),
     energy: config.energy !== false,
@@ -438,6 +441,7 @@ export class LGThinQPlatform implements DynamicPlatformPlugin {
           lintFilterAfter: this.settings.lintFilterAfter, lintFilterAutoClear: this.settings.lintFilterAutoClear,
           ventCheckPercent: this.settings.ventCheckPercent,
           doneHoldMinutes: this.settings.doneHoldMinutes, problemAsOccupancy: this.settings.problemAsOccupancy,
+          notifyAsContact: this.settings.notifyAsContact,
           remoteStartSensor: this.settings.appliances.get(alias.trim().toLowerCase())?.hideRemoteStart !== true },
         (payload) => this.client!.control(device.deviceId, payload),
         () => this.schedule(machine, 3));
