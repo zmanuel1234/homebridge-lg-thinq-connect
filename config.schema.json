@@ -210,7 +210,7 @@
             ]
           }
         ],
-        "description": "The Done, Tub Clean, Lint Filter, Vent Check and Rinse Aid sensors. For occupancy sensors iOS's notifications only say \"There is activity in <room>\", the same for each; for contact sensors they name the sensor (\"Dryer Done opened\"), so rename them in the Home app to read well. Changing it replaces these sensors: set their notifications and automations again."
+        "description": "The Done, Tub Clean, Lint Filter, Vent Check and Rinse Aid sensors. For occupancy sensors iOS's notifications only say \"There is activity in <room>\", the same for each; for contact sensors they name the sensor (\"Dryer Finished opened\"). Changing it replaces these sensors: set their notifications and automations again."
       },
       "ignore": {
         "title": "Leave out these appliances",

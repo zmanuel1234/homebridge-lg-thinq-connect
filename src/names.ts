@@ -14,10 +14,13 @@ export function displayName(appliance: string, name: string): string {
 
 /**
  * The name to show now, given the one the Home app has: ours on first use; then the Home app's,
- * unless it's only our earlier lower-case default (1.0.x), which is brought up to date.
+ * unless it's only an earlier default of ours (the 1.0.x lower-case one, or one of `previous`),
+ * which is brought up to date.
  */
-export function keepOrUpdate(current: unknown, name: string): string | undefined {
+export function keepOrUpdate(current: unknown, name: string, previous: string[] = []): string | undefined {
   if (typeof current !== 'string' || !current) { return name; }
-  if (current !== name && current.toLowerCase() === name.toLowerCase()) { return name; }
+  if (current === name) { return undefined; }
+  const was = current.toLowerCase();
+  if (was === name.toLowerCase() || previous.some((p) => p.toLowerCase() === was)) { return name; }
   return undefined;
 }

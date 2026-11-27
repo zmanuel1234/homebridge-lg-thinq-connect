@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.20 - 2026-11-27
+
+### Changed
+- Sensor names that read well in notifications, in title case: "Washer Finished" (was Done),
+  "Washer Error" (Problem), "Washer Tub Clean Due" (Tub Clean), "Washer Ready To Start" (Remote
+  Start), "Dryer Clean Lint Filter" (Lint Filter) and "Dryer Check Vent" (Vent Check). Sensors still
+  showing the earlier default name get the new one; names changed in the Home app are kept. Only
+  the names change: automations and scenes are unaffected.
+
 ## 1.0.19 - 2026-11-27
 
 ### Added

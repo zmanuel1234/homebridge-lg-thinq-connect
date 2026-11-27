@@ -75,8 +75,8 @@ function defineTests(hap: Hap): void {
     assert.equal(acc.getServiceById(S.Valve, 'cycle'), laundry.valve);
     assert.equal(value(laundry.valve.getCharacteristic(C.ValveType)), C.ValveType.GENERIC_VALVE);
     assert.equal(value(laundry.valve.getCharacteristic(C.ConfiguredName)), 'Washer');
-    assert.equal(value(laundry.doneSensor.getCharacteristic(C.ConfiguredName)), 'Washer Done');
-    assert.equal(value(laundry.problemSensor.getCharacteristic(C.ConfiguredName)), 'Washer Problem');
+    assert.equal(value(laundry.doneSensor.getCharacteristic(C.ConfiguredName)), 'Washer Finished');
+    assert.equal(value(laundry.problemSensor.getCharacteristic(C.ConfiguredName)), 'Washer Error');
     const info = acc.getService(S.AccessoryInformation)!;
     assert.equal(value(info.getCharacteristic(C.Manufacturer)), 'LG');
     assert.equal(value(info.getCharacteristic(C.Model)), 'F3P2CYVAT__');
@@ -458,7 +458,7 @@ function defineTests(hap: Hap): void {
   test('tub-clean reminder: on once LG\'s cycle count reaches the setting, logged once', () => {
     const { acc, laundry, lines } = setup({ tubCleanAfter: 30 });
     const sensor = acc.getServiceById(S.OccupancySensor, 'tub-clean')!;
-    assert.equal(value(sensor.getCharacteristic(C.ConfiguredName)), 'Washer Tub Clean');
+    assert.equal(value(sensor.getCharacteristic(C.ConfiguredName)), 'Washer Tub Clean Due');
     laundry.update(status({ cycleCount: 29 }));
     assert.equal(value(sensor.getCharacteristic(C.OccupancyDetected)), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
     laundry.update(status({ cycleCount: 30 }));
@@ -548,9 +548,9 @@ function defineTests(hap: Hap): void {
     assert.equal(plain.laundry.ventSensor, undefined);
     assert.equal(setup({ lintFilterAfter: 5, ventCheckPercent: 30 }).laundry.lintSensor, undefined, 'not for a washer');
     const { acc, laundry } = dryerSetup({ lintFilterAfter: 5, ventCheckPercent: 30 });
-    assert.equal(value(laundry.lintSensor!.getCharacteristic(C.ConfiguredName)), 'Dryer Lint Filter');
+    assert.equal(value(laundry.lintSensor!.getCharacteristic(C.ConfiguredName)), 'Dryer Clean Lint Filter');
     assert.equal(value(laundry.lintButton!.getCharacteristic(C.ConfiguredName)), 'Dryer Lint Filter Cleaned');
-    assert.equal(value(laundry.ventSensor!.getCharacteristic(C.ConfiguredName)), 'Dryer Vent Check');
+    assert.equal(value(laundry.ventSensor!.getCharacteristic(C.ConfiguredName)), 'Dryer Check Vent');
     assert.equal(acc.getServiceById(S.Switch, 'lint-filter-cleaned'), laundry.lintButton);
     // Turned off again: removed
     const off = dryerSetup({}, acc);
@@ -686,8 +686,28 @@ function defineTests(hap: Hap): void {
     first.laundry.doneSensor.getCharacteristic(C.ConfiguredName).updateValue('Washer done');
     first.laundry.problemSensor.getCharacteristic(C.ConfiguredName).updateValue('Laundry trouble');
     const again = setup({}, first.acc);
-    assert.equal(value(again.laundry.doneSensor.getCharacteristic(C.ConfiguredName)), 'Washer Done');
+    assert.equal(value(again.laundry.doneSensor.getCharacteristic(C.ConfiguredName)), 'Washer Finished');
     assert.equal(value(again.laundry.problemSensor.getCharacteristic(C.ConfiguredName)), 'Laundry trouble');
+  });
+
+  test('names: the 1.0.19 defaults (Done, Problem, Tub Clean, Remote Start, Lint Filter, Vent Check) become the new ones; chosen names stay', () => {
+    const old = setup({ tubCleanAfter: 30, allowControl: true });
+    const name = (svc: { getCharacteristic: (c: typeof C.ConfiguredName) => Characteristic }) => svc.getCharacteristic(C.ConfiguredName);
+    name(old.laundry.doneSensor).updateValue('Washer Done');
+    name(old.laundry.problemSensor).updateValue('Washer Problem');
+    name(old.laundry.tubCleanSensor!).updateValue('Washer tub clean');
+    name(old.laundry.remoteStartSensor!).updateValue('Washer Remote Start');
+    const again = setup({ tubCleanAfter: 30, allowControl: true }, old.acc);
+    assert.equal(value(name(again.laundry.doneSensor)), 'Washer Finished');
+    assert.equal(value(name(again.laundry.problemSensor)), 'Washer Error');
+    assert.equal(value(name(again.laundry.tubCleanSensor!)), 'Washer Tub Clean Due');
+    assert.equal(value(name(again.laundry.remoteStartSensor!)), 'Washer Ready To Start');
+    const dryer = dryerSetup({ lintFilterAfter: 1, ventCheckPercent: 30 });
+    name(dryer.laundry.lintSensor!).updateValue('Dryer Lint Filter');
+    name(dryer.laundry.ventSensor!).updateValue('Clean the vent!');
+    const dryerAgain = dryerSetup({ lintFilterAfter: 1, ventCheckPercent: 30 }, dryer.acc);
+    assert.equal(value(name(dryerAgain.laundry.lintSensor!)), 'Dryer Clean Lint Filter');
+    assert.equal(value(name(dryerAgain.laundry.ventSensor!)), 'Clean the vent!', 'a name chosen in the Home app stays');
   });
 
   test('a refused tap leaves the tile readable (HAP-NodeJS kept the error and the Home app showed No Response)', async () => {
@@ -804,7 +824,7 @@ function defineTests(hap: Hap): void {
     const { acc, laundry } = setup({ problemAsOccupancy: true }, first.acc);
     assert.equal(acc.getServiceById(S.ContactSensor, 'problem'), undefined, 'the old one is gone');
     const sensor = acc.getServiceById(S.OccupancySensor, 'problem')!;
-    assert.equal(value(sensor.getCharacteristic(C.ConfiguredName)), 'Washer Problem', 'same name');
+    assert.equal(value(sensor.getCharacteristic(C.ConfiguredName)), 'Washer Error', 'same name');
     const shown = () => value(sensor.getCharacteristic(C.OccupancyDetected));
     laundry.update(status({ state: 'INITIAL' }));
     assert.equal(shown(), C.OccupancyDetected.OCCUPANCY_NOT_DETECTED);
@@ -850,8 +870,8 @@ function defineTests(hap: Hap): void {
     const done = acc.getServiceById(S.ContactSensor, 'done')!;
     const tub = acc.getServiceById(S.ContactSensor, 'tub-clean')!;
     assert.equal(laundry.doneSensor, done);
-    assert.equal(value(done.getCharacteristic(C.ConfiguredName)), 'Washer Done', 'same name');
-    assert.equal(value(tub.getCharacteristic(C.ConfiguredName)), 'Washer Tub Clean');
+    assert.equal(value(done.getCharacteristic(C.ConfiguredName)), 'Washer Finished', 'same name');
+    assert.equal(value(tub.getCharacteristic(C.ConfiguredName)), 'Washer Tub Clean Due');
     const state = (svc: typeof done) => value(svc.getCharacteristic(C.ContactSensorState));
     laundry.update(status({ state: 'END', done: true, cycleCount: 31 }));
     assert.equal(state(done), C.ContactSensorState.CONTACT_NOT_DETECTED, 'open: done');
@@ -875,7 +895,7 @@ function defineTests(hap: Hap): void {
     assert.equal(setup().acc.getServiceById(S.OccupancySensor, 'remote-start'), undefined, 'no sensor without control');
     const { acc, laundry } = setup({ allowControl: true });
     const sensor = acc.getServiceById(S.OccupancySensor, 'remote-start')!;
-    assert.equal(value(sensor.getCharacteristic(C.ConfiguredName)), 'Washer Remote Start');
+    assert.equal(value(sensor.getCharacteristic(C.ConfiguredName)), 'Washer Ready To Start');
     const shown = () => value(sensor.getCharacteristic(C.OccupancyDetected));
     laundry.update(status({ state: 'INITIAL', remoteControl: true }));
     assert.equal(shown(), C.OccupancyDetected.OCCUPANCY_DETECTED, 'waiting to be started');
