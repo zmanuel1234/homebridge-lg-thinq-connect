@@ -207,6 +207,8 @@ export interface LaundryStatus {
   rinseAidLow?: boolean;
   /** The course or program, when reported (dishwashers: dishWashingCourse). */
   course?: string;
+  /** Seconds until a delayed cycle finishes, while waiting for one set by its end time (RESERVED). */
+  endsIn?: number;
   /** Seconds until a delayed start, while waiting for one (RESERVED). */
   startsIn?: number;
 }
@@ -272,6 +274,10 @@ export function laundryStatus(unit: LaundryUnit, state: unknown): LaundryStatus 
     ...ovenStatus(unit, s),
     startsIn: current === 'RESERVED'
       ? num(field(timer, 'relativeHourToStart')) * 3600 + num(field(timer, 'relativeMinuteToStart')) * 60 || undefined
+      : undefined,
+    // A delay set as "finish in" (common on US machines) rather than "start in"
+    endsIn: current === 'RESERVED'
+      ? num(field(timer, 'relativeHourToStop')) * 3600 + num(field(timer, 'relativeMinuteToStop')) * 60 || undefined
       : undefined,
   };
 }
@@ -356,7 +362,8 @@ export function mergeState(base: unknown, patch: unknown): unknown {
 
 /** What an LG alert means: a finished cycle, a problem, or neither (just logged). */
 export function alertKind(pushCode: string): 'finished' | 'problem' | 'other' {
-  if (/ERROR|FAIL|FULL|EMPTY|PROBLEM/.test(pushCode)) { return 'problem'; }
+  // Also a water leak, and a humidifier or dehumidifier out of water (LG's codes, as Home Assistant lists them)
+  if (/ERROR|FAIL|FULL|EMPTY|PROBLEM|LEAK|LACK_OF_WATER|NEED_WATER/.test(pushCode)) { return 'problem'; }
   // An oven reaching its temperature isn't the end of cooking
   if (/PREHEAT/.test(pushCode)) { return 'other'; }
   if (/COMPLETE|FINISH|DONE/.test(pushCode)) { return 'finished'; }

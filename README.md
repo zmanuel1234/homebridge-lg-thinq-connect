@@ -549,6 +549,17 @@ the most used project on LG's official API, so this plugin keeps track of it:
   one). Some values have no Home app tile, such as the program name, filter dates or a fridge's
   door alarm history; these are in the log instead.
 - **Not covered yet.** The kimchi refrigerator shows nothing beyond its basic tile.
+- **Checked against Home Assistant's code** (27 November 2026, every appliance type). What Home
+  Assistant shows and this plugin doesn't, and why:
+  - On/off timers and sleep timers (air conditioners, purifiers, humidifiers, ventilators), and a
+    washer's delay setting: the Home app has no timer control. A delay already set is shown: the
+    "Delayed start waiting" phase, and the log says when the cycle starts or finishes.
+  - Odor level (purifiers, air conditioners): HomeKit's air quality has no odor value.
+  - Settings that LG keeps on the appliance: dishwasher rinse and softener levels, chime and
+    reminder preferences; purifier personalization and air monitoring; wine cellar light level.
+  - AeroTower wind angle and warm air temperature.
+  - A refrigerator's water filter state word: shown as the filter's level where LG reports it.
+  - Home brew and plant cultivator details (recipes, capsules, growth mode).
 
 Each week an automated check, run by the maintainer, looks at new Home Assistant changes and LG
 toolkit releases, and opens a "Parity check" issue here when something needs a look.

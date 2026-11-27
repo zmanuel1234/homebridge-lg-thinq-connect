@@ -449,13 +449,13 @@ function defineTests(hap: Hap): void {
     const { part, accessory, sent } = make('DEVICE_SYSTEM_BOILER', { property: {
       boilerJobMode: { currentJobMode: en(['HEAT', 'COOL', 'AUTO']) },
       operation: { boilerOperationMode: en(['POWER_ON', 'POWER_OFF']), hotWaterMode: en(['ON', 'OFF']), roomTempMode: en(['AIR', 'WATER'], ['r']) },
-      roomTemperatureInUnits: [{ unit: 'C', airHeatTargetTemperature: range(16, 30) }],
+      roomTemperatureInUnits: [{ unit: 'C', airHeatTargetTemperature: range(16, 30), outWaterCurrentTemperature: { type: 'number', mode: ['r'] } }],
       hotWaterTemperatureInUnits: [{ unit: 'C', targetTemperature: range(30, 60) }],
     } }, 'Heat pump');
     part.update({
       boilerJobMode: { currentJobMode: 'HEAT' },
       operation: { boilerOperationMode: 'POWER_ON', hotWaterMode: 'OFF', roomTempMode: 'AIR' },
-      roomTemperatureInUnits: [{ unit: 'C', airCurrentTemperature: 20.5, airHeatTargetTemperature: 21 }],
+      roomTemperatureInUnits: [{ unit: 'C', airCurrentTemperature: 20.5, airHeatTargetTemperature: 21, outWaterCurrentTemperature: 38 }],
       hotWaterTemperatureInUnits: [{ unit: 'C', currentTemperature: 42, targetTemperature: 50, minTemperature: 30, maxTemperature: 55 }],
     });
     const room = accessory.getServiceById(S.Thermostat, 'room')!;
@@ -465,6 +465,11 @@ function defineTests(hap: Hap): void {
     assert.equal(val(room.getCharacteristic(C.TargetHeatingCoolingState)), C.TargetHeatingCoolingState.HEAT);
     assert.equal(val(water.getCharacteristic(C.TargetHeatingCoolingState)), C.TargetHeatingCoolingState.OFF);
     assert.equal(water.getCharacteristic(C.TargetTemperature).props.maxValue, 55, 'limits from the state');
+    // The water leaving the heat pump, as Home Assistant shows it; no return sensor when it isn't reported
+    const flow = accessory.getServiceById(S.TemperatureSensor, 'flow-temperature')!;
+    assert.equal(val(flow.getCharacteristic(C.ConfiguredName)), 'Heat pump Flow Temperature');
+    assert.equal(val(flow.getCharacteristic(C.CurrentTemperature)), 38);
+    assert.equal(accessory.getServiceById(S.TemperatureSensor, 'return-temperature'), undefined);
     await write(room.getCharacteristic(C.TargetTemperature), 22);
     await write(room.getCharacteristic(C.TargetHeatingCoolingState), C.TargetHeatingCoolingState.COOL);
     await write(water.getCharacteristic(C.TargetHeatingCoolingState), C.TargetHeatingCoolingState.HEAT);

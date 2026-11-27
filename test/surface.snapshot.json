@@ -123,6 +123,8 @@
     "Thermostat/water: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units"
   ],
   "heat pump": [
+    "TemperatureSensor/flow-temperature: Configured Name, Current Temperature, Name",
+    "TemperatureSensor/return-temperature: Configured Name, Current Temperature, Name",
     "Thermostat/hot-water: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units",
     "Thermostat/room: Configured Name, Current Heating Cooling State, Current Temperature, Name, Target Heating Cooling State, Target Temperature, Temperature Display Units"
   ],

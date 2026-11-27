@@ -119,9 +119,16 @@ export class WaterHeater extends Thermostats {
   }
 }
 
+/** A heat pump's water temperatures: [LG property, name, subtype]. */
+const WATER_TEMPERATURES: [string, string, string][] = [
+  ['outWaterCurrentTemperature', 'flow temperature', 'flow-temperature'],
+  ['inWaterCurrentTemperature', 'return temperature', 'return-temperature'],
+];
+
 /** Heat pumps: room heating / cooling, and hot water. */
 export class HeatPump extends Thermostats {
   readonly room: Service;
+  readonly waterSensors = new Map<string, Service>();
   readonly water?: Service;
   private readonly res: Obj;
   private readonly roomRange: Range;
@@ -156,6 +163,15 @@ export class HeatPump extends Thermostats {
         (v) => this.setWater(v !== T.OFF), (c) => this.setWaterTarget(c));
       keep.add('hot-water');
     }
+    // The water leaving and returning to the heat pump, when it reports them (as Home Assistant shows them)
+    const roomProfile = JSON.stringify(this.res.roomTemperatureInUnits ?? '');
+    for (const [prop, label, subtype] of WATER_TEMPERATURES) {
+      if (!roomProfile.includes(`"${prop}"`)) { continue; }
+      const svc = this.service(this.hap.Service.TemperatureSensor, `${ctx.name} ${label}`, subtype);
+      limit(svc.getCharacteristic(C.CurrentTemperature), { minValue: -40, maxValue: 100 });
+      this.waterSensors.set(prop, svc);
+      keep.add(subtype);
+    }
     this.prune(keep);
     this.update(undefined);
   }
@@ -164,6 +180,11 @@ export class HeatPump extends Thermostats {
     const { Characteristic: C } = this.hap;
     const T = C.TargetHeatingCoolingState;
     if (state) {
+      const temps = field(state, 'roomTemperatureInUnits');
+      for (const [prop, svc] of this.waterSensors) {
+        const t = temperatureC(temps, prop);
+        if (t !== undefined) { set(svc.getCharacteristic(C.CurrentTemperature), t); }
+      }
       this.powered = stateValue(state, 'operation', 'boilerOperationMode') === 'POWER_ON';
       const job = stateValue(state, 'boilerJobMode', 'currentJobMode');
       if (typeof job === 'string') { this.jobMode = job; }

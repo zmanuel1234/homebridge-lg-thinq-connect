@@ -361,7 +361,7 @@ export class LaundryAccessory {
     if (next && prev && next.state !== prev.state) {
       const left = next.remaining ? `, ${Math.round(next.remaining / 60)} min left` : '';
       const course = next.course && (next.running || next.paused) ? ` (${stateLabel(next.course).toLowerCase()})` : '';
-      const wait = next.startsIn ? `, starts in ${duration(next.startsIn)}` : '';
+      const wait = next.startsIn ? `, starts in ${duration(next.startsIn)}` : next.endsIn ? `, finishes in ${duration(next.endsIn)}` : '';
       this.deps.log.info(`[${this.options.name}] ${stateLabel(next.state, this.unit.kind)}${course}${left}${wait}.`);
       if (next.error) {
         this.deps.log.warn(`[${this.options.name}] The machine reports an error${next.errorName ? `: ${next.errorName}` : ''}.`);

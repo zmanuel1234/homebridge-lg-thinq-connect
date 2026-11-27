@@ -104,7 +104,8 @@ const APPLIANCES: { name: string; type: string; profile: unknown; options?: Appl
   { name: 'heat pump', type: 'DEVICE_SYSTEM_BOILER', profile: { property: {
     operation: { boilerOperationMode: en(['POWER_ON', 'POWER_OFF']), hotWaterMode: en(['ON', 'OFF']) },
     boilerJobMode: { currentJobMode: en(['HEAT', 'COOL', 'AUTO']) },
-    roomTemperatureInUnits: [{ unit: 'C', airHeatTargetTemperature: range(15, 30), airCurrentTemperature: number }],
+    roomTemperatureInUnits: [{ unit: 'C', airHeatTargetTemperature: range(15, 30), airCurrentTemperature: number,
+      outWaterCurrentTemperature: number, inWaterCurrentTemperature: number }],
     hotWaterTemperatureInUnits: [{ unit: 'C', targetTemperature: range(30, 55), currentTemperature: number }],
   } } },
   { name: 'robot vacuum', type: 'DEVICE_ROBOT_CLEANER', profile: { property: {
