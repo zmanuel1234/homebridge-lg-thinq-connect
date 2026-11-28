@@ -590,6 +590,21 @@ Releases are published to npm by GitHub Actions (`.github/workflows/publish.yml`
 
 Each version has a section in `CHANGELOG.md`: `## 1.2.3 - date`, an optional one-line summary, then bullets (no Added/Changed/Fixed headings). A release published without notes takes that section as its notes.
 
+## Credits
+
+- LG's [ThinQ Connect](https://thinq.developer.lge.com/en/cloud/docs/thinq-connect/) documentation
+  and its Node toolkit [thinqconnect](https://github.com/thinq-connect/jsthinqconnect) (Apache-2.0)
+  describe the API and each appliance type's properties.
+- Home Assistant's [LG ThinQ integration](https://github.com/home-assistant/core/tree/dev/homeassistant/components/lg_thinq)
+  (Apache-2.0) showed how each appliance type behaves; its sample data from real appliances is
+  used in this plugin's tests (`test/fixtures/ha`, with its licence).
+- [homebridge-lg-thinqconnect-ac](https://www.npmjs.com/package/homebridge-lg-thinqconnect-ac) (MIT)
+  for the air conditioner mapping, including sending commands one at a time, and
+  [homebridge-lg-thinq-system-boiler](https://www.npmjs.com/package/homebridge-lg-thinq-system-boiler)
+  (MIT) for the heat pump mapping.
+- The long work in [homebridge-lg-thinq](https://github.com/nVuln/homebridge-lg-thinq) showed which
+  Home app tiles suit each appliance.
+
 ## License
 
 MIT

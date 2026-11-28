@@ -22,3 +22,5 @@ dist/
 !/test/hbConfig/auth.json
 coverage/
 *.tsbuildinfo
+# The live-updates file (it holds a private key) of a Homebridge started from this folder.
+lg-thinq-connect/

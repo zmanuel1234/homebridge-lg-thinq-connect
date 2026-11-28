@@ -119,7 +119,17 @@ async function main(): Promise<void> {
     : `${report.appliances.length} appliance(s) above. Look it over, then paste it into your issue.`);
 }
 
-if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+/** Whether Node was started on this file (directly, through npm's bin link, or without the .js). */
+function startedAsCommand(): boolean {
+  const self = realpathSync(fileURLToPath(import.meta.url));
+  const given = process.argv[1];
+  if (!given) { return false; }
+  return [given, `${given}.js`].some((p) => {
+    try { return realpathSync(p) === self; } catch { return false; }
+  });
+}
+
+if (startedAsCommand()) {
   main().catch((err: unknown) => {
     console.error(`lg-thinq-diagnostics: ${(err as Error).message}`);
     process.exitCode = 1;
