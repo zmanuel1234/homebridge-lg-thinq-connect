@@ -569,6 +569,26 @@ the most used project on LG's official API, so this plugin keeps track of it:
 Each week an automated check, run by the maintainer, looks at new Home Assistant changes and LG
 toolkit releases, and opens a "Parity check" issue here when something needs a look.
 
+## Development
+
+The plugin and its tests are written in TypeScript (`src/`, `test/`). It's published as
+compiled JavaScript (`dist/`), which npm builds on `npm ci`, `npm pack` and `npm publish`.
+
+```
+npm ci          # installs and builds
+npm test        # runs the tests against the TypeScript sources
+npm run check   # type checking
+npm run lint    # oxlint
+npm run build   # build only
+npm run verify  # everything CI checks, including the settings schema and README examples
+```
+
+`npm publish` runs `npm run verify` first.
+
+Releases are published to npm by GitHub Actions (`.github/workflows/publish.yml`, the same in the author's other plugins) when a GitHub release is published. The tag must be `v` followed by the version in `package.json`, the release needs notes (the CHANGELOG section for the version), and **Set as a pre-release** must be ticked exactly for a version with a `-`. The workflow runs `npm run release:check`, adds the package and its `SHA256SUMS` to the release, and publishes that package with npm's trusted publishing: a `-dev-` version to npm's `dev` tag, any other pre-release to `beta`, a stable version to `latest`. **Run workflow** with a release's tag publishes a release that already exists. CI (`.github/workflows/ci.yml`, also shared) runs `npm run verify` on Node 24 and `npm run test:matrix` on Node 22, 24 and 26.
+
+Each version has a section in `CHANGELOG.md`: `## 1.2.3 - date`, an optional one-line summary, then bullets (no Added/Changed/Fixed headings). A release published without notes takes that section as its notes.
+
 ## Credits
 
 - LG's [ThinQ Connect](https://thinq.developer.lge.com/en/cloud/docs/thinq-connect/) documentation
