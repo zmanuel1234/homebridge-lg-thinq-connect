@@ -15,9 +15,9 @@ import { dirname } from 'node:path';
 import { connect as tlsConnect } from 'node:tls';
 import type { Duplex } from 'node:stream';
 import type { Logging } from 'homebridge';
-import { field, type ThinQClient } from './api';
-import { newIdentity as makeIdentity, type Identity } from './csr';
-import { MqttClient } from './mqtt';
+import { field, type ThinQClient } from './api.js';
+import { newIdentity as makeIdentity, type Identity } from './csr.js';
+import { MqttClient } from './mqtt.js';
 
 export type LiveClient = Pick<ThinQClient, 'messageServer' | 'registerClient' | 'issueCertificate' | 'subscribeEvents' | 'subscribePush'>;
 

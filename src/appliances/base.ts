@@ -1,11 +1,11 @@
 // What every appliance shares: a Home app accessory, services named after the appliance, commands
 // sent one at a time, and LG's problem alerts shown on a "problem" sensor.
 
-import { ThinQError } from '../api';
-import { displayName, keepOrUpdate, namedBefore } from '../names';
+import { ThinQError } from '../api.js';
+import { displayName, keepOrUpdate, namedBefore } from '../names.js';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service, WithUUID } from 'homebridge';
-import type { Device } from '../api';
-import type { LaundryContext } from '../accessory';
+import type { Device } from '../api.js';
+import type { LaundryContext } from '../accessory.js';
 
 export interface ApplianceContext {
   log: Logging;

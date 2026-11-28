@@ -9,28 +9,30 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { API, Logging, PlatformAccessory } from 'homebridge';
 import type * as HapNodejs from '@homebridge/hap-nodejs';
-import { type ApplianceContext, MAPPED_TYPES, mappingFor } from '../src/appliances';
-import { LaundryAccessory, type LaundryContext } from '../src/accessory';
-import { LAUNDRY_TYPES, laundryUnits } from '../src/laundry';
-import { PLUGIN_NAME } from '../src/settings';
-import { readSettings } from '../src/platform';
-import { realDevices } from './fake-lg';
-import schema from '../config.schema.json';
+import { type ApplianceContext, MAPPED_TYPES, mappingFor } from '../src/appliances/index.js';
+import { LaundryAccessory, type LaundryContext } from '../src/accessory.js';
+import { LAUNDRY_TYPES, laundryUnits } from '../src/laundry.js';
+import { PLUGIN_NAME } from '../src/settings.js';
+import { readSettings } from '../src/platform.js';
+import { realDevices } from './fake-lg.js';
+import schema from '../config.schema.json' with { type: 'json' };
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 type Hap = typeof HapNodejs;
 let hap: Hap | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   hap = require('@homebridge/hap-nodejs') as Hap;
 } catch { /* the HAP tests elsewhere report why */ }
 
-const SNAPSHOT = join(__dirname, 'surface.snapshot.json');
+const SNAPSHOT = join(import.meta.dirname, 'surface.snapshot.json');
 const en = (values: string[], mode: string[] = ['r', 'w']) => ({ type: 'enum', mode, value: Object.fromEntries(mode.map((m) => [m, values])) });
 const range = (min: number, max: number, step = 1, mode: string[] = ['r', 'w']) =>
   ({ type: 'range', mode, value: Object.fromEntries(mode.map((m) => [m, { min, max, step }])) });
 const bool = (mode: string[] = ['r', 'w']) => ({ type: 'boolean', mode, value: Object.fromEntries(mode.map((m) => [m, [true, false]])) });
 const number = { type: 'number', mode: ['r'] };
-const ha = (name: string): unknown => JSON.parse(readFileSync(join(__dirname, 'fixtures', 'ha', name, 'profile.json'), 'utf8'));
+const ha = (name: string): unknown => JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', 'ha', name, 'profile.json'), 'utf8'));
 
 /** Profiles with every feature each mapping can show (from LG's docs and toolkits, and Home Assistant's samples). */
 const APPLIANCES: { name: string; type: string; profile: unknown; options?: ApplianceContext['options']; extraControls?: boolean }[] = [
@@ -234,7 +236,7 @@ if (hap) { defineTests(hap); } else { test('HomeKit surface', { skip: 'HAP libra
 
 // The accessory IDs: the Home app keys scenes and automations to these, so they never change in 1.x
 test('HomeKit surface: accessory IDs are made the same way', () => {
-  const src = readFileSync(join(__dirname, '..', 'src', 'platform.ts'), 'utf8');
+  const src = readFileSync(join(import.meta.dirname, '..', 'src', 'platform.ts'), 'utf8');
   assert.ok(src.includes('uuid.generate(`${PLUGIN_NAME}:${device.deviceId}:${unit.location}`)'), 'laundry accessory IDs');
   assert.ok(src.includes('uuid.generate(`${PLUGIN_NAME}:${device.deviceId}:`)'), 'other appliances\' accessory IDs');
   assert.equal(PLUGIN_NAME, 'homebridge-lg-thinq-connect');

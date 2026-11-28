@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { connect } from 'node:net';
 import { once } from 'node:events';
-import { MqttClient, PacketReader, packet } from '../src/mqtt';
-import { FakeBroker } from './fake-broker';
+import { MqttClient, PacketReader, packet } from '../src/mqtt.js';
+import { FakeBroker } from './fake-broker.js';
 
 async function setup(t: { after(fn: () => unknown): void }, options: { keepAliveSeconds?: number; timeoutMs?: number } = {}) {
   const broker = await new FakeBroker().start();

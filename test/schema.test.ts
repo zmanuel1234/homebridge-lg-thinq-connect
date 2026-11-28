@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import config from '../config.schema.json';
-import { readSettings } from '../src/platform';
-import { PLATFORM_NAME } from '../src/settings';
+import config from '../config.schema.json' with { type: 'json' };
+import { readSettings } from '../src/platform.js';
+import { PLATFORM_NAME } from '../src/settings.js';
 import type { PlatformConfig } from 'homebridge';
 
 interface SchemaNode {
@@ -118,8 +118,8 @@ test('settings screen: every setting is in the layout, and intervals are number 
 });
 
 test('settings screen: phase choices are states LG reports for washers or dryers', async () => {
-  const { realDevices } = await import('./fake-lg');
-  const { laundryUnits } = await import('../src/laundry');
+  const { realDevices } = await import('./fake-lg.js');
+  const { laundryUnits } = await import('../src/laundry.js');
   const [w, d] = realDevices();
   const known = new Set([...laundryUnits('DEVICE_WASHER', w.profile)[0].states, ...laundryUnits('DEVICE_DRYER', d.profile)[0].states]);
   for (const choice of props['laundry.phaseSensors'].items!.oneOf!) {

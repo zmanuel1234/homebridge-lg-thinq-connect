@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { PlatformConfig } from 'homebridge';
-import { isOldShape, kindOf, migrateConfig } from '../src/configShape';
-import { readSettings } from '../src/platform';
+import { isOldShape, kindOf, migrateConfig } from '../src/configShape.js';
+import { readSettings } from '../src/platform.js';
 
 // The user's 2.x config, as the settings screen saved it (token shortened)
 const flat = {

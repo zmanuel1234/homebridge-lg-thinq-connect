@@ -3,7 +3,7 @@
 // headers LG requires checked on every request.
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import fixturesJson from './fixtures/washer-dryer-diagnostics.json';
+import fixturesJson from './fixtures/washer-dryer-diagnostics.json' with { type: 'json' };
 
 export interface Recorded {
   method: string;

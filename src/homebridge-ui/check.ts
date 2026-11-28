@@ -1,9 +1,9 @@
-import { ThinQClient, ThinQError, type ClientOptions } from '../api';
-import { kindOf } from '../configShape';
-import { isCycleAppliance, isLaundry } from '../laundry';
-import { MAPPED_TYPES } from '../appliances';
-import { supportLevel } from '../support';
-import { collect } from '../bin/lg-thinq-diagnostics';
+import { ThinQClient, ThinQError, type ClientOptions } from '../api.js';
+import { kindOf } from '../configShape.js';
+import { isCycleAppliance, isLaundry } from '../laundry.js';
+import { MAPPED_TYPES } from '../appliances/index.js';
+import { supportLevel } from '../support.js';
+import { collect } from '../bin/lg-thinq-diagnostics.js';
 
 /**
  * tested: confirmed on real appliances. checked: matches Home Assistant on real sample data

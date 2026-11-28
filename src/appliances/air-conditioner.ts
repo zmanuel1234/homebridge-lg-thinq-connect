@@ -14,16 +14,16 @@
 // LG modes without a heater/cooler equivalent (fan only, dry, air clean) show as on and idle.
 
 import type { CharacteristicValue, Service } from 'homebridge';
-import { field } from '../api';
-import { alertKind } from '../laundry';
-import { Appliance, type ApplianceContext, set, limit } from './base';
-import { AirSensors, alertCodes } from './sensors';
+import { field } from '../api.js';
+import { alertKind } from '../laundry.js';
+import { Appliance, type ApplianceContext, set, limit } from './base.js';
+import { AirSensors, alertCodes } from './sensors.js';
 import {
   type Obj, type Range, cToF, enumValues, fToC, fieldOf, levelFor, levelPercent, powerField, resources, speedLevels,
   stateValue, temperatureC, temperatureRangeC, unitOf, writable,
-} from './profile';
+} from './profile.js';
 
-export { alertCodes } from './sensors';
+export { alertCodes } from './sensors.js';
 
 const MODES = ['COOL', 'HEAT', 'AUTO'] as const;
 type Mode = typeof MODES[number];

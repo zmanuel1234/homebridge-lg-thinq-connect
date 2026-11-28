@@ -5,7 +5,7 @@
 // each mode. A state has the same resources with current values. Some resources are lists, one
 // entry per location (a fridge's FRIDGE and FREEZER) or per unit (temperatureInUnits: C and F).
 
-import { field } from '../api';
+import { field } from '../api.js';
 
 export type Obj = Record<string, unknown>;
 

@@ -1,11 +1,14 @@
 import test, { mock } from 'node:test';
-import { ThinQError } from '../src/api';
+import { ThinQError } from '../src/api.js';
 import assert from 'node:assert/strict';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service } from 'homebridge';
 import type * as HapNodejs from '@homebridge/hap-nodejs';
-import { LaundryAccessory, type LaundryContext, type LaundryOptions } from '../src/accessory';
-import { type LaundryStatus, laundryStatus, laundryUnits } from '../src/laundry';
-import { realDevices } from './fake-lg';
+import { LaundryAccessory, type LaundryContext, type LaundryOptions } from '../src/accessory.js';
+import { type LaundryStatus, laundryStatus, laundryUnits } from '../src/laundry.js';
+import { realDevices } from './fake-lg.js';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 type Hap = typeof HapNodejs;
 
@@ -14,7 +17,6 @@ type Hap = typeof HapNodejs;
 let hap: Hap | null = null;
 let loadError = '';
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   hap = require('@homebridge/hap-nodejs') as Hap;
 } catch (err) {
   loadError = (err as Error).message.split('\n')[0];

@@ -12,20 +12,22 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { API, Characteristic, Logging, PlatformAccessory } from 'homebridge';
 import type * as HapNodejs from '@homebridge/hap-nodejs';
-import { type ApplianceContext, mappingFor } from '../src/appliances';
-import { LaundryAccessory, type LaundryContext } from '../src/accessory';
-import { laundryStatus, laundryUnits } from '../src/laundry';
-import { SUPPORT } from '../src/support';
-import { levelFor, speedLevels } from '../src/appliances/profile';
+import { type ApplianceContext, mappingFor } from '../src/appliances/index.js';
+import { LaundryAccessory, type LaundryContext } from '../src/accessory.js';
+import { laundryStatus, laundryUnits } from '../src/laundry.js';
+import { SUPPORT } from '../src/support.js';
+import { levelFor, speedLevels } from '../src/appliances/profile.js';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 type Hap = typeof HapNodejs;
 let hap: Hap | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   hap = require('@homebridge/hap-nodejs') as Hap;
 } catch { /* reported by the other HAP tests */ }
 
-const DIR = join(__dirname, 'fixtures', 'ha');
+const DIR = join(import.meta.dirname, 'fixtures', 'ha');
 const json = (name: string, file: string): unknown => JSON.parse(readFileSync(join(DIR, name, `${file}.json`), 'utf8'));
 
 interface Shown { state: string; attrs: Record<string, string> }

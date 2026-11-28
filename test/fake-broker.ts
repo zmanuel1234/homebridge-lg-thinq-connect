@@ -2,7 +2,7 @@
 // It answers CONNECT, SUBSCRIBE and PINGREQ, records PUBACKs, and lets a test publish to clients.
 import { createServer, type Server, type Socket } from 'node:net';
 import type { AddressInfo } from 'node:net';
-import { PacketReader, packet } from '../src/mqtt';
+import { PacketReader, packet } from '../src/mqtt.js';
 
 export interface BrokerClient {
   socket: Socket;

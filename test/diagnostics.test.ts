@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { collect, redact } from '../src/bin/lg-thinq-diagnostics';
-import { ThinQClient } from '../src/api';
-import { FakeLG } from './fake-lg';
+import { collect, redact } from '../src/bin/lg-thinq-diagnostics.js';
+import { ThinQClient } from '../src/api.js';
+import { FakeLG } from './fake-lg.js';
 
 test('redact: device IDs anywhere, and serial, MAC and network fields', () => {
   const out = redact({

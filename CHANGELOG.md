@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.0 - 2026-11-28
+
+No change to how appliances work: the same accessories, LG requests, settings page and `lg-thinq-diagnostics` output as 3.2.0.
+
+- Published as an ES module, on the author's Homebridge plugin template (which is built on Homebridge's own), like the author's other plugins.
+- Development only: the template's TypeScript and lint setup; `npm run watch` runs a local Homebridge that restarts on every change.
+
 ## 3.2.0 - 2026-11-27
 
 Requires Homebridge 2; nothing else changes in how the plugin works.

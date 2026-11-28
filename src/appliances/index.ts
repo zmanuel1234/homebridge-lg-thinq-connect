@@ -2,16 +2,16 @@
 // All of these are experimental: they appear only with the "Experimental appliances" setting on,
 // until someone with the appliance confirms them.
 
-import { Cooktop } from './cooking';
-import { AirConditioner } from './air-conditioner';
-import { AirPurifier, Fan, Hood, HumidityAppliance, Microwave } from './air';
-import { Fridge } from './fridge';
-import { HeatPump, WaterHeater } from './heating';
-import { Basic, RobotVacuum, StickVacuum, basicHasSomething } from './other';
-import type { ApplianceContext, Part } from './base';
-import { resources } from './profile';
+import { Cooktop } from './cooking.js';
+import { AirConditioner } from './air-conditioner.js';
+import { AirPurifier, Fan, Hood, HumidityAppliance, Microwave } from './air.js';
+import { Fridge } from './fridge.js';
+import { HeatPump, WaterHeater } from './heating.js';
+import { Basic, RobotVacuum, StickVacuum, basicHasSomething } from './other.js';
+import type { ApplianceContext, Part } from './base.js';
+import { resources } from './profile.js';
 
-export type { ApplianceContext, ApplianceOptions, Part } from './base';
+export type { ApplianceContext, ApplianceOptions, Part } from './base.js';
 
 // HomeKit accessory categories (Homebridge's Categories is a const enum, so the numbers are used)
 const CATEGORY = { OTHER: 1, FAN: 3, THERMOSTAT: 9, AIR_PURIFIER: 19, AIR_CONDITIONER: 21, AIR_HUMIDIFIER: 22, AIR_DEHUMIDIFIER: 23 } as const;

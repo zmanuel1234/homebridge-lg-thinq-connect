@@ -2,30 +2,32 @@
 // and the commands each sends. Air conditioners, the air purifier, dehumidifier and range hood use
 // Home Assistant's sample data (test/fixtures/ha); the rest are built from LG's documented
 // property names.
-import { ThinQError } from '../src/api';
+import { ThinQError } from '../src/api.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { API, Characteristic, Logging, PlatformAccessory } from 'homebridge';
 import type * as HapNodejs from '@homebridge/hap-nodejs';
-import { type ApplianceContext, categoryOf, mappingFor } from '../src/appliances';
-import type { LaundryContext } from '../src/accessory';
-import { filterPercent } from '../src/appliances/sensors';
-import { levelFor, levelPercent, speedLevels, temperatureC } from '../src/appliances/profile';
+import { type ApplianceContext, categoryOf, mappingFor } from '../src/appliances/index.js';
+import type { LaundryContext } from '../src/accessory.js';
+import { filterPercent } from '../src/appliances/sensors.js';
+import { levelFor, levelPercent, speedLevels, temperatureC } from '../src/appliances/profile.js';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 type Hap = typeof HapNodejs;
 let hap: Hap | null = null;
 let loadError = '';
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   hap = require('@homebridge/hap-nodejs') as Hap;
 } catch (err) {
   loadError = (err as Error).message.split('\n')[0];
 }
 
 const fixture = (name: string, file: 'profile' | 'status' | 'device'): unknown =>
-  JSON.parse(readFileSync(join(__dirname, 'fixtures', 'ha', name, `${file}.json`), 'utf8')) as unknown;
+  JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', 'ha', name, `${file}.json`), 'utf8')) as unknown;
 
 /** An enum field description as LG writes one. */
 const en = (values: string[], mode: string[] = ['r', 'w']) => ({ type: 'enum', mode, value: Object.fromEntries(mode.map((m) => [m, values])) });
@@ -957,7 +959,7 @@ function defineTests(hap: Hap): void {
     console.warn = catchWarning;
     console.log = catchWarning;
     try {
-      for (const name of readdirSync(join(__dirname, 'fixtures', 'ha')).filter((n) => existsSync(join(__dirname, 'fixtures', 'ha', n, 'device.json')))) {
+      for (const name of readdirSync(join(import.meta.dirname, 'fixtures', 'ha')).filter((n) => existsSync(join(import.meta.dirname, 'fixtures', 'ha', n, 'device.json')))) {
         const info = fixture(name, 'device') as { deviceInfo?: { deviceType: string }; deviceType?: string };
         const type = info.deviceInfo?.deviceType || info.deviceType || '';
         const profile = fixture(name, 'profile');

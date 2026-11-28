@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { alertFor, alertKind, isLaundry, laundryStatus, laundryUnits, mergeState, operationPayload, stateLabel } from '../src/laundry';
-import { realDevices } from './fake-lg';
+import { alertFor, alertKind, isLaundry, laundryStatus, laundryUnits, mergeState, operationPayload, stateLabel } from '../src/laundry.js';
+import { realDevices } from './fake-lg.js';
 
 const [washer, dryer] = realDevices();
 
