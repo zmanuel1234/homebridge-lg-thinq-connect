@@ -5,22 +5,24 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import type { API, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
 import type * as HapNodejs from '@homebridge/hap-nodejs';
-import { LGThinQPlatform, readSettings, untilNextEnergyCheck } from '../src/platform';
-import { ThinQClient } from '../src/api';
-import { totalConsumption } from '../src/energy';
-import { FakeLG } from './fake-lg';
-import { FakeBroker } from './fake-broker';
+import { LGThinQPlatform, readSettings, untilNextEnergyCheck } from '../src/platform.js';
+import { ThinQClient } from '../src/api.js';
+import { totalConsumption } from '../src/energy.js';
+import { FakeLG } from './fake-lg.js';
+import { FakeBroker } from './fake-broker.js';
 import { connect } from 'node:net';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 type Hap = typeof HapNodejs;
 let hap: Hap | null = null;
 let loadError = '';
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   hap = require('@homebridge/hap-nodejs') as Hap;
 } catch (err) {
   loadError = (err as Error).message.split('\n')[0];
@@ -489,7 +491,7 @@ function defineTests(hap: Hap): void {
 
   test('a checked type (a real air conditioner\'s data) is added without "Experimental appliances", and controlled from the Home app', async (t) => {
     const hb = await homebridge(t);
-    const dir = join(__dirname, 'fixtures', 'ha', 'air_conditioner');
+    const dir = join(import.meta.dirname, 'fixtures', 'ha', 'air_conditioner');
     const read = (f: string): unknown => JSON.parse(readFileSync(join(dir, f), 'utf8')) as unknown;
     const info = (read('device.json') as { deviceInfo: Record<string, unknown> }).deviceInfo;
     hb.lg.devices.push({ deviceId: 'ac-1', deviceInfo: info, profile: read('profile.json'), state: read('status.json') });

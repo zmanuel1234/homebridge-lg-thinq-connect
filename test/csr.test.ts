@@ -5,7 +5,7 @@ import { createPublicKey } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { newIdentity } from '../src/csr';
+import { newIdentity } from '../src/csr.js';
 
 let openssl = '';
 try { openssl = execFileSync('openssl', ['version']).toString().trim(); } catch { /* not installed */ }

@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { ThinQClient, ThinQError } from '../src/api';
-import { checkToken, diagnostics, supportOf, typeName } from '../src/homebridge-ui/check';
-import { FakeLG } from './fake-lg';
-import schema from '../config.schema.json';
+import { ThinQClient, ThinQError } from '../src/api.js';
+import { checkToken, diagnostics, supportOf, typeName } from '../src/homebridge-ui/check.js';
+import { FakeLG } from './fake-lg.js';
+import schema from '../config.schema.json' with { type: 'json' };
 
 async function fakeLG(t: { after: (fn: () => Promise<void>) => void }): Promise<FakeLG> {
   const lg = await new FakeLG().start();

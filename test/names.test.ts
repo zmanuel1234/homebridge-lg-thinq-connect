@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { displayName, keepOrUpdate, titleCase } from '../src/names';
+import { displayName, keepOrUpdate, titleCase } from '../src/names.js';
 
 test('names: what the tile is, in title case, after the appliance\'s own name', () => {
   assert.equal(titleCase('rinse aid low'), 'Rinse Aid Low');

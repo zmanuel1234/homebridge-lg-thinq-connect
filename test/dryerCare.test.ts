@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { type DryerCareContext, MIN_DRY_MINUTES, noteEstimate, recordDry, recordOverrun, usualDryMinutes } from '../src/dryerCare';
+import { type DryerCareContext, MIN_DRY_MINUTES, noteEstimate, recordDry, recordOverrun, usualDryMinutes } from '../src/dryerCare.js';
 
 const dries = (ctx: DryerCareContext, minutes: number[], percent = 30) => minutes.map((m) => recordDry(ctx, m, percent));
 

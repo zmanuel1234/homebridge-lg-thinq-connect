@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { API_KEY, ThinQClient, ThinQError, clientIdFor, regionFor } from '../src/api';
-import { FakeLG } from './fake-lg';
+import { API_KEY, ThinQClient, ThinQError, clientIdFor, regionFor } from '../src/api.js';
+import { FakeLG } from './fake-lg.js';
 
 test('regions: each country goes to its LG server', () => {
   assert.equal(regionFor('US'), 'aic');

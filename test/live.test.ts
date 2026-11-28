@@ -7,10 +7,10 @@ import { mkdtempSync, readFileSync, statSync, existsSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Logging } from 'homebridge';
-import { ThinQClient, clientIdFor } from '../src/api';
-import { LiveUpdates, type LiveMessage, type LiveOptions } from '../src/live';
-import { FakeLG } from './fake-lg';
-import { FakeBroker } from './fake-broker';
+import { ThinQClient, clientIdFor } from '../src/api.js';
+import { LiveUpdates, type LiveMessage, type LiveOptions } from '../src/live.js';
+import { FakeLG } from './fake-lg.js';
+import { FakeBroker } from './fake-broker.js';
 
 const fastIdentity = () => ({ privateKeyPem: 'KEY', csrPem: '-----BEGIN CERTIFICATE REQUEST-----\nx\n-----END CERTIFICATE REQUEST-----\n' });
 const until = async (check: () => boolean, ms = 3000): Promise<void> => {
