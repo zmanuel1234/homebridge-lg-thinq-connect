@@ -6,11 +6,11 @@
 // one entry per door (MAIN) or compartment (FRIDGE, FREEZER, CONVERTIBLE).
 
 import type { Service } from 'homebridge';
-import { field } from '../api';
-import { Appliance, type ApplianceContext, set, limit } from './base';
-import { type Range, asObj, fToC, locations, num, rangeOf, resources, writable } from './profile';
-import { stateLabel } from '../laundry';
-import { onOffValues } from './air';
+import { field } from '../api.js';
+import { Appliance, type ApplianceContext, set, limit } from './base.js';
+import { type Range, asObj, fToC, locations, num, rangeOf, resources, writable } from './profile.js';
+import { stateLabel } from '../laundry.js';
+import { onOffValues } from './air.js';
 
 /** On/off settings: a switch when LG lets them be changed, else a status sensor (on while set). */
 const SWITCHES: { resource: string; name: string; label: string }[] = [

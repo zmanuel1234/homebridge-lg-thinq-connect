@@ -1,10 +1,10 @@
 // Robot vacuums, and a basic fallback for appliance types without a mapping of their own.
 
 import type { Service } from 'homebridge';
-import { field } from '../api';
-import { stateLabel } from '../laundry';
-import { Appliance, type ApplianceContext, set } from './base';
-import { type Obj, asObj, enumValues, fieldOf, locations, num, powerField, resources, stateValue, temperatureC } from './profile';
+import { field } from '../api.js';
+import { stateLabel } from '../laundry.js';
+import { Appliance, type ApplianceContext, set } from './base.js';
+import { type Obj, asObj, enumValues, fieldOf, locations, num, powerField, resources, stateValue, temperatureC } from './profile.js';
 
 // Robot vacuum states, as Home Assistant groups them (its vacuum.py), in LG's upper case.
 const CLEANING = new Set(['WORKING', 'STATION', 'STATION_DRY', 'CLEAN_LEARNING', 'DETECTING', 'CLEANING']);

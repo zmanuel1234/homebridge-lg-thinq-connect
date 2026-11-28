@@ -1,16 +1,16 @@
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service } from 'homebridge';
-import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { type Device, ThinQClient, ThinQError, clientIdFor } from './api';
-import { alertFor, alertKind, isCycleAppliance, isLaundry, laundryStatus, laundryUnits, mergeState, stateLabel } from './laundry';
-import { keepOrUpdate } from './names';
-import { migrateConfig } from './configShape';
-import { consumptionService, ENERGY_SUBTYPE, mainService, thisMonth, totalConsumption } from './energy';
-import { supportLevel } from './support';
-import { type ApplianceContext, type ApplianceOptions, type Part, categoryOf, mappingFor } from './appliances';
-import { type LaundryContext, LaundryAccessory } from './accessory';
-import { type LiveClient, type LiveMessage, type LiveOptions, LiveUpdates } from './live';
+import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
+import { type Device, ThinQClient, ThinQError, clientIdFor } from './api.js';
+import { alertFor, alertKind, isCycleAppliance, isLaundry, laundryStatus, laundryUnits, mergeState, stateLabel } from './laundry.js';
+import { keepOrUpdate } from './names.js';
+import { migrateConfig } from './configShape.js';
+import { consumptionService, ENERGY_SUBTYPE, mainService, thisMonth, totalConsumption } from './energy.js';
+import { supportLevel } from './support.js';
+import { type ApplianceContext, type ApplianceOptions, type Part, categoryOf, mappingFor } from './appliances/index.js';
+import { type LaundryContext, LaundryAccessory } from './accessory.js';
+import { type LiveClient, type LiveMessage, type LiveOptions, LiveUpdates } from './live.js';
 
 /** What the platform needs from LG; ThinQClient in Homebridge, a stand-in in tests. */
 export interface Client {

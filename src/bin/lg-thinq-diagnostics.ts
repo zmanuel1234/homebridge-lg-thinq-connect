@@ -9,11 +9,13 @@
 // JSON when redirected. The token is read from the LG_THINQ_TOKEN environment variable, or asked
 // for without showing it.
 
-import { writeFileSync } from 'node:fs';
+import { realpathSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { Writable } from 'node:stream';
-import { ThinQClient, asText, field } from '../api';
+import { ThinQClient, asText, field } from '../api.js';
+import { fileURLToPath } from 'node:url';
 
 /** Keys whose values identify the appliance or the home network, whatever their spelling or type. */
 const PRIVATE_KEY = /serial|^mac(addr(ess)?)?$|ssid|wifi|deviceid|groupid/i;
@@ -104,8 +106,7 @@ async function main(): Promise<void> {
   const out = outArg ? resolve(outArg) : '';
   const token = process.env.LG_THINQ_TOKEN?.trim() || await askHidden('LG personal access token (not shown): ');
   const client = new ThinQClient({ token, country });
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pkg = require('../../package.json') as { name: string; version: string };
+  const pkg = createRequire(import.meta.url)('../../package.json') as { name: string; version: string };
   const report = await collect(client, country.toUpperCase(), `${pkg.name} ${pkg.version}`);
   const json = `${JSON.stringify(report, null, 2)}\n`;
   if (out) { writeFileSync(out, json); } else { process.stdout.write(json); }
@@ -118,7 +119,7 @@ async function main(): Promise<void> {
     : `${report.appliances.length} appliance(s) above. Look it over, then paste it into your issue.`);
 }
 
-if (require.main === module) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   main().catch((err: unknown) => {
     console.error(`lg-thinq-diagnostics: ${(err as Error).message}`);
     process.exitCode = 1;

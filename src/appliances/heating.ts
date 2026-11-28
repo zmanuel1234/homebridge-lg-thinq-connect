@@ -3,9 +3,9 @@
 // water. Property names are LG's toolkit's; temperatures come per unit (…InUnits, °C preferred).
 
 import type { Service } from 'homebridge';
-import { field } from '../api';
-import { Appliance, type ApplianceContext, set, limit } from './base';
-import { type Obj, type Range, asObj, enumValues, fieldOf, num, powerField, resources, stateValue, temperatureC, temperatureRangeC } from './profile';
+import { field } from '../api.js';
+import { Appliance, type ApplianceContext, set, limit } from './base.js';
+import { type Obj, type Range, asObj, enumValues, fieldOf, num, powerField, resources, stateValue, temperatureC, temperatureRangeC } from './profile.js';
 
 /** A °C range from an …InUnits resource's min/max values in the state (hot water), if given. */
 function rangeFromState(state: unknown, resource: string): Range | undefined {

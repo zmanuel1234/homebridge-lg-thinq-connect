@@ -10,7 +10,7 @@
 // Other appliances that run cycles the same way (dishwashers, Stylers, ovens: runState, timer,
 // an operation with START and STOP) use the same code, as experimental types.
 
-import { field } from './api';
+import { field } from './api.js';
 
 export type LaundryKind = 'washer' | 'dryer' | 'dishwasher' | 'styler' | 'oven';
 

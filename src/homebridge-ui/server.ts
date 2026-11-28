@@ -1,6 +1,6 @@
 import { HomebridgePluginUiServer } from '@homebridge/plugin-ui-utils';
-import { checkToken, diagnostics } from './check';
-import { isOldShape, migrateConfig } from '../configShape';
+import { checkToken, diagnostics } from './check.js';
+import { isOldShape, migrateConfig } from '../configShape.js';
 
 /** The plugin's settings page backend: checks a token and collects diagnostics, without saving anything. */
 class SettingsServer extends HomebridgePluginUiServer {

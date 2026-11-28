@@ -24,12 +24,12 @@
 // Starting, pausing and resuming from the valve is off unless the "allow control" setting is on,
 // and LG only accepts it after Remote Start is pressed on the machine.
 
-import { ThinQError } from './api';
-import { displayName, keepOrUpdate, namedBefore } from './names';
+import { ThinQError } from './api.js';
+import { displayName, keepOrUpdate, namedBefore } from './names.js';
 import type { API, Characteristic, CharacteristicValue, Logging, PlatformAccessory, Service } from 'homebridge';
-import { type LaundryStatus, type LaundryUnit, operationPayload, ovenStartPayload, stateLabel } from './laundry';
-import { limit, showProblem } from './appliances/base';
-import { COUNTED_DRY_MS, type DryerCareContext, noteEstimate, recordDry, recordOverrun, usualDryMinutes } from './dryerCare';
+import { type LaundryStatus, type LaundryUnit, operationPayload, ovenStartPayload, stateLabel } from './laundry.js';
+import { limit, showProblem } from './appliances/base.js';
+import { COUNTED_DRY_MS, type DryerCareContext, noteEstimate, recordDry, recordOverrun, usualDryMinutes } from './dryerCare.js';
 
 /**
  * Sensors whose default names changed in 1.0.20, by subtype: their earlier default (before the

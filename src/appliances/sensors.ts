@@ -2,9 +2,9 @@
 // an air quality sensor, and filter life. Used by air purifiers and air conditioners.
 
 import type { Service } from 'homebridge';
-import { field } from '../api';
-import { type Appliance, set } from './base';
-import { type Obj, num } from './profile';
+import { field } from '../api.js';
+import { type Appliance, set } from './base.js';
+import { type Obj, num } from './profile.js';
 
 /** The appliance's alert codes (profile.notification.push). */
 export function alertCodes(profile: unknown): string[] {

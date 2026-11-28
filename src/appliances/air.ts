@@ -3,15 +3,15 @@
 // Home Assistant's integration; dehumidifier, air purifier and hood sample data is Home Assistant's.
 
 import type { CharacteristicValue, Service } from 'homebridge';
-import { alertKind } from '../laundry';
-import { AirSensors, alertCodes } from './sensors';
-import { cyclePhase } from '../laundry';
-import { field } from '../api';
-import { Appliance, type ApplianceContext, set, limit } from './base';
+import { alertKind } from '../laundry.js';
+import { AirSensors, alertCodes } from './sensors.js';
+import { cyclePhase } from '../laundry.js';
+import { field } from '../api.js';
+import { Appliance, type ApplianceContext, set, limit } from './base.js';
 import {
   type Obj, type Range, enumValues, fieldOf, levelFor, levelPercent, num, powerField, rangeOf, resources, speedLevels,
   stateValue, temperatureC, writable,
-} from './profile';
+} from './profile.js';
 
 /** On/off and a fan speed from named levels (LOW, MID, HIGH), shared by the fan-like appliances. */
 /** On and off values of a switch-like property: a boolean, or an enum such as ON/OFF or WARM_ON/WARM_OFF. */

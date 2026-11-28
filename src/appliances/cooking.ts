@@ -4,8 +4,8 @@
 // the Home app isn't offered: that should happen at the cooktop.
 
 import type { Service } from 'homebridge';
-import { Appliance, type ApplianceContext, set } from './base';
-import { field } from '../api';
+import { Appliance, type ApplianceContext, set } from './base.js';
+import { field } from '../api.js';
 
 type Obj = Record<string, unknown>;
 

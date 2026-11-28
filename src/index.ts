@@ -1,7 +1,7 @@
 import type { API } from 'homebridge';
-import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { LGThinQPlatform } from './platform';
+import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
+import { LGThinQPlatform } from './platform.js';
 
-export = (api: API): void => {
+export default (api: API): void => {
   api.registerPlatform(PLUGIN_NAME, PLATFORM_NAME, LGThinQPlatform);
 };
