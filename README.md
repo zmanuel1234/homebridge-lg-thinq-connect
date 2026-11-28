@@ -125,7 +125,7 @@ for pause, resume and the notifications.
 
 - An LG account with your appliances in the **LG ThinQ** app.
 - A **personal access token** for that account (below).
-- Homebridge 1.6 or later (including 2.x), Node.js 22 (22.19 or later), 24 or 26.
+- Homebridge 2 (2.0.0 or later), Node.js 22 (22.19 or later), 24 or 26.
 - Internet access: the appliances report to LG's cloud, and the plugin asks LG.
 
 ## Setup
@@ -458,9 +458,8 @@ major version (now 3.x):
 The plugin's tests hold every appliance's tiles and settings to a recorded list
 (`test/surface.snapshot.json`), so a change can't slip through by accident.
 
-**Homebridge and Node.js.** Works with Homebridge 1.6 or later and Homebridge 2.0, on Node.js 22,
-24 or 26. Every change is tested on Homebridge 2 and Node.js 22, 24 and 26; before each release
-the tests are also run on Homebridge 1.8 (`npm run test:homebridge1`).
+**Homebridge and Node.js.** Works with Homebridge 2 (2.0.0 or later), on Node.js 22, 24 or 26.
+Every change is tested on Homebridge 2 and Node.js 22, 24 and 26.
 
 ## Privacy
 
