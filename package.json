@@ -28,7 +28,7 @@
     "lg-thinq-diagnostics": "dist/bin/lg-thinq-diagnostics.js"
   },
   "files": [
-    "dist/",
+    "dist",
     "config.schema.json",
     "README.md",
     "CHANGELOG.md",
@@ -68,6 +68,9 @@
     "node": "^22.19.0 || ^24.0.0 || ^26.0.0",
     "homebridge": "^2.0.0"
   },
+  "dependencies": {
+    "@homebridge/plugin-ui-utils": "^2.3.0"
+  },
   "devDependencies": {
     "@types/node": "^22.20.5",
     "ajv": "8.20.0",
@@ -76,8 +79,5 @@
     "oxlint-tsgolint": "7.0.2008",
     "tsx": "^4.23.15",
     "typescript": "7.0.2"
-  },
-  "dependencies": {
-    "@homebridge/plugin-ui-utils": "^2.3.0"
   }
 }

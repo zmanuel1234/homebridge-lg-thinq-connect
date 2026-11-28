@@ -28,7 +28,7 @@ test('package: the diagnostics command is built and runnable', { skip }, () => {
 });
 
 test('package: published files include the build; only the settings page helper to install', () => {
-  assert.ok(pkg.files.includes('dist/'));
+  assert.ok(pkg.files.includes('dist'));
   assert.ok(pkg.files.includes('config.schema.json'));
   assert.match(pkg.main, /^dist\//);
   assert.ok(pkg.scripts.prepare.includes('build'), 'npm must build before packing and on git installs');
